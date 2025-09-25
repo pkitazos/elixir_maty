@@ -1,5 +1,5 @@
 defmodule TwoBuyer.Main do
-  alias TwoBuyer.Participants.{Seller,Buyer1,Buyer2}
+  alias TwoBuyer.Participants.{Seller, Buyer1, Buyer2}
 
   def start do
     {:ok, ap} = Maty.AccessPoint.start_link([:seller, :buyer1, :buyer2])

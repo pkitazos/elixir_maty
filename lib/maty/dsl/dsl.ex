@@ -51,7 +51,7 @@ defmodule Maty.DSL do
         apply(module, handler_name, [init_args, state, session_ctx])
       end
 
-      updated_state = put_in(state, [:callbacks, init_token], callback)
+      updated_state = put_in(state, [:callbacks, init_token], {role, callback})
       {:ok, updated_state}
     else
       :error -> {:error, :invalid_registration_info}

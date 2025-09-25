@@ -32,9 +32,7 @@ defmodule TwoBuyer.Participants.Seller do
 
   handler :title_handler, :buyer1, {:title, title :: binary()}, state do
     amount = lookup_price(title)
-    # amount = "€150"
     MatyDSL.send(:buyer1, {:quote, amount})
-    # MatyDSL.done(state)
     MatyDSL.suspend(:decision_handler, state)
   end
 

@@ -84,7 +84,7 @@ defmodule Maty.Actor do
 
         # todo: decide if this is global or local state
         {:suspend, handler_info, intermediate_state} =
-          init_handler.({partial_session, role}, initial_actor_state)
+          init_handler.(module, {partial_session, role}, initial_actor_state)
 
         updated_actor_state =
           put_in(intermediate_state, [:sessions, session_id, :handlers, role], handler_info)

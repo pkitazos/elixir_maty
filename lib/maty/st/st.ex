@@ -1,4 +1,6 @@
 defmodule Maty.ST do
+  alias Maty.ST
+
   @moduledoc """
   Defines the core data structures for Session Types.
 
