@@ -1139,7 +1139,7 @@ defmodule Maty.Typechecker.TC do
           handler_ast_clause :: Macro.t(),
           st_pre :: ST.t(),
           type_signature :: tuple()
-        ) :: {:ok, {atom(), atom()}} | {:error, binary()}
+        ) :: {:ok, ST.SBranch.t()} | {:error, binary()}
   def check_wf_message_handler_clause(
         module,
         handler_label,
