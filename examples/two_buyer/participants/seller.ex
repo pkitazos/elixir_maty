@@ -7,9 +7,7 @@ defmodule TwoBuyer.Participants.Seller do
   @st {:title_handler, "&buyer1:{title(binary).+buyer1:{quote(number).decision_handler}}"}
   @st {:decision_handler, "&buyer2:{address(binary).+buyer2:{date(date).end},quit(nil).end}"}
 
-  @impl true
-  @spec on_link(pid(), maty_actor_state()) :: {:ok, maty_actor_state()}
-  def on_link(ap_pid, initial_state) do
+  on_link ap_pid :: pid(), initial_state do
     MatyDSL.register(
       ap_pid,
       @role,

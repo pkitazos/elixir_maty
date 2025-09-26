@@ -84,6 +84,18 @@ defmodule Maty.DSL.Handlers do
     end
   end
 
+  defmacro on_link(pattern, initial_state_var, do: body) do
+    {clean_pattern, type_spec} = process_init_pattern(pattern)
+
+    quote do
+      @impl true
+      @spec on_link(unquote(type_spec), maty_actor_state()) :: {:ok, maty_actor_state()}
+      def on_link(unquote(clean_pattern), unquote(initial_state_var)) do
+        unquote(body)
+      end
+    end
+  end
+
   defguardp is_supported_type(val)
             when is_atom(val) or
                    is_binary(val) or

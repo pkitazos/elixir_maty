@@ -4,7 +4,7 @@ defmodule Maty.DSL do
 
   defmacro __using__(_opts) do
     quote do
-      import Maty.DSL.Handlers, only: [handler: 5, init_handler: 4]
+      import Maty.DSL.Handlers, only: [handler: 5, init_handler: 4, on_link: 3]
       require Maty.DSL
       alias Maty.DSL, as: MatyDSL
       require Maty.DSL.State
