@@ -10,17 +10,13 @@ Visited so far:
 - [x] [hook](./lib/maty/hook.ex)
 - [x] [typechecker](./lib/maty/typechecker.ex)
 - [x] [typechecker/preprocessor](./lib/maty/typechecker/preprocessor.ex)
-
-Next up:
-
-- [ ] [types](./lib/maty/types.ex)
-- [ ] [utils](./lib/maty/utils.ex)
+- [x] [types](./lib/maty/types.ex)
+- [x] [utils](./lib/maty/utils.ex)
+- [x] [st/st](./lib/maty/st/st.ex)
+- [x] [typechecker/delta](./lib/maty/typechecker/delta.ex)
 
 All:
 
-- [ ] [st/st](./lib/maty/st/st.ex)
-
-- [ ] [typechecker/delta](./lib/maty/typechecker/delta.ex)
 - [ ] [typechecker/type_spec_parser](./lib/maty/typechecker/type_spec_parser.ex)
 - [ ] [typechecker/tc](./lib/maty/typechecker/tc.ex)
 - [ ] [typechecker/helpers](./lib/maty/typechecker/helpers.ex)

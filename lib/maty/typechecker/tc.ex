@@ -207,11 +207,9 @@ defmodule Maty.Typechecker.TC do
   def tc_expr(module, var_env, st_pre, {v1_ast, v2_ast}) do
     stack_trace(2)
 
-    with {:v1, {:ok, {v1_type, v1_st}, v1_env}} <-
-           {:v1, tc_expr(module, var_env, st_pre, v1_ast)},
-         {:v2, {:ok, {v2_type, v2_st}, v2_env}} <-
-           {:v2, tc_expr(module, v1_env, v1_st, v2_ast)} do
-      {:ok, {{:tuple, [v1_type, v2_type]}, v2_st}, v2_env}
+    with {:v1, {:ok, {v1_t, v1_st}, v1_env}} <- {:v1, tc_expr(module, var_env, st_pre, v1_ast)},
+         {:v2, {:ok, {v2_t, v2_st}, v2_env}} <- {:v2, tc_expr(module, v1_env, v1_st, v2_ast)} do
+      {:ok, {{:tuple, [v1_t, v2_t]}, v2_st}, v2_env}
     else
       {:v1, {:error, error, err_env}} -> {:error, error, err_env}
       {:v2, {:error, error, err_env}} -> {:error, error, err_env}

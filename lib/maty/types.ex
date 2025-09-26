@@ -7,6 +7,12 @@ defmodule Maty.Types do
   @type init_token :: reference()
   @type role :: atom()
 
+  # a session consists of:
+  # - an ID
+  # - a map of session roles to pairs of (handlers x role you are being called as? not sure what this role is)
+  # - the address book
+  # - some session-local state
+
   @type session :: %{
           id: session_id(),
           handlers: %{role() => {function(), role()}},
@@ -14,18 +20,28 @@ defmodule Maty.Types do
           local_state: map()
         }
 
+  # this is a custom wrapper type
+  # a particular handler always needs some session context
+  # that is, the actual session, and the role of the actor for the given handler
   @type session_ctx :: {session(), role()}
 
+  # a Maty actor stores:
+  # - a map of sessions it is participating in
+  # - a map of initialisation token to pairs of (role x callback) to invoke when the session starts
+  # - some global state (maybe not actually)
   @type maty_actor_state :: %{
           sessions: %{session_id() => session()},
           callbacks: %{init_token() => {role(), function()}},
           global_state: map()
         }
 
+  # an access point stores a map of candidate participants
+  # it maps roles to queues storing pairs of (PID x initialisation token)
   @type access_point_state :: %{
           participants: %{role() => :queue.queue({pid(), init_token()})}
         }
 
+  # these are the names of our types
   @maty_types [
     :session_id,
     :init_token,
@@ -41,6 +57,7 @@ defmodule Maty.Types do
     @maty_types
   end
 
+  # this maps our type names to their actual structural type
   def map do
     session_id = :ref
     init_token = :ref
@@ -134,6 +151,8 @@ defmodule Maty.Types do
          }}
 
     # ------------------------------------------------------------------
+
+    # these are boolean functions which check if a given type is the same as some other type
 
     def is?(:ref, :session_id), do: true
     def is?(:ref, :init_token), do: true

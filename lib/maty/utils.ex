@@ -1,21 +1,14 @@
 defmodule Maty.Utils do
-  def deep_contains?(data, key) when is_list(data) do
-    Enum.any?(data, fn item -> deep_contains?(item, key) end)
-  end
-
-  def deep_contains?(data, key) when is_tuple(data) do
-    data
-    |> Tuple.to_list()
-    |> deep_contains?(key)
-  end
-
-  def deep_contains?(data, key) do
-    data == key
-  end
-
+  # move
+  # these are display functions for printing function ids
+  # this should probably move, change and be renamed,
+  # but it's good that it exists somewhere
   def to_func({name, arity}), do: "#{name}/#{arity}"
   def to_func(name: name, arity: arity), do: "#{name}/#{arity}"
 
+  # this whole module needs some tlc
+  # it's meant to make environment management simpler,
+  # but right now it's just complicating things
   defmodule Env do
     def setup(module, attribute) do
       Module.register_attribute(module, attribute, accumulate: true, persist: true)
@@ -65,6 +58,7 @@ defmodule Maty.Utils do
     end
   end
 
+  # this is explicitly for debugging purposes, and should absolutely be removed from any final product
   def stack_trace(_num), do: :ok
   # def stack_trace(num), do: Logger.debug("[#{num}]", ansi_color: :light_green)
 end
