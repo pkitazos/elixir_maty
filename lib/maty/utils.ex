@@ -15,11 +15,41 @@ defmodule Maty.Utils do
     end
 
     def get(module, attribute) do
-      Module.get_attribute(module, attribute)
+      try do
+        # Try compile-time access first
+        Module.get_attribute(module, attribute)
+      rescue
+        ArgumentError ->
+          # Module is already compiled, use runtime access
+          case module.__info__(:attributes) do
+            attributes when is_list(attributes) ->
+              Keyword.get(attributes, attribute)
+
+            _ ->
+              nil
+          end
+      end
     end
 
     def get_map(module, attribute) do
-      Module.get_attribute(module, attribute) |> Enum.into(%{})
+      try do
+        # Try compile-time access first
+        Module.get_attribute(module, attribute) |> Enum.into(%{})
+      rescue
+        ArgumentError ->
+          # Module is already compiled, use runtime access
+          case module.__info__(:attributes) do
+            attributes when is_list(attributes) ->
+              case Keyword.get(attributes, attribute) do
+                nil -> %{}
+                list when is_list(list) -> Enum.into(list, %{})
+                other -> %{default: other}
+              end
+
+            _ ->
+              %{}
+          end
+      end
     end
 
     def add_at_key(module, attribute, key, val) do

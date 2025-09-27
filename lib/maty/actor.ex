@@ -49,11 +49,19 @@ defmodule Maty.Actor do
 
         handler_label = session.handlers[to]
 
-        handler_info = Utils.Env.get_map(module, :delta_M) |> Map.fetch!(handler_label)
+        # ! environments don't exist at runtime, so we need some other mechanism
+        # ! via which we can invoke the correct handler
+        handlers_M = Utils.Env.get_map(module, :delta_M)
+        handlers_I = Utils.Env.get_map(module, :delta_I)
+        handlers = Map.merge(handlers_M, handlers_I)
+
+        handler_info = Map.fetch!(handlers, handler_label)
         {handler, expected_role} = handler_info.function
 
         # we currently only check the role, but should also check the session type associated with this handler
         # to see if there is a branch which expects a message with this label as one of the branches
+        # or not?
+        # this has something to do with the stash mechanism I think
         if from == expected_role do
           updated_actor_state =
             case apply(module, handler, [msg, from, actor_state, {session, to}]) do
@@ -82,9 +90,9 @@ defmodule Maty.Actor do
 
         {role, init_handler} = initial_actor_state.callbacks[init_token]
 
-        # todo: decide if this is global or local state
+        # todo: this should only be session-local state
         {:suspend, handler_info, intermediate_state} =
-          init_handler.(module, {partial_session, role}, initial_actor_state)
+          init_handler.(module, initial_actor_state, {partial_session, role})
 
         updated_actor_state =
           put_in(intermediate_state, [:sessions, session_id, :handlers, role], handler_info)

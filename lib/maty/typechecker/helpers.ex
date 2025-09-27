@@ -368,4 +368,11 @@ defmodule Maty.Typechecker.Helpers do
         {:error, msg}
     end
   end
+
+  def check_IO_args_type({:list, :binary}), do: :ok
+  def check_IO_args_type(:binary), do: :ok
+
+  def check_IO_args_type(_other) do
+    {:IO_args_error, "Something other than a string was passed to IO.puts"}
+  end
 end

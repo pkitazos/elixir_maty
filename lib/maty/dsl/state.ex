@@ -37,14 +37,14 @@ defmodule Maty.DSL.State do
     end
   end
 
-  @spec get(Types.maty_actor_state()) :: map()
+  @spec internal_get(Types.maty_actor_state(), Types.session_ctx()) :: map()
   def internal_get(state, {session, _}) do
     get_in(state, [:sessions, session.id, :local_state])
   end
 
   defmacro get(state) do
     quote do
-      Maty.DSL.State.get(unquote(state), var!(session_ctx))
+      Maty.DSL.State.internal_get(unquote(state), var!(session_ctx))
     end
   end
 end

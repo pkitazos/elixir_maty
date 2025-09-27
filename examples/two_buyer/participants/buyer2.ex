@@ -22,18 +22,28 @@ defmodule TwoBuyer.Participants.Buyer2 do
   end
 
   handler :share_handler, :buyer1, {:share, amount :: number()}, state do
+    IO.puts("&buyer1 : share(number)")
+
     if amount > 100 do
       MatyDSL.send(:seller, {:quit, nil})
+
+      IO.puts("+seller : quit()")
+
       MatyDSL.done(state)
     else
       address = get_address()
 
       MatyDSL.send(:seller, {:address, address})
+
+      IO.puts("+seller : address(binary)")
+
       MatyDSL.suspend(:date_handler, state)
     end
   end
 
   handler :date_handler, :seller, {:date, _date :: Date.t()}, state do
+    IO.puts("&seller : date(date)")
+
     MatyDSL.done(state)
   end
 

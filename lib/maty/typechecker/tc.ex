@@ -766,6 +766,24 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
+  # --- IO ---
+
+  def tc_expr(
+        module,
+        var_env,
+        st_pre,
+        {{:., _meta1, [IO, :puts]}, _meta2, args}
+      ) do
+    with {:ok, {args_type, ^st_pre}, var_env} <- tc_expr(module, var_env, st_pre, args),
+         :ok <- Helpers.check_IO_args_type(args_type) do
+      {:ok, {:no_return, st_pre}, var_env}
+    else
+      {:IO_args_error, error} ->
+        # pin - convert to new kind of error
+        {:error, error}
+    end
+  end
+
   # --- Maty Suspend Operation (T-Suspend) ---
   # Matches throw({:suspend, handler, state}) from Maty.DSL.suspend/2
   def tc_expr(

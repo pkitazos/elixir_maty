@@ -40,6 +40,8 @@ defmodule Maty.DSL do
           state :: Types.maty_actor_state()
         ) :: {:ok, Types.maty_actor_state()} | {:error, atom()}
   def register(ap_pid, role, reg_info, state) do
+    ap_pid = sanitise_ap_pid(ap_pid)
+
     with {:ok, handler_name} when is_atom(handler_name) <- Keyword.fetch(reg_info, :callback),
          {:ok, init_args} <- Keyword.fetch(reg_info, :args) do
       # identified the suspended callback
@@ -81,4 +83,8 @@ defmodule Maty.DSL do
       throw({:done, unquote(state)})
     end
   end
+
+  # ! I still don't know why this happens
+  defp sanitise_ap_pid([pid | _]), do: pid
+  defp sanitise_ap_pid(pid), do: pid
 end
