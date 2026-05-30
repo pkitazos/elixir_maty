@@ -3,7 +3,7 @@ defmodule Maty.Typechecker.TC do
 
   alias Maty.{ST, Utils}
   alias Maty.Types.T, as: Type
-  alias Maty.Typechecker.{Error, Helpers}
+  alias Maty.Typechecker.{Error, Helpers, TC}
 
   import Maty.Typechecker.PatternBinding, only: [tc_pattern: 4]
   import Maty.Utils, only: [stack_trace: 1]
@@ -767,22 +767,14 @@ defmodule Maty.Typechecker.TC do
   end
 
   # --- IO ---
-
-  def tc_expr(
-        module,
-        var_env,
-        st_pre,
-        {{:., _meta1, [IO, :puts]}, _meta2, args}
-      ) do
-    with {:ok, {args_type, ^st_pre}, var_env} <- tc_expr(module, var_env, st_pre, args),
-         :ok <- Helpers.check_IO_args_type(args_type) do
-      {:ok, {:no_return, st_pre}, var_env}
-    else
-      {:IO_args_error, error} ->
-        # pin - convert to new kind of error
-        {:error, error}
-    end
+  def tc_expr(module, var_env, st_pre, {{:., _, [IO, _]}, _, _} = ast) do
+    TC.IO.tc_expr(module, var_env, st_pre, ast)
   end
+
+  # # --- Map ---
+  # def tc_expr(module, var_env, st_pre, {{:., _, [Map, _]}, _, _} = ast) do
+  #   TC.Map.tc_expr(module, var_env, st_pre, ast)
+  # end
 
   # --- Maty Suspend Operation (T-Suspend) ---
   # Matches throw({:suspend, handler, state}) from Maty.DSL.suspend/2

@@ -25,10 +25,11 @@ priv/plts/*.plt
 priv/plts/*.plt.hash
 out/
 
-.vscode
-.zed
+.vscode/
+.zed/
 *.t.*
 .DS_Store
-docs/notes
+docs/notes/
 docs/squiggles/**/*.pdf
-.obsidian
+.obsidian/
+_tmp/

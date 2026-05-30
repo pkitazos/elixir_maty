@@ -1,7 +1,6 @@
 defmodule Maty.Actor do
   alias Maty.{Types, Utils}
 
-  # potentially make this a macro as well, can call it something like on_link or on_spawn or on_start
   @callback on_link(args :: any(), initial_state :: Types.maty_actor_state()) ::
               {:ok, Types.maty_actor_state()}
 
