@@ -23,19 +23,20 @@ defmodule TwoBuyer.Participants.Buyer2 do
 
   handler :share_handler, :buyer1, {:share, amount :: number()}, state do
     IO.puts("&buyer1 : share(number)")
+    :timer.sleep(500)
 
     if amount > 100 do
       MatyDSL.send(:seller, {:quit, nil})
-
       IO.puts("+seller : quit()")
+      :timer.sleep(500)
 
       MatyDSL.done(state)
     else
       address = get_address()
 
       MatyDSL.send(:seller, {:address, address})
-
       IO.puts("+seller : address(binary)")
+      :timer.sleep(500)
 
       MatyDSL.suspend(:date_handler, state)
     end
@@ -43,6 +44,7 @@ defmodule TwoBuyer.Participants.Buyer2 do
 
   handler :date_handler, :seller, {:date, _date :: Date.t()}, state do
     IO.puts("&seller : date(date)")
+    :timer.sleep(500)
 
     MatyDSL.done(state)
   end

@@ -771,10 +771,10 @@ defmodule Maty.Typechecker.TC do
     TC.IO.tc_expr(module, var_env, st_pre, ast)
   end
 
-  # # --- Map ---
-  # def tc_expr(module, var_env, st_pre, {{:., _, [Map, _]}, _, _} = ast) do
-  #   TC.Map.tc_expr(module, var_env, st_pre, ast)
-  # end
+  # --- :timer ---
+  def tc_expr(module, var_env, st_pre, {{:., _, [:timer, _]}, _, _} = ast) do
+    TC.Timer.tc_expr(module, var_env, st_pre, ast)
+  end
 
   # --- Maty Suspend Operation (T-Suspend) ---
   # Matches throw({:suspend, handler, state}) from Maty.DSL.suspend/2

@@ -30,28 +30,31 @@ defmodule TwoBuyer.Participants.Seller do
 
   handler :title_handler, :buyer1, {:title, title :: binary()}, state do
     IO.puts("&buyer1 : title(binary)")
+    :timer.sleep(500)
 
     amount = lookup_price(title)
     MatyDSL.send(:buyer1, {:quote, amount})
-
     IO.puts("+buyer1 : quote(number)")
+    :timer.sleep(500)
 
     MatyDSL.suspend(:decision_handler, state)
   end
 
   handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
     IO.puts("&buyer2 : address(binary)")
+    :timer.sleep(500)
 
     date = shipping_date(addr)
     MatyDSL.send(:buyer2, {:date, date})
-
     IO.puts("+buyer2 : date(date)")
+    :timer.sleep(500)
 
     MatyDSL.done(state)
   end
 
   handler :decision_handler, :buyer2, {:quit, nil}, state do
     IO.puts("&buyer2 : quit()")
+    :timer.sleep(500)
 
     MatyDSL.done(state)
   end

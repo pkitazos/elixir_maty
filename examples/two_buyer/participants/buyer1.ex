@@ -17,20 +17,21 @@ defmodule TwoBuyer.Participants.Buyer1 do
 
   init_handler :install, title :: binary(), state do
     MatyDSL.send(:seller, {:title, title})
-
     IO.puts("+seller : title(binary)")
+    :timer.sleep(500)
 
     MatyDSL.suspend(:quote_handler, state)
   end
 
   handler :quote_handler, :seller, {:quote, amount :: number()}, state do
     IO.puts("&seller : quote(number)")
+    :timer.sleep(500)
 
     share_amount = amount / 2
 
     MatyDSL.send(:buyer2, {:share, share_amount})
-
     IO.puts("+buyer2 : share(number)")
+    :timer.sleep(500)
 
     MatyDSL.done(state)
   end
