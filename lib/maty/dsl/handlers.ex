@@ -46,6 +46,8 @@ defmodule Maty.DSL.Handlers do
               {:done, new_state} -> {:done, new_state}
             end
           end
+
+          def __handler_expects__(unquote(handler_name)), do: unquote(role)
         end
 
       _ ->

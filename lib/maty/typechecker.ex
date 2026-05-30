@@ -297,7 +297,10 @@ defmodule Maty.Typechecker do
   def fetch_module_definitions!(bytecode) do
     read_debug_info!(bytecode)
     |> Map.fetch!(:definitions)
-    |> Enum.reject(fn x -> Keyword.get(elem(x, 2), :context) == Maty.Actor end)
+    |> Enum.reject(fn {func_id, _, meta, _} ->
+      Keyword.get(meta, :context) == Maty.Actor or
+        match?({:__handler_expects__, _}, func_id)
+    end)
   end
 
   # Function to read debug information from bytecode.

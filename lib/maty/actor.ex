@@ -1,5 +1,5 @@
 defmodule Maty.Actor do
-  alias Maty.{Types, Utils}
+  alias Maty.Types
 
   @callback on_link(args :: any(), initial_state :: Types.maty_actor_state()) ::
               {:ok, Types.maty_actor_state()}
@@ -42,30 +42,15 @@ defmodule Maty.Actor do
       # what happens if I receive a message from another Maty actor before I properly setup up my session?
       # perhaps do a similar thing where I send the message to the back of the queue and process it later?
       {:maty_message, session_id, to, from, msg} ->
-        # to    -> my role
-        # from  -> recipient role
         session = actor_state.sessions[session_id]
+        {handler_label, expected_role} = session.handlers[to]
 
-        handler_label = session.handlers[to]
-
-        # ! environments don't exist at runtime, so we need some other mechanism
-        # ! via which we can invoke the correct handler
-        handlers_M = Utils.Env.get_map(module, :delta_M)
-        handlers_I = Utils.Env.get_map(module, :delta_I)
-        handlers = Map.merge(handlers_M, handlers_I)
-
-        handler_info = Map.fetch!(handlers, handler_label)
-        {handler, expected_role} = handler_info.function
-
-        # we currently only check the role, but should also check the session type associated with this handler
-        # to see if there is a branch which expects a message with this label as one of the branches
-        # or not?
-        # this has something to do with the stash mechanism I think
         if from == expected_role do
           updated_actor_state =
-            case apply(module, handler, [msg, from, actor_state, {session, to}]) do
+            case apply(module, handler_label, [from, msg, actor_state, {session, to}]) do
               {:suspend, next, intermediate_state} ->
-                put_in(intermediate_state, [:sessions, session.id, :handlers, to], next)
+                expected = module.__handler_expects__(next)
+                put_in(intermediate_state, [:sessions, session.id, :handlers, to], {next, expected})
 
               {:done, intermediate_state} ->
                 update_in(intermediate_state, [:sessions], &Map.delete(&1, session.id))
@@ -73,7 +58,7 @@ defmodule Maty.Actor do
 
           loop(module, updated_actor_state)
         else
-          send(self(), {:maty_message, session.id, to, msg})
+          send(self(), {:maty_message, session.id, to, from, msg})
           loop(module, actor_state)
         end
 
@@ -89,12 +74,13 @@ defmodule Maty.Actor do
 
         {role, init_handler} = initial_actor_state.callbacks[init_token]
 
-        # todo: this should only be session-local state
-        {:suspend, handler_info, intermediate_state} =
+        {:suspend, handler_name, intermediate_state} =
           init_handler.(module, initial_actor_state, {partial_session, role})
 
+        expected_role = module.__handler_expects__(handler_name)
+
         updated_actor_state =
-          put_in(intermediate_state, [:sessions, session_id, :handlers, role], handler_info)
+          put_in(intermediate_state, [:sessions, session_id, :handlers, role], {handler_name, expected_role})
 
         loop(module, updated_actor_state)
 
