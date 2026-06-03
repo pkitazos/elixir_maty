@@ -85,6 +85,7 @@ defmodule Maty.Typechecker.Helpers do
   def ast_to_literal(literal) when is_binary(literal), do: literal
   def ast_to_literal(literal) when is_boolean(literal), do: literal
   def ast_to_literal(nil), do: nil
+  def ast_to_literal(literal) when is_atom(literal), do: literal
 
   # If the AST node doesn't match a simple literal form
   def ast_to_literal(_other_ast), do: :error_complex_key
