@@ -3,7 +3,7 @@ defmodule Maty.Typechecker.TC do
 
   alias Maty.ST
   alias Maty.Types.T, as: Type
-  alias Maty.Typechecker.{Error, Helpers, TC, Ctx}
+  alias Maty.Typechecker.{Error, Helpers, TC, Ctx, Judgment}
 
   import Maty.Typechecker.PatternBinding, only: [tc_pattern: 4]
   import Maty.Utils, only: [deftc: 2]
@@ -13,11 +13,9 @@ defmodule Maty.Typechecker.TC do
   """
   @type ast :: Macro.t()
 
-  @typedoc """
-  Environment mapping variable names to their types.
-  Used to track types of variables during typechecking.
-  """
-  @type var_env() :: %{atom() => Type.t()}
+  @type var_env :: Judgment.var_env()
+  @type result :: Judgment.result()
+
   @doc """
   Typechecks an expression AST node within a given variable environment and
   session state pre-condition.
@@ -29,7 +27,7 @@ defmodule Maty.Typechecker.TC do
     - `{:error, error_message, var_env}` on failure
   """
   @spec tc_expr(ctx :: Ctx.t(), var_env :: var_env(), st_pre :: ST.t(), ast :: ast()) ::
-          {:ok, {Type.t(), ST.t()}, var_env()} | {:error, binary(), var_env()}
+          result()
 
   # --- Revised Value Typing Clauses ---
 
@@ -1358,7 +1356,7 @@ defmodule Maty.Typechecker.TC do
           st_pre :: ST.t(),
           ast_list :: [ast()]
         ) ::
-          {:ok, {Type.t(), ST.t()}, var_env()} | {:error, binary(), var_env()}
+          result()
   def tc_expr_list(_ctx, var_env, st_pre, []) do
     # Result of an empty block is nil, state preserved.
     {:ok, {nil, st_pre}, var_env}

@@ -1,7 +1,7 @@
 defmodule Maty.Typechecker.PatternBinding do
   require Logger
   alias Maty.Types.T, as: Type
-  alias Maty.Typechecker.{Ctx, Error, Helpers}
+  alias Maty.Typechecker.{Ctx, Error, Helpers, Judgment}
   import Maty.Utils, only: [deftc: 2]
 
   @typedoc """
@@ -9,11 +9,7 @@ defmodule Maty.Typechecker.PatternBinding do
   """
   @type ast :: Macro.t()
 
-  @typedoc """
-  Environment mapping variable names to their types.
-  Used to track types of variables during typechecking.
-  """
-  @type var_env() :: %{atom() => Type.t()}
+  @type var_env :: Judgment.var_env()
 
   # move
   @doc """
