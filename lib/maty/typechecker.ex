@@ -389,6 +389,4 @@ defmodule Maty.Typechecker do
     "[#{Utils.to_func(func_id)}] #{error_msg}"
   end
 
-  def stack_trace(num, extra \\ ""),
-    do: Logger.debug("[#{num}] #{extra}", ansi_color: :light_blue)
 end

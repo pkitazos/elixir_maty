@@ -1,4 +1,5 @@
 defmodule Maty.Utils do
+  require Logger
   # move
   # these are display functions for printing function ids
   # this should probably move, change and be renamed,
@@ -58,7 +59,35 @@ defmodule Maty.Utils do
     end
   end
 
-  # this is explicitly for debugging purposes, and should absolutely be removed from any final product
-  def stack_trace(_num), do: :ok
-  # def stack_trace(num), do: Logger.debug("[#{num}]", ansi_color: :light_green)
+  @debug_stack_trace Application.compile_env(:maty, :debug_stack_trace, false)
+
+  if @debug_stack_trace do
+    defmacro stack_trace do
+      quote do
+        {func_name, func_arity} = __ENV__.function
+
+        Logger.debug(
+          "[#{inspect(__MODULE__)}.#{func_name}/#{func_arity}:#{__ENV__.line}]",
+          ansi_color: :light_green
+        )
+      end
+    end
+  else
+    defmacro stack_trace do
+      :ok
+    end
+  end
+
+  # Wrapper around `def` that injects a `stack_trace()` call at the top of each clause.
+  # When MATY_DEBUG=1, logs the module, function, arity, and line number.
+  # When debug is off, `stack_trace()` compiles to `:ok` and is optimized away.
+  defmacro deftc(call, do: body) do
+    quote do
+      def unquote(call) do
+        # use fully qualified name, because when the macro is expanded `stack_trace` may not be in scope
+        Maty.Utils.stack_trace()
+        unquote(body)
+      end
+    end
+  end
 end

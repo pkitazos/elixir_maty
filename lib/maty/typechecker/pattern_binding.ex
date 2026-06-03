@@ -1,7 +1,8 @@
 defmodule Maty.Typechecker.PatternBinding do
+  require Logger
   alias Maty.Types.T, as: Type
   alias Maty.Typechecker.{Ctx, Error, Helpers}
-  import Maty.Utils, only: [stack_trace: 1]
+  import Maty.Utils, only: [deftc: 2]
 
   @typedoc """
   Represents Elixir AST nodes that can be typechecked.
@@ -32,53 +33,45 @@ defmodule Maty.Typechecker.PatternBinding do
           {:ok, map(), var_env()} | {:error, binary(), var_env()}
 
   # Pat-Var: Pattern is a variable 'x'
-  def tc_pattern(_ctx, {var_name, _meta, context}, expected_type, var_env)
-      when is_atom(var_name) and (is_atom(context) or is_nil(context)) do
-    stack_trace(300)
+  deftc tc_pattern(_ctx, {var_name, _meta, context}, expected_type, var_env)
+       when is_atom(var_name) and (is_atom(context) or is_nil(context)) do
     new_bindings = %{var_name => expected_type}
     updated_env = Map.merge(var_env, new_bindings)
     {:ok, new_bindings, updated_env}
   end
 
   # Pat-Wild: Pattern is '_'
-  def tc_pattern(_ctx, :_, _expected_type, var_env) do
-    stack_trace(301)
+  deftc tc_pattern(_ctx, :_, _expected_type, var_env) do
     {:ok, %{}, var_env}
   end
 
-  def tc_pattern(
-        _ctx,
-        {:when, _,
-         [
-           {:x, _, Kernel},
-           {{:., _, [:erlang, :orelse]}, _,
-            [
-              {{:., _, [:erlang, :"=:="]}, _, [{:x, _, Kernel}, false]},
-              {{:., _, [:erlang, :"=:="]}, _, [{:x, _, Kernel}, nil]}
-            ]}
-         ]},
-        _expected_type,
-        var_env
-      ) do
-    stack_trace(320)
-
+  deftc tc_pattern(
+         _ctx,
+         {:when, _,
+          [
+            {:x, _, Kernel},
+            {{:., _, [:erlang, :orelse]}, _,
+             [
+               {{:., _, [:erlang, :"=:="]}, _, [{:x, _, Kernel}, false]},
+               {{:., _, [:erlang, :"=:="]}, _, [{:x, _, Kernel}, nil]}
+             ]}
+          ]},
+         _expected_type,
+         var_env
+       ) do
     {:ok, %{}, var_env}
   end
 
-  def tc_pattern(_ctx, {:_, _meta, _context}, _expected_type, var_env) do
-    stack_trace(302)
-
+  deftc tc_pattern(_ctx, {:_, _meta, _context}, _expected_type, var_env) do
     {:ok, %{}, var_env}
   end
 
   # Pat-Value: Pattern is a literal value 'v'
-  def tc_pattern(ctx, literal_pattern, expected_type, var_env)
-      when is_number(literal_pattern) or
-             is_binary(literal_pattern) or
-             is_boolean(literal_pattern) or
-             is_atom(literal_pattern) do
-    stack_trace(303)
-
+  deftc tc_pattern(ctx, literal_pattern, expected_type, var_env)
+       when is_number(literal_pattern) or
+              is_binary(literal_pattern) or
+              is_boolean(literal_pattern) or
+              is_atom(literal_pattern) do
     case Helpers.get_literal_type(literal_pattern) do
       {:ok, literal_type} ->
         if literal_type == expected_type or literal_type == :atom do
@@ -106,9 +99,7 @@ defmodule Maty.Typechecker.PatternBinding do
   end
 
   # Pat-EmptyList: Pattern is '[]'
-  def tc_pattern(ctx, [], expected_type, var_env) do
-    stack_trace(304)
-
+  deftc tc_pattern(ctx, [], expected_type, var_env) do
     case expected_type do
       {:list, _} ->
         {:ok, %{}, var_env}
@@ -130,9 +121,7 @@ defmodule Maty.Typechecker.PatternBinding do
   end
 
   # Pat-EmptyTuple: Pattern is '{}'
-  def tc_pattern(ctx, {:{}, _, []}, expected_type, var_env) do
-    stack_trace(305)
-
+  deftc tc_pattern(ctx, {:{}, _, []}, expected_type, var_env) do
     case expected_type do
       {:tuple, []} ->
         {:ok, %{}, var_env}
@@ -153,9 +142,7 @@ defmodule Maty.Typechecker.PatternBinding do
   end
 
   # Pat-EmptyMap: Pattern is '%{}'
-  def tc_pattern(ctx, {:%{}, _, []}, expected_type, var_env) do
-    stack_trace(306)
-
+  deftc tc_pattern(ctx, {:%{}, _, []}, expected_type, var_env) do
     case expected_type do
       {:map, _} ->
         {:ok, %{}, var_env}
@@ -178,9 +165,7 @@ defmodule Maty.Typechecker.PatternBinding do
   # --- Recursive Pattern Clauses ---
 
   # Pat-Cons
-  def tc_pattern(ctx, {:|, meta, [p1_ast, p2_ast]}, expected_type, var_env) do
-    stack_trace(307)
-
+  deftc tc_pattern(ctx, {:|, meta, [p1_ast, p2_ast]}, expected_type, var_env) do
     case expected_type do
       {:list, element_type} ->
         with {:p1, {:ok, bindings1, env1}} <-
@@ -212,9 +197,7 @@ defmodule Maty.Typechecker.PatternBinding do
   end
 
   # Pat-Tuple
-  def tc_pattern(ctx, {p1_ast, p2_ast} = pattern_ast, expected_type, var_env) do
-    stack_trace(308)
-
+  deftc tc_pattern(ctx, {p1_ast, p2_ast} = pattern_ast, expected_type, var_env) do
     with {:type, {:tuple, [type_a, type_b]}} <- {:type, expected_type},
          {:p1, {:ok, bindings1, env1}} <- {:p1, tc_pattern(ctx, p1_ast, type_a, var_env)},
          {:p2, {:ok, bindings2, _env2}} <- {:p2, tc_pattern(ctx, p2_ast, type_b, env1)},
@@ -253,9 +236,7 @@ defmodule Maty.Typechecker.PatternBinding do
     end
   end
 
-  def tc_pattern(ctx, {:{}, meta, elements_asts}, expected_type, var_env) do
-    stack_trace(309)
-
+  deftc tc_pattern(ctx, {:{}, meta, elements_asts}, expected_type, var_env) do
     case expected_type do
       {:tuple, expected_types} when length(elements_asts) == length(expected_types) ->
         # process elements sequentially, checking disjointedness at each step
@@ -319,9 +300,7 @@ defmodule Maty.Typechecker.PatternBinding do
 
   # Pat-Map
   # Assuming keys k_i are literal atoms.
-  def tc_pattern(ctx, {:%{}, meta, pairs}, expected_type, var_env) do
-    stack_trace(310)
-
+  deftc tc_pattern(ctx, {:%{}, meta, pairs}, expected_type, var_env) do
     case expected_type do
       {:map, expected_type_map} ->
         initial_acc = {:ok, %{}, var_env}
