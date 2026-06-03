@@ -200,13 +200,13 @@ defmodule Maty.Typechecker.Helpers do
     end)
   end
 
-  def check_message_structure(_module, _meta, {label_atom, payload_expr_ast})
+  def check_message_structure(_ctx, _meta, {label_atom, payload_expr_ast})
       when is_atom(label_atom) do
     {:message_ok, label_atom, payload_expr_ast}
   end
 
-  def check_message_structure(module, meta, other_ast) do
-    error = Error.TypeMismatch.send_message_not_tuple(module, meta, got: other_ast)
+  def check_message_structure(ctx, meta, other_ast) do
+    error = Error.TypeMismatch.send_message_not_tuple(ctx.module, meta, got: other_ast)
     {:error, error}
   end
 
@@ -293,12 +293,12 @@ defmodule Maty.Typechecker.Helpers do
   def check_init_st(_st), do: :ok
 
   # move
-  def check_clause_arity(module, meta, func_id, arity, spec_args_types) do
+  def check_clause_arity(ctx, meta, func_id, arity, spec_args_types) do
     if arity == length(spec_args_types) do
       :arity_ok
     else
       error =
-        Error.FunctionCall.arity_mismatch(module, meta, func_id,
+        Error.FunctionCall.arity_mismatch(ctx.module, meta, func_id,
           expected: length(spec_args_types),
           got: arity
         )
@@ -308,20 +308,20 @@ defmodule Maty.Typechecker.Helpers do
   end
 
   # move
-  def check_final_session_state(_module, _meta, _func_id, %ST.SEnd{}), do: :state_ok
+  def check_final_session_state(_ctx, _meta, _func_id, %ST.SEnd{}), do: :state_ok
 
-  def check_final_session_state(module, meta, func_id, other_st) do
-    error = Error.FunctionCall.function_altered_session_state(module, meta, func_id, other_st)
+  def check_final_session_state(ctx, meta, func_id, other_st) do
+    error = Error.FunctionCall.function_altered_session_state(ctx.module, meta, func_id, other_st)
     {:error, error}
   end
 
   # move
-  def check_return_type(module, meta, actual_return_type, spec_return_type) do
+  def check_return_type(ctx, meta, actual_return_type, spec_return_type) do
     if actual_return_type == spec_return_type do
       :type_ok
     else
       error =
-        Error.TypeMismatch.return_type_mismatch(module, meta,
+        Error.TypeMismatch.return_type_mismatch(ctx.module, meta,
           expected: spec_return_type,
           got: actual_return_type
         )
@@ -331,7 +331,7 @@ defmodule Maty.Typechecker.Helpers do
   end
 
   # move
-  def check_argument_patterns(module, meta, arg_pattern_asts, spec_args_types) do
+  def check_argument_patterns(ctx, meta, arg_pattern_asts, spec_args_types) do
     initial_arg_env = %{}
 
     args_check_result =
@@ -339,10 +339,10 @@ defmodule Maty.Typechecker.Helpers do
       |> Enum.reduce_while(
         {:ok, %{}, initial_arg_env},
         fn {p_ast, expected_type}, {:ok, acc_bindings, current_env} ->
-          case PatternBinding.tc_pattern(module, p_ast, expected_type, current_env) do
+          case PatternBinding.tc_pattern(ctx, p_ast, expected_type, current_env) do
             {:ok, new_bindings, updated_env} ->
               case check_and_merge_bindings(
-                     module,
+                     ctx.module,
                      meta,
                      acc_bindings,
                      new_bindings,

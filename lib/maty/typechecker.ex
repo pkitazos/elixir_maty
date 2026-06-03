@@ -7,10 +7,7 @@ defmodule Maty.Typechecker do
   """
 
   alias Maty.Utils
-  alias Maty.Typechecker.Delta
-  alias Maty.Typechecker.TC
-  alias Maty.Typechecker.Error
-  alias Maty.Typechecker.Preprocessor
+  alias Maty.Typechecker.{Ctx, Delta, TC, Error, Preprocessor}
 
   require Logger
 
@@ -99,6 +96,15 @@ defmodule Maty.Typechecker do
     # Ψ is the function definition environment, maps function names to type signatures
     psi = Utils.Env.get_map(env.module, :psi)
 
+    # build the typing context struct for tc_expr and friends
+    ctx = %Ctx{
+      module: env.module,
+      meta: [line: 0],
+      delta_M: delta_m,
+      delta_I: delta_i,
+      psi: psi
+    }
+
     # convert the lists of pairs into sets of fst for fast lookup (can also be optimised)
     module_init_handlers = Delta.key_set(delta_I)
     module_handlers = Delta.key_set(delta_M)
@@ -127,7 +133,7 @@ defmodule Maty.Typechecker do
                   # because we may have multiple handler clauses, we need to iterate over
                   # all definitions and their associated type signatures and check if they are well-formed
                   TC.check_wf_message_handler_clause(
-                    env.module,
+                    ctx,
                     handler_name,
                     clause,
                     handler_M.st,
@@ -207,7 +213,7 @@ defmodule Maty.Typechecker do
               with {:clause, [clause]} <- {:clause, func_clauses},
                    {:signature, [type_signature]} <- {:signature, type_signatures} do
                 TC.check_wf_on_link_callback(
-                  env.module,
+                  ctx,
                   clause,
                   type_signature
                 )
@@ -248,7 +254,7 @@ defmodule Maty.Typechecker do
               res =
                 for {clause, type_signature} <- Enum.zip(func_clauses, type_signatures) do
                   TC.check_wf_init_handler_clause(
-                    env.module,
+                    ctx,
                     handler_name,
                     clause,
                     handler_I.st,
@@ -268,7 +274,7 @@ defmodule Maty.Typechecker do
             # otherwise, this is just a regular function which we still need to check is well-formed
             true ->
               res =
-                TC.check_wf_function(env.module, func_id, func_clauses)
+                TC.check_wf_function(ctx, func_id, func_clauses)
                 |> Enum.reject(&match?({:ok, _}, &1))
                 |> Enum.map(fn {:error, error_msg} -> {func_id, error_msg} end)
 
