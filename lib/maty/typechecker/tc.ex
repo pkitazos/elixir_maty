@@ -1,10 +1,12 @@
 defmodule Maty.Typechecker.TC do
   require Logger
 
+  import Maty.Typechecker.TC.Thread
   alias Maty.ST
   alias Maty.Types.T, as: Type
   alias Maty.Typechecker.{Error, Helpers, TC, Ctx, Judgment}
 
+  import Maty.Typechecker.TC.Bind
   import Maty.Typechecker.PatternBinding, only: [tc_pattern: 4]
   import Maty.Utils, only: [deftc: 2]
 
@@ -178,41 +180,19 @@ defmodule Maty.Typechecker.TC do
 
   # --- 2-Tuple Value Construction ---
   # Handles literal 2-tuples {v1, v2} explicitly, distinct from n-tuples {:{}, _, [...]} in the AST
-  deftc tc_expr(ctx, var_env, st_pre, {v1_ast, v2_ast}) do
-    with {:v1, {:ok, {v1_t, v1_st}, v1_env}} <- {:v1, tc_expr(ctx, var_env, st_pre, v1_ast)},
-         {:v2, {:ok, {v2_t, v2_st}, v2_env}} <- {:v2, tc_expr(ctx, v1_env, v1_st, v2_ast)} do
-      {:ok, {{:tuple, [v1_t, v2_t]}, v2_st}, v2_env}
-    else
-      {:v1, {:error, error, err_env}} -> {:error, error, err_env}
-      {:v2, {:error, error, err_env}} -> {:error, error, err_env}
+  deftc tc_expr(ctx, env, st, {v1_ast, v2_ast}) do
+    thread do
+      v1_t <~ tc_expr(ctx, env, st, v1_ast)
+      v2_t <~ tc_expr(ctx, env, st, v2_ast)
+      ok({:tuple, [v1_t, v2_t]}, env, st)
     end
   end
 
   # n-Tuple Construction {v1, v2, ...} (Val-Tuple adaptation)
   # Preserves session state.
   deftc tc_expr(ctx, var_env, st_pre, {:{}, _, items}) when is_list(items) do
-    # Process tuple elements sequentially, threading env and state
-    Enum.reduce_while(
-      items,
-      {:ok, {[], st_pre}, var_env},
-      fn item, {:ok, {acc_types, current_st}, current_env} ->
-        case tc_expr(ctx, current_env, current_st, item) do
-          {:ok, {item_type, next_st}, next_env} ->
-            {:cont, {:ok, {[item_type | acc_types], next_st}, next_env}}
-
-          {:error, error, err_env} ->
-            {:halt, {:error, error, err_env}}
-        end
-      end
-    )
-    |> case do
-      {:ok, {types_rev, final_st}, final_env} ->
-        # Formal: Tuple[A1, ..., An]
-        {:ok, {{:tuple, Enum.reverse(types_rev)}, final_st}, final_env}
-
-      {:error, error, err_env} ->
-        {:error, error, err_env}
-    end
+    traverse(items, var_env, st_pre, fn item, env, st -> tc_expr(ctx, env, st, item) end)
+    |> map(fn types -> {:tuple, types} end)
   end
 
   # Map Construction %{k1 => v1, ...} (Val-Map / Val-EmptyMap adaptation)
@@ -288,53 +268,53 @@ defmodule Maty.Typechecker.TC do
 
   # --- Logical Not Operator (T-Not) ---
 
-  deftc tc_expr(ctx, var_env, st_pre, {{:., meta, [:erlang, :not]}, _, [operand_ast]}) do
-    case tc_expr(ctx, var_env, st_pre, operand_ast) do
-      {:ok, {:boolean, operand_st}, operand_env} ->
-        {:ok, {:boolean, operand_st}, operand_env}
+  deftc tc_expr(ctx, env, st, {{:., meta, [:erlang, :not]}, _, [operand_ast]}) do
+    thread do
+      result_type <~ tc_expr(ctx, env, st, operand_ast)
 
-      {:ok, {other_type, _operand_st}, operand_env} ->
-        error =
-          Error.TypeMismatch.logical_operator_requires_boolean(ctx.module, meta, :not, other_type)
+      case result_type do
+        :boolean ->
+          ok(:boolean, env, st)
 
-        {:error, error, operand_env}
-
-      {:error, error, err_env} ->
-        {:error, error, err_env}
+        other_type ->
+          error(
+            Error.TypeMismatch.logical_operator_requires_boolean(
+              ctx.module,
+              meta,
+              :not,
+              other_type
+            ),
+            env
+          )
+      end
     end
   end
 
   # --- Binary Operators (T-Op) ---
 
   # Handles Arithmetic and Comparison Ops: +, -, *, /, <, >, <=, >=, ==, !=
-  deftc tc_expr(ctx, var_env, st_pre, {{:., meta, [:erlang, op]}, _, [lhs_ast, rhs_ast]})
+  deftc tc_expr(ctx, env, st, {{:., meta, [:erlang, op]}, _, [lhs_ast, rhs_ast]})
         when op in [:+, :-, :*, :/, :<, :>, :<=, :>=, :==, :!=] do
-    with {:lhs, {:ok, {lhs_type, lhs_st}, lhs_env}} <-
-           {:lhs, tc_expr(ctx, var_env, st_pre, lhs_ast)},
-         {:rhs, {:ok, {rhs_type, rhs_st}, rhs_env}} <-
-           {:rhs, tc_expr(ctx, lhs_env, lhs_st, rhs_ast)},
-         # pin - maybe helper could return more standard type
-         {:op_check, {:ok, result_type}, _} <-
-           {:op_check, Helpers.op_type_rel(op, lhs_type, rhs_type), [lhs_type, rhs_type, rhs_env]} do
-      {:ok, {result_type, rhs_st}, rhs_env}
-    else
-      {:lhs, {:error, msg, env}} ->
-        {:error, msg, env}
+    thread do
+      lhs_type <~ tc_expr(ctx, env, st, lhs_ast)
+      rhs_type <~ tc_expr(ctx, env, st, rhs_ast)
 
-      {:rhs, {:error, msg, env}} ->
-        {:error, msg, env}
+      case Helpers.op_type_rel(op, lhs_type, rhs_type) do
+        {:ok, result_type} ->
+          ok(result_type, env, st)
 
-      {:op_check, :error, [lhs_type, rhs_type, rhs_env]} ->
-        error =
-          Error.TypeMismatch.binary_operator_type_mismatch(
-            ctx.module,
-            meta,
-            op,
-            lhs_type,
-            rhs_type
+        :error ->
+          error(
+            Error.TypeMismatch.binary_operator_type_mismatch(
+              ctx.module,
+              meta,
+              op,
+              lhs_type,
+              rhs_type
+            ),
+            env
           )
-
-        {:error, error, rhs_env}
+      end
     end
   end
 
@@ -342,69 +322,56 @@ defmodule Maty.Typechecker.TC do
 
   deftc tc_expr(
           ctx,
-          var_env,
-          st_pre,
+          env,
+          st,
           {:<<>>, meta, [{:"::", _, [lhs_ast, _]}, {:"::", _, [rhs_ast, _]}]}
         ) do
-    with {:lhs, {:ok, {lhs_type, lhs_st}, lhs_env}} <-
-           {:lhs, tc_expr(ctx, var_env, st_pre, lhs_ast)},
-         {:rhs, {:ok, {rhs_type, rhs_st}, rhs_env}} <-
-           {:rhs, tc_expr(ctx, lhs_env, lhs_st, rhs_ast)},
-         # pin - maybe helper could return more standard type
-         {:op_check, {:ok, result_type}, _} <-
-           {:op_check, Helpers.op_type_rel(:<>, lhs_type, rhs_type),
-            [lhs_type, rhs_type, rhs_env]} do
-      {:ok, {result_type, rhs_st}, rhs_env}
-    else
-      {:lhs, {:error, msg, env}} ->
-        {:error, msg, env}
+    thread do
+      lhs_type <~ tc_expr(ctx, env, st, lhs_ast)
+      rhs_type <~ tc_expr(ctx, env, st, rhs_ast)
 
-      {:rhs, {:error, msg, env}} ->
-        {:error, msg, env}
+      case Helpers.op_type_rel(:<>, lhs_type, rhs_type) do
+        {:ok, result_type} ->
+          ok(result_type, env, st)
 
-      {:op_check, :error, [lhs_type, rhs_type, rhs_env]} ->
-        error =
-          Error.TypeMismatch.binary_operator_type_mismatch(
-            ctx.module,
-            meta,
-            :<>,
-            lhs_type,
-            rhs_type
+        :error ->
+          error(
+            Error.TypeMismatch.binary_operator_type_mismatch(
+              ctx.module,
+              meta,
+              :<>,
+              lhs_type,
+              rhs_type
+            ),
+            env
           )
-
-        {:error, error, rhs_env}
+      end
     end
   end
 
   # Handles Boolean Ops: and, or
-  deftc tc_expr(ctx, var_env, st_pre, {op, meta, [lhs_ast, rhs_ast]})
+  deftc tc_expr(ctx, env, st, {op, meta, [lhs_ast, rhs_ast]})
         when op in [:and, :or] do
-    with {:lhs, {:ok, {lhs_type, lhs_st}, lhs_env}} <-
-           {:lhs, tc_expr(ctx, var_env, st_pre, lhs_ast)},
-         {:rhs, {:ok, {rhs_type, rhs_st}, rhs_env}} <-
-           {:rhs, tc_expr(ctx, lhs_env, lhs_st, rhs_ast)},
-         # pin - maybe helper could return more standard type
-         {:op_check, {:ok, result_type}, _} <-
-           {:op_check, Helpers.op_type_rel(op, lhs_type, rhs_type), [lhs_type, rhs_type, rhs_env]} do
-      {:ok, {result_type, rhs_st}, rhs_env}
-    else
-      {:lhs, {:error, msg, env}} ->
-        {:error, msg, env}
+    thread do
+      lhs_type <~ tc_expr(ctx, env, st, lhs_ast)
+      rhs_type <~ tc_expr(ctx, env, st, rhs_ast)
 
-      {:rhs, {:error, msg, env}} ->
-        {:error, msg, env}
+      case Helpers.op_type_rel(op, lhs_type, rhs_type) do
+        {:ok, result_type} ->
+          ok(result_type, env, st)
 
-      {:op_check, :error, [lhs_type, rhs_type, rhs_env]} ->
-        error =
-          Error.TypeMismatch.logical_operator_type_mismatch(
-            ctx.module,
-            meta,
-            op,
-            lhs_type,
-            rhs_type
+        :error ->
+          error(
+            Error.TypeMismatch.logical_operator_type_mismatch(
+              ctx.module,
+              meta,
+              op,
+              lhs_type,
+              rhs_type
+            ),
+            env
           )
-
-        {:error, error, rhs_env}
+      end
     end
   end
 
@@ -467,16 +434,14 @@ defmodule Maty.Typechecker.TC do
 
   # --- Let Expression / Match Operator (T-Let) ---
   # Represents `pattern = expr1`
-  deftc tc_expr(ctx, var_env, st_pre, {:=, _meta, [pattern_ast, expr1_ast]}) do
-    with {:e1, {:ok, {type_A, st_post_e1}, env_post_e1}} <-
-           {:e1, tc_expr(ctx, var_env, st_pre, expr1_ast)},
-         #  todo not sure about the naming of the atoms here
-         {:p_match, {:ok, _new_bindings, updated_env_with_bindings}} <-
-           {:p_match, tc_pattern(ctx, pattern_ast, type_A, env_post_e1)} do
-      {:ok, {type_A, st_post_e1}, updated_env_with_bindings}
-    else
-      {:e1, {:error, msg, env}} -> {:error, msg, env}
-      {:p_match, {:error, msg, env}} -> {:error, msg, env}
+  deftc tc_expr(ctx, env, st, {:=, _meta, [pattern_ast, expr1_ast]}) do
+    thread do
+      type_a <~ tc_expr(ctx, env, st, expr1_ast)
+
+      case tc_pattern(ctx, pattern_ast, type_a, env) do
+        {:ok, _bindings, env2} -> ok(type_a, env2, st)
+        {:error, msg, env2} -> error(msg, env2)
+      end
     end
   end
 
@@ -1363,26 +1328,8 @@ defmodule Maty.Typechecker.TC do
   end
 
   def tc_expr_list(ctx, var_env, st_pre, ast_list) do
-    # Reduce over expressions, threading state and env. Keep track of the *last* result.
-
-    Enum.reduce_while(
-      ast_list,
-      {:ok, {nil, st_pre}, var_env},
-      fn expr_ast, {:ok, {_prev_result, current_st}, current_env} ->
-        # Logger.info("AST: #{inspect(expr_ast)}")
-
-        case tc_expr(ctx, current_env, current_st, expr_ast) do
-          {:ok, last_result, next_env} ->
-            # Store the latest successful result and continue
-            # Logger.error("last item in block: #{inspect(last_result)}")
-            {:cont, {:ok, last_result, next_env}}
-
-          {:error, error, err_env} ->
-            # Halt on first error
-            {:halt, {:error, error, err_env}}
-        end
-      end
-    )
+    traverse(ast_list, var_env, st_pre, fn ast, env, st -> tc_expr(ctx, env, st, ast) end)
+    |> map(&List.last/1)
   end
 
   # move
