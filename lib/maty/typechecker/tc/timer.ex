@@ -1,22 +1,24 @@
 defmodule Maty.Typechecker.TC.Timer do
   alias Maty.Typechecker.TC
 
-  def tc_expr(
-        ctx,
-        var_env,
-        st_pre,
-        {{:., _meta1, [:timer, :sleep]}, _meta2, [arg]}
-      ) do
-    case TC.tc_expr(ctx, var_env, st_pre, arg) do
-      {:ok, {:number, ^st_pre}, updated_env} ->
-        {:ok, {:atom, st_pre}, updated_env}
+  import Maty.Utils, only: [deftc: 2]
+  import Maty.Typechecker.TC.Thread
+  import Maty.Typechecker.TC.Bind
 
-      {:ok, {other_type, ^st_pre}, updated_env} ->
-        {:error, ":timer.sleep expects a number argument, got: #{inspect(other_type)}",
-         updated_env}
+  deftc tc_expr(
+          ctx,
+          env,
+          st,
+          {{:., _meta1, [:timer, :sleep]}, _meta2, [arg]}
+        ) do
+    thread do
+      arg_type <~ TC.tc_expr(ctx, env, st, arg)
 
-      {:error, _msg, _env} = error ->
-        error
+      if arg_type == :number do
+        ok(:atom, env, st)
+      else
+        error(":timer.sleep expects a number argument, got: #{inspect(arg_type)}", env)
+      end
     end
   end
 end

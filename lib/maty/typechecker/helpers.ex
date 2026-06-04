@@ -9,18 +9,18 @@ defmodule Maty.Typechecker.Helpers do
   # Returns unified type or :error_incompatible
   def unify_list_types([]) do
     # Type of empty list element is any/nil
-    :any
+    {:ok, :any}
   end
 
   def unify_list_types([type | rest]) do
     if Enum.all?(rest, &(&1 == type)) do
-      type
+      {:ok, type}
     else
-      :error_incompatible
+      {:error, :incompatible}
     end
   end
 
-  def unify_list_types(type) when not is_list(type), do: :error_incompatible
+  def unify_list_types(type) when not is_list(type), do: {:error, :incompatible}
 
   # Helper to check if a type is a valid base type for map keys (Formal C)
   def is_base_type?(:atom), do: true
@@ -74,21 +74,21 @@ defmodule Maty.Typechecker.Helpers do
   Returns the literal value on success, or :error_complex_key for nodes
   that don't represent a simple literal.
   """
-  @spec ast_to_literal(ast :: Macro.t()) :: term() | :error_complex_key
+  @spec ast_to_literal(ast :: Macro.t()) :: {:ok, term()} | :error
   # Atom literal: AST is typically {atom_value, meta, context_atom_or_nil}
   def ast_to_literal({atom_value, _meta, _context}) when is_atom(atom_value) do
-    atom_value
+    {:ok, atom_value}
   end
 
   # Other literals (numbers, binaries, booleans, nil) often appear directly in AST
-  def ast_to_literal(literal) when is_number(literal), do: literal
-  def ast_to_literal(literal) when is_binary(literal), do: literal
-  def ast_to_literal(literal) when is_boolean(literal), do: literal
-  def ast_to_literal(nil), do: nil
-  def ast_to_literal(literal) when is_atom(literal), do: literal
+  def ast_to_literal(literal) when is_number(literal), do: {:ok, literal}
+  def ast_to_literal(literal) when is_binary(literal), do: {:ok, literal}
+  def ast_to_literal(literal) when is_boolean(literal), do: {:ok, literal}
+  def ast_to_literal(nil), do: {:ok, nil}
+  def ast_to_literal(literal) when is_atom(literal), do: {:ok, literal}
 
   # If the AST node doesn't match a simple literal form
-  def ast_to_literal(_other_ast), do: :error_complex_key
+  def ast_to_literal(_other_ast), do: :error
 
   def get_literal_type(literal) when is_atom(literal), do: {:ok, :atom}
   def get_literal_type(literal) when is_number(literal), do: {:ok, :number}
@@ -257,10 +257,9 @@ defmodule Maty.Typechecker.Helpers do
   # Checks if a type is compatible with maty_actor_state
   def check_maty_state_type(state_type) do
     if Type.is?(state_type, :maty_actor_state) do
-      :ok
+      {:ok, Type.maty_actor_state()}
     else
-      error = Error.TypeMismatch.invalid_maty_state_type(state_type)
-      {:maty_state_error, error}
+      {:error, Error.TypeMismatch.invalid_maty_state_type(state_type)}
     end
   end
 

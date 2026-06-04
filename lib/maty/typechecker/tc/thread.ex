@@ -37,7 +37,7 @@ defmodule Maty.Typechecker.TC.Thread do
   defp build([{:<~, _, [pat, expr]} | rest]) do
     quote do
       case unquote(expr) do
-        {:ok, {unquote(pat), new_st}, new_env} ->
+        {:ok, unquote(pat), new_st, new_env} ->
           var!(env) = new_env
           var!(st) = new_st
           unquote(build(rest))

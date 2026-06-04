@@ -29,7 +29,7 @@ defmodule Maty.Typechecker.TC.Bind do
 
   @doc "Lift a value into a successful result, leaving env and st untouched (pure / return)."
   @spec ok(a, var_env(), ST.t()) :: t(a) when a: var
-  def ok(value, env, st), do: {:ok, {value, st}, env}
+  def ok(value, env, st), do: {:ok, value, st, env}
 
   @doc "Build a failure carrying the current env."
   @spec error(term(), var_env()) :: {:error, term(), var_env()}
@@ -41,7 +41,7 @@ defmodule Maty.Typechecker.TC.Bind do
   return a `t()`.
   """
   @spec bind(t(a), (a, var_env(), ST.t() -> t(b))) :: t(b) when a: var, b: var
-  def bind({:ok, {value, st}, env}, fun), do: fun.(value, env, st)
+  def bind({:ok, value, st, env}, fun), do: fun.(value, env, st)
   def bind({:error, _, _} = err, _fun), do: err
 
   # Tolerated so a chain doesn't crash on the few WF-check functions that still return a bare {:error, reason}.
@@ -71,18 +71,51 @@ defmodule Maty.Typechecker.TC.Bind do
         when a: var, b: var
   def traverse(items, env, st, fun) do
     items
-    |> Enum.reduce_while({:ok, {[], st}, env}, fn item, {:ok, {acc, cur_st}, cur_env} ->
+    |> Enum.reduce_while({:ok, [], st, env}, fn item, {:ok, acc, cur_st, cur_env} ->
       case fun.(item, cur_env, cur_st) do
-        {:ok, {value, next_st}, next_env} ->
-          {:cont, {:ok, {[value | acc], next_st}, next_env}}
+        {:ok, value, next_st, next_env} ->
+          {:cont, {:ok, [value | acc], next_st, next_env}}
 
         {:error, _reason, _env} = err ->
           {:halt, err}
       end
     end)
     |> case do
-      {:ok, {rev, final_st}, final_env} -> {:ok, {Enum.reverse(rev), final_st}, final_env}
+      {:ok, rev, final_st, final_env} -> {:ok, Enum.reverse(rev), final_st, final_env}
       {:error, _reason, _env} = err -> err
     end
   end
+
+  def fan_out(items, env, st, fun) do
+    results = Enum.map(items, fn item -> fun.(item, env, st) end)
+
+    case Enum.find(results, &match?({:error, _, _}, &1)) do
+      {:error, msg, _err_env} ->
+        error(msg, env)
+
+      nil ->
+        values = Enum.map(results, fn {:ok, val, branch_st, _env} -> {val, branch_st} end)
+        ok(values, env, st)
+    end
+  end
+
+  @spec lift_result({:ok, a} | {:error, term()}, term(), var_env(), ST.t()) :: result(a)
+        when a: var
+  def lift_result({:error, _reason}, error, env, _st), do: error(error, env)
+  def lift_result(:error, error, env, _st), do: error(error, env)
+  def lift_result({:ok, val}, _error, env, st), do: ok(val, env, st)
+
+  @doc "Like lift_result/4 but preserves the original error reason."
+  @spec lift_result({:ok, a} | {:error, term()}, var_env(), ST.t()) :: result(a)
+        when a: var
+  def lift_result({:ok, val}, env, st), do: ok(val, env, st)
+  def lift_result({:error, reason}, env, _st), do: error(reason, env)
+
+  @spec lift_maybe(a | nil, term(), var_env(), ST.t()) :: result(a) when a: var
+  def lift_maybe(nil, error, env, _st), do: error(error, env)
+  def lift_maybe(val, _error, env, st), do: ok(val, env, st)
+
+  @spec lift_bool(boolean(), term(), var_env(), ST.t()) :: result(nil) when a: var
+  def lift_bool(true, _error, env, st), do: ok(nil, env, st)
+  def lift_bool(false, error, env, _st), do: error(error, env)
 end
