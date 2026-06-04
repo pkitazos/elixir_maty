@@ -241,18 +241,10 @@ defmodule Maty.Typechecker.Helpers do
     # end
   end
 
-  def check_payload_type(actual_payload_type, expected_payload_type) do
-    if actual_payload_type == expected_payload_type do
-      :ok
-    else
-      [expected: expected_payload_type, got: actual_payload_type]
-    end
-  end
-
   # Checks if a type is one of the valid handler types we defined earlier
   def check_handler_type(:maty_handler_msg), do: :ok
   def check_handler_type(:maty_handler_init), do: :ok
-  def check_handler_type(_other_type), do: :error
+  def check_handler_type(_other_type), do: {:error, :not_a_handler}
 
   # Checks if a type is compatible with maty_actor_state
   def check_maty_state_type(state_type) do
@@ -294,20 +286,18 @@ defmodule Maty.Typechecker.Helpers do
   # move
   def check_clause_arity(ctx, meta, func_id, arity, spec_args_types) do
     if arity == length(spec_args_types) do
-      :arity_ok
+      :ok
     else
-      error =
-        Error.FunctionCall.arity_mismatch(ctx.module, meta, func_id,
-          expected: length(spec_args_types),
-          got: arity
-        )
-
-      {:error, error}
+      {:error,
+       Error.FunctionCall.arity_mismatch(ctx.module, meta, func_id,
+         expected: length(spec_args_types),
+         got: arity
+       )}
     end
   end
 
   # move
-  def check_final_session_state(_ctx, _meta, _func_id, %ST.SEnd{}), do: :state_ok
+  def check_final_session_state(_ctx, _meta, _func_id, %ST.SEnd{}), do: :ok
 
   def check_final_session_state(ctx, meta, func_id, other_st) do
     error = Error.FunctionCall.function_altered_session_state(ctx.module, meta, func_id, other_st)
@@ -317,15 +307,13 @@ defmodule Maty.Typechecker.Helpers do
   # move
   def check_return_type(ctx, meta, actual_return_type, spec_return_type) do
     if actual_return_type == spec_return_type do
-      :type_ok
+      :ok
     else
-      error =
-        Error.TypeMismatch.return_type_mismatch(ctx.module, meta,
-          expected: spec_return_type,
-          got: actual_return_type
-        )
-
-      {:error, error}
+      {:error,
+       Error.TypeMismatch.return_type_mismatch(ctx.module, meta,
+         expected: spec_return_type,
+         got: actual_return_type
+       )}
     end
   end
 
@@ -362,7 +350,7 @@ defmodule Maty.Typechecker.Helpers do
 
     case args_check_result do
       {:ok, _final_bindings, body_var_env} ->
-        {:args_ok, body_var_env}
+        {:ok, body_var_env}
 
       {:error, msg} ->
         {:error, msg}

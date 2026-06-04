@@ -507,7 +507,7 @@ defmodule Maty.Typechecker.TC do
       # Check payload type matches expected
       _
       <~ lift_bool(
-        Helpers.check_payload_type(actual_payload_type, matched_branch.payload) == :ok,
+        actual_payload_type == matched_branch.payload,
         Error.ProtocolViolation.incorrect_payload_type(
           ctx.module,
           meta,
@@ -632,7 +632,7 @@ defmodule Maty.Typechecker.TC do
         :ok ->
           ok(nil, env, st)
 
-        :error ->
+        {:error, :not_a_handler} ->
           error(
             Error.ProtocolViolation.suspend_invalid_handler_type(
               ctx.module,
@@ -888,41 +888,32 @@ defmodule Maty.Typechecker.TC do
         ) ::
           [{:ok, Type.t()} | {:error, binary()}]
   def check_wf_function(ctx, {_name, arity} = func_id, clauses) do
-    case Map.fetch(ctx.psi, func_id) do
-      {:ok, signatures} when is_list(signatures) ->
-        defs = Enum.zip(signatures, clauses)
-
-        for {{spec_args_types, spec_return_type},
-             {clause_meta, arg_pattern_asts, _guards, body_block}} <- defs do
-          with :arity_ok <-
-                 Helpers.check_clause_arity(ctx, clause_meta, func_id, arity, spec_args_types),
-               # pin - maybe helper could return more standard type
-               {:args_ok, body_var_env} <-
-                 Helpers.check_argument_patterns(
-                   ctx,
-                   clause_meta,
-                   arg_pattern_asts,
-                   spec_args_types
-                 ),
-               # pin - maybe helper could return more standard type
-               {:body_ok, actual_return_type, final_st, _final_env} <-
-                 check_function_body(ctx, body_var_env, body_block),
-               # pin - maybe helper could return more standard type
-               :state_ok <-
-                 Helpers.check_final_session_state(ctx, clause_meta, func_id, final_st),
-               :type_ok <-
-                 Helpers.check_return_type(
-                   ctx,
-                   clause_meta,
-                   actual_return_type,
-                   spec_return_type
-                 ) do
-            {:ok, actual_return_type}
-          else
-            {:error, error_msg} -> {:error, error_msg}
-          end
+    with {:ok, signatures} when is_list(signatures) <- Map.fetch(ctx.psi, func_id) do
+      for {{spec_args, spec_return}, {meta, arg_pattern_asts, _guards, body_block}} <-
+            Enum.zip(signatures, clauses) do
+        with :ok <- Helpers.check_clause_arity(ctx, meta, func_id, arity, spec_args),
+             {:ok, env} <-
+               Helpers.check_argument_patterns(
+                 ctx,
+                 meta,
+                 arg_pattern_asts,
+                 spec_args
+               ),
+             {:ok, {return_type, st}} <- check_function_body(ctx, env, body_block),
+             :ok <- Helpers.check_final_session_state(ctx, meta, func_id, st),
+             :ok <-
+               Helpers.check_return_type(
+                 ctx,
+                 meta,
+                 return_type,
+                 spec_return
+               ) do
+          {:ok, return_type}
+        else
+          {:error, error_msg} -> {:error, error_msg}
         end
-
+      end
+    else
       :error ->
         error = Error.TypeSpecification.no_spec_for_function(ctx.module, func_id)
         List.duplicate({:error, error}, length(clauses))
@@ -949,52 +940,42 @@ defmodule Maty.Typechecker.TC do
   def check_wf_message_handler_clause(
         ctx,
         handler_label,
-        {clause_meta, args, _guards, body_block},
+        {meta,
+         [
+           received_role,
+           {label, _} = message_pattern_ast,
+           {state_var, _, _},
+           _session_ctx_var_ast
+         ], _guards, body_block},
         st_pre,
-        type_signature
+        {[declared_role, {:tuple, [_, payload_type]} = message_type, _state, _session_ctx],
+         _return_type}
       ) do
-    with [received_role, message_pattern_ast, state_var_ast, _session_ctx_var_ast] <- args,
-         {[declared_role, message_type, _state, _session_ctx], _return_type} <- type_signature,
-
-         # get name of state variable
-         {state_var, _, _} <- state_var_ast,
-
-         # role should already just be an atom
-         {:ok, :atom, ^st_pre, _} <- tc_expr(ctx, %{}, st_pre, received_role),
-
-         # get shape of message
-         # bind whatever from the message payload
-         {:ok, _message_bindings, var_env} <-
-           tc_pattern(ctx, message_pattern_ast, message_type, %{}),
-
-         # create all the necessary bindings (this thing Γ_args, x : ActorState(B))
-         # need to also add psi here
-         var_env = Map.put(var_env, state_var, Type.maty_actor_state()),
-
-         #  var_env = Map.merge(gamma_args_env, psi),
-         # check the session type is SIn
-         {:st, st = %ST.SIn{from: expected_role, branches: branches}} <- {:st, st_pre},
-
+    with %ST.SIn{from: expected_role, branches: branches} <- st_pre,
          # check handler and session type roles align
-         {:role, [got: ^expected_role, expected: _expected_role], _st} <-
-           {:role, [got: ^received_role = declared_role, expected: expected_role], st},
-         {label, _} <- message_pattern_ast,
-         {:tuple, [_, payload_type]} <- message_type,
-
-         # check there is a matching branch
-         # take note of this branch
-         {:branch, {:ok, handler_branch}, [got: _attempted_match, expected: _branches], _st} <-
-           {:branch,
-            Helpers.find_matching_branch(
-              branches,
-              {label, payload_type}
-            ), [got: {label, payload_type}, expected: branches], st},
-
-         # extract only the relevant bits (leave out the try catch)
-         body = extract_body(body_block),
-         {:ok, :no_return, {:st_bottom, _exit_status}, _var_env} <-
-           tc_expr_list(ctx, var_env, handler_branch.continue_as, body) do
-      # all checks passed!
+         :ok <-
+           check_handler_roles(
+             ctx,
+             handler_label,
+             st_pre,
+             received_role,
+             declared_role,
+             expected_role
+           ),
+         # check there is a matching branch for this label + payload
+         {:ok, handler_branch} <-
+           match_handler_branch(ctx, handler_label, st_pre, branches, label, payload_type),
+         # typecheck received role is an atom
+         {:ok, :atom, ^st_pre, env} <- tc_expr(ctx, %{}, st_pre, received_role),
+         # bind variables from the message pattern
+         {:ok, _bindings, env} <- tc_pattern(ctx, message_pattern_ast, message_type, env),
+         # extend env with state variable binding
+         env = Map.put(env, state_var, Type.maty_actor_state()),
+         # typecheck the handler body
+         {:ok, return_type, final_st, _} <-
+           tc_expr_list(ctx, env, handler_branch.continue_as, extract_body(body_block)),
+         # body must terminate with :no_return and exhausted session
+         :ok <- check_handler_termination(meta, handler_label, return_type, final_st) do
       {:ok, handler_branch}
     else
       {:error, msg, _env} ->
@@ -1003,83 +984,72 @@ defmodule Maty.Typechecker.TC do
       {:error, msg} ->
         {:error, msg}
 
-      {:st, other_st} ->
-        {:error, "st broken: #{inspect(other_st)}"}
-
-      {:role, [got: role_received, expected: role_expected], st} ->
-        error_msg =
-          Error.ProtocolViolation.incorrect_recipient_participant(
-            ctx.module,
-            handler_label,
-            st,
-            got: role_received,
-            expected: role_expected
-          )
-
-        {:error, error_msg}
-
-      {:branch, {:error, :label_mismatch},
-       [got: {label_received, _payload_received}, expected: branches], st} ->
-        branch_options = branches |> Enum.map(fn b -> b.label end)
-
-        error_msg =
-          Error.ProtocolViolation.incorrect_incoming_message_label(ctx.module, handler_label, st,
-            got: label_received,
-            expected: branch_options
-          )
-
-        {:error, error_msg}
-
-      # todo: fix the double incorrect message label check
-      {:branch, {:error, :payload_mismatch},
-       [got: {label_received, payload_received}, expected: branches], st} ->
-        expected_branch =
-          branches
-          |> Enum.find(fn b -> b.label == label_received end)
-
-        case expected_branch do
-          nil ->
-            branch_options = branches |> Enum.map(fn b -> b.label end)
-
-            error_msg =
-              Error.ProtocolViolation.incorrect_incoming_message_label(
-                ctx.module,
-                handler_label,
-                st,
-                got: label_received,
-                expected: branch_options
-              )
-
-            {:error, error_msg}
-
-          other ->
-            error_msg =
-              Error.ProtocolViolation.incorrect_incoming_payload_type(
-                ctx.module,
-                handler_label,
-                st,
-                got: payload_received,
-                expected: other.payload
-              )
-
-            {:error, error_msg}
-        end
-
-      {:body_ok, {final_type, final_state}, _env} ->
-        error =
-          Error.handler_body_wrong_termination(
-            clause_meta,
-            handler_label,
-            final_type,
-            final_state
-          )
-
-        {:error, error}
-
-      other ->
-        # pin - convert to new kind of error
-        {:error, Error.internal_error("Unexpected mismatch in handler check: #{inspect(other)}")}
+      other_st ->
+        {:error, Error.internal_error("Expected SIn session type, got: #{inspect(other_st)}")}
     end
+  end
+
+  defp check_handler_roles(ctx, handler_label, st, received_role, declared_role, expected_role) do
+    if received_role == expected_role and declared_role == expected_role do
+      :ok
+    else
+      got = if received_role != expected_role, do: received_role, else: declared_role
+
+      {:error,
+       Error.ProtocolViolation.incorrect_recipient_participant(
+         ctx.module,
+         handler_label,
+         st,
+         got: got,
+         expected: expected_role
+       )}
+    end
+  end
+
+  defp match_handler_branch(ctx, handler_label, st, branches, label, payload_type) do
+    case Helpers.find_matching_branch(branches, {label, payload_type}) do
+      {:ok, branch} ->
+        {:ok, branch}
+
+      {:error, :label_mismatch} ->
+        {:error,
+         Error.ProtocolViolation.incorrect_incoming_message_label(
+           ctx.module,
+           handler_label,
+           st,
+           got: label,
+           expected: Enum.map(branches, & &1.label)
+         )}
+
+      {:error, :payload_mismatch} ->
+        expected_branch = Enum.find(branches, fn b -> b.label == label end)
+
+        if expected_branch do
+          {:error,
+           Error.ProtocolViolation.incorrect_incoming_payload_type(
+             ctx.module,
+             handler_label,
+             st,
+             got: payload_type,
+             expected: expected_branch.payload
+           )}
+        else
+          {:error,
+           Error.ProtocolViolation.incorrect_incoming_message_label(
+             ctx.module,
+             handler_label,
+             st,
+             got: label,
+             expected: Enum.map(branches, & &1.label)
+           )}
+        end
+    end
+  end
+
+  defp check_handler_termination(_meta, _handler_label, :no_return, {:st_bottom, _}), do: :ok
+
+  defp check_handler_termination(meta, handler_label, return_type, final_st) do
+    {:error, Error.handler_body_wrong_termination(meta, handler_label, return_type, final_st)}
   end
 
   @doc """
@@ -1091,12 +1061,6 @@ defmodule Maty.Typechecker.TC do
 
   Returns `{:ok, handler_label}` if well-formed. Otherwise returns `{:error, message}`.
   """
-
-  # [
-  #   {_meta, [args_ast, state_var_ast, session_ctx], [],
-  #    {:try, _, [[do: {:__block__, _, [_, _, {:__block__, _, block}]}, catch: _]]}}
-  # ]
-
   @spec check_wf_init_handler_clause(
           ctx :: Ctx.t(),
           handler_label :: atom(),
@@ -1108,88 +1072,73 @@ defmodule Maty.Typechecker.TC do
   def check_wf_init_handler_clause(
         ctx,
         handler_label,
-        {clause_meta, [arg_pattern_ast, {state_var, _, _}, _session_ctx_var_ast], _guards,
-         body_block},
+        {meta, [arg_pattern_ast, {state_var, _, _}, _session_ctx_var_ast], _guards, body_block},
         st_pre,
         {[args_types, _state, _session_ctx], _return_type}
       ) do
-    with {:ok, _message_bindings, var_env} <- tc_pattern(ctx, arg_pattern_ast, args_types, %{}),
-
-         #  create all the necessary bindings (this thing Γ_args, x : ActorState(B))
-         var_env = Map.put(var_env, state_var, Type.maty_actor_state()),
-
-         # check the session type is NOT SIn (should be SOut or Suspend)
-         {:st, :ok} <- {:st, Helpers.check_init_st(st_pre)},
-
-         # extract only the relevant bits (leave out the try catch)
-         body = extract_body(body_block),
-         {:ok, :no_return, {:st_bottom, _exit_status}, _var_env} <-
-           tc_expr_list(ctx, var_env, st_pre, body) do
-      # all checks passed!
+    with nil,
+         # bind variables from the argument pattern
+         {:ok, _bindings, env} <- tc_pattern(ctx, arg_pattern_ast, args_types, %{}),
+         # extend env with state variable binding
+         env = Map.put(env, state_var, Type.maty_actor_state()),
+         # session type must not be SIn (should be SOut or Suspend)
+         :ok <- Helpers.check_init_st(st_pre),
+         # typecheck the handler body
+         {:ok, return_type, st, _} <-
+           tc_expr_list(ctx, env, st_pre, extract_body(body_block)),
+         # body must terminate with :no_return and exhausted session
+         :ok <- check_handler_termination(meta, handler_label, return_type, st) do
       :ok
     else
-      {:error, msg, _env} ->
-        {:error, msg}
-
-      {:error, msg} ->
-        {:error, msg}
-
-      {:body_ok, {final_type, final_state}, _env} ->
-        error =
-          Error.handler_body_wrong_termination(
-            clause_meta,
-            handler_label,
-            final_type,
-            final_state
-          )
-
-        {:error, error}
-
-      {:st, {:error, _msg} = error} ->
-        error
-
-      other ->
-        # pin - convert to new kind of error
-        error_msg =
-          Error.internal_error("Unexpected mismatch in init handler check: #{inspect(other)}")
-
-        {:error, error_msg}
+      {:error, msg, _env} -> {:error, msg}
+      {:error, msg} -> {:error, msg}
     end
   end
 
   def check_wf_on_link_callback(
         ctx,
-        {_clause_meta, args, _guards, body_block},
-        type_signature
+        {_meta, [arg_pattern_ast, {state_var, _, _}], _guards, body_block},
+        {[args_types, _state], _return_type}
       ) do
-    with [arg_pattern_ast, state_var_ast] <- args,
-         {[args_types, _state], _return_type} <- type_signature,
+    body = extract_body(body_block)
 
-         #  get name of state variable
-         {state_var, _, _} <- state_var_ast,
-
+    with nil,
          # bind variables from the function signature
-         {:ok, _message_bindings, var_env} <-
-           tc_pattern(ctx, arg_pattern_ast, args_types, %{}),
-         #  create all the necessary bindings (this thing Γ_args, x : ActorState(B))
-         var_env = Map.put(var_env, state_var, Type.maty_actor_state()),
-
-         # typecheck the function (calls to register etc.)
-         body = extract_body(body_block),
-         {:ok, return_type, %ST.SEnd{}, _var_env} <-
-           tc_expr_list(ctx, var_env, %ST.SEnd{}, body),
-
-         # make sure there is at least one call to register in this function
-         {:register, true} <- {:register, Helpers.contains_register_call?(body)},
-
-         # make sure the function returns {:ok, some_actor_state}
-         true <- return_type == {:tuple, [:ok, Type.maty_actor_state()]} do
-      # all checks pass
+         {:ok, _bindings, env} <- tc_pattern(ctx, arg_pattern_ast, args_types, %{}),
+         # extend env with state variable binding
+         env = Map.put(env, state_var, Type.maty_actor_state()),
+         # typecheck the body (calls to register etc.)
+         {:ok, return_type, final_st, _env} <- tc_expr_list(ctx, env, %ST.SEnd{}, body),
+         # session state must not change
+         :ok <- check_on_link_session_state(final_st),
+         # must contain at least one call to Maty.DSL.register
+         :ok <- check_contains_register(body),
+         # must return {:ok, actor_state}
+         :ok <- check_on_link_return_type(return_type) do
       :ok
     else
-      {:error, msg, _var_env} -> {:error, msg}
-      # pin - convert to new kind of error
-      other -> {:error, "Something is not looking right: #{inspect(other)}"}
+      {:error, msg, _env} -> {:error, msg}
+      {:error, msg} -> {:error, msg}
+    end
+  end
+
+  defp check_on_link_session_state(%ST.SEnd{}), do: :ok
+
+  defp check_on_link_session_state(other_st) do
+    {:error, "on_link callback altered session state: #{inspect(other_st)}"}
+  end
+
+  defp check_contains_register(body) do
+    if Helpers.contains_register_call?(body),
+      do: :ok,
+      else: {:error, "on_link callback must contain at least one call to register"}
+  end
+
+  defp check_on_link_return_type(return_type) do
+    if return_type == {:tuple, [:ok, Type.maty_actor_state()]} do
+      :ok
+    else
+      {:error, "on_link callback must return {:ok, actor_state}, got: #{inspect(return_type)}"}
     end
   end
 
@@ -1221,11 +1170,8 @@ defmodule Maty.Typechecker.TC do
     initial_st = %ST.SEnd{}
 
     case tc_expr_list(ctx, body_var_env, initial_st, body_asts) do
-      {:ok, return_type, final_st, final_env} ->
-        {:body_ok, return_type, final_st, final_env}
-
-      {:error, msg, _env} ->
-        {:error, msg}
+      {:ok, return_type, final_st, _final_env} -> {:ok, {return_type, final_st}}
+      {:error, msg, _env} -> {:error, msg}
     end
   end
 
