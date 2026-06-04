@@ -43,38 +43,38 @@ defmodule Maty.Typechecker.TCExprTest do
 
   describe "tc_expr/4 literals" do
     test "boolean true" do
-      assert {:ok, {:boolean, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, true)
+      assert {:ok, :boolean, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, true)
     end
 
     test "boolean false" do
-      assert {:ok, {:boolean, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, false)
+      assert {:ok, :boolean, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, false)
     end
 
     test "nil" do
-      assert {:ok, {nil, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, nil)
+      assert {:ok, nil, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, nil)
     end
 
     test "binary string" do
-      assert {:ok, {:binary, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, "hello")
+      assert {:ok, :binary, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, "hello")
     end
 
     test "number integer" do
-      assert {:ok, {:number, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, 42)
+      assert {:ok, :number, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, 42)
     end
 
     test "number float" do
-      assert {:ok, {:number, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, 3.14)
+      assert {:ok, :number, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, 3.14)
     end
 
     test "literals preserve session state" do
-      assert {:ok, {:number, @st_out}, %{}} = TC.tc_expr(@ctx, %{}, @st_out, 42)
-      assert {:ok, {:binary, @st_out}, %{}} = TC.tc_expr(@ctx, %{}, @st_out, "hi")
-      assert {:ok, {:boolean, @st_out}, %{}} = TC.tc_expr(@ctx, %{}, @st_out, true)
+      assert {:ok, :number, @st_out, %{}} = TC.tc_expr(@ctx, %{}, @st_out, 42)
+      assert {:ok, :binary, @st_out, %{}} = TC.tc_expr(@ctx, %{}, @st_out, "hi")
+      assert {:ok, :boolean, @st_out, %{}} = TC.tc_expr(@ctx, %{}, @st_out, true)
     end
 
     test "literals preserve var env" do
       env = %{x: :number, y: :binary}
-      assert {:ok, {:number, @st_end}, ^env} = TC.tc_expr(@ctx, env, @st_end, 42)
+      assert {:ok, :number, @st_end, ^env} = TC.tc_expr(@ctx, env, @st_end, 42)
     end
   end
 
@@ -83,14 +83,14 @@ defmodule Maty.Typechecker.TCExprTest do
   describe "tc_expr/4 variables" do
     test "variable lookup succeeds when bound" do
       env = %{x: :number}
-      assert {:ok, {:number, @st_end}, ^env} = TC.tc_expr(@ctx, env, @st_end, var(:x))
+      assert {:ok, :number, @st_end, ^env} = TC.tc_expr(@ctx, env, @st_end, var(:x))
     end
 
     test "variable lookup returns type from env" do
       env = %{name: :binary, count: :number, flag: :boolean}
-      assert {:ok, {:binary, @st_end}, _} = TC.tc_expr(@ctx, env, @st_end, var(:name))
-      assert {:ok, {:number, @st_end}, _} = TC.tc_expr(@ctx, env, @st_end, var(:count))
-      assert {:ok, {:boolean, @st_end}, _} = TC.tc_expr(@ctx, env, @st_end, var(:flag))
+      assert {:ok, :binary, @st_end, _} = TC.tc_expr(@ctx, env, @st_end, var(:name))
+      assert {:ok, :number, @st_end, _} = TC.tc_expr(@ctx, env, @st_end, var(:count))
+      assert {:ok, :boolean, @st_end, _} = TC.tc_expr(@ctx, env, @st_end, var(:flag))
     end
 
     test "unbound variable returns error" do
@@ -100,7 +100,7 @@ defmodule Maty.Typechecker.TCExprTest do
 
     test "variable preserves session state" do
       env = %{x: :number}
-      assert {:ok, {:number, @st_out}, ^env} = TC.tc_expr(@ctx, env, @st_out, var(:x))
+      assert {:ok, :number, @st_out, ^env} = TC.tc_expr(@ctx, env, @st_out, var(:x))
     end
   end
 
@@ -108,20 +108,20 @@ defmodule Maty.Typechecker.TCExprTest do
 
   describe "tc_expr/4 lists" do
     test "empty list" do
-      assert {:ok, {{:list, :any}, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, [])
+      assert {:ok, {:list, :any}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, [])
     end
 
     test "homogeneous number list" do
-      assert {:ok, {{:list, :number}, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, [1, 2, 3])
+      assert {:ok, {:list, :number}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, [1, 2, 3])
     end
 
     test "homogeneous binary list" do
-      assert {:ok, {{:list, :binary}, @st_end}, %{}} =
+      assert {:ok, {:list, :binary}, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, ["a", "b", "c"])
     end
 
     test "homogeneous boolean list" do
-      assert {:ok, {{:list, :boolean}, @st_end}, %{}} =
+      assert {:ok, {:list, :boolean}, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, [true, false])
     end
 
@@ -131,18 +131,18 @@ defmodule Maty.Typechecker.TCExprTest do
     end
 
     test "single element list" do
-      assert {:ok, {{:list, :number}, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, [42])
+      assert {:ok, {:list, :number}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, [42])
     end
 
     test "list of variables" do
       env = %{x: :number, y: :number}
 
-      assert {:ok, {{:list, :number}, @st_end}, ^env} =
+      assert {:ok, {:list, :number}, @st_end, ^env} =
                TC.tc_expr(@ctx, env, @st_end, [var(:x), var(:y)])
     end
 
     test "list preserves session state" do
-      assert {:ok, {{:list, :number}, @st_out}, %{}} = TC.tc_expr(@ctx, %{}, @st_out, [1, 2])
+      assert {:ok, {:list, :number}, @st_out, %{}} = TC.tc_expr(@ctx, %{}, @st_out, [1, 2])
     end
   end
 
@@ -152,39 +152,39 @@ defmodule Maty.Typechecker.TCExprTest do
     test "2-tuple" do
       ast = {1, "hello"}
 
-      assert {:ok, {{:tuple, [:number, :binary]}, @st_end}, %{}} =
+      assert {:ok, {:tuple, [:number, :binary]}, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, ast)
     end
 
     test "3-tuple" do
       ast = {:{}, @meta, [1, "hello", true]}
 
-      assert {:ok, {{:tuple, [:number, :binary, :boolean]}, @st_end}, %{}} =
+      assert {:ok, {:tuple, [:number, :binary, :boolean]}, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, ast)
     end
 
     test "nested tuple" do
       ast = {1, {2, 3}}
 
-      assert {:ok, {{:tuple, [:number, {:tuple, [:number, :number]}]}, @st_end}, %{}} =
+      assert {:ok, {:tuple, [:number, {:tuple, [:number, :number]}]}, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, ast)
     end
 
     test "empty tuple" do
       ast = {:{}, @meta, []}
-      assert {:ok, {{:tuple, []}, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, {:tuple, []}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
     end
 
     test "tuple with variables" do
       env = %{x: :number, y: :binary}
       ast = {var(:x), var(:y)}
 
-      assert {:ok, {{:tuple, [:number, :binary]}, @st_end}, ^env} =
+      assert {:ok, {:tuple, [:number, :binary]}, @st_end, ^env} =
                TC.tc_expr(@ctx, env, @st_end, ast)
     end
 
     test "tuple preserves session state" do
-      assert {:ok, {{:tuple, [:number, :number]}, @st_out}, %{}} =
+      assert {:ok, {:tuple, [:number, :number]}, @st_out, %{}} =
                TC.tc_expr(@ctx, %{}, @st_out, {1, 2})
     end
   end
@@ -194,20 +194,20 @@ defmodule Maty.Typechecker.TCExprTest do
   describe "tc_expr/4 maps" do
     test "empty map" do
       ast = {:%{}, @meta, []}
-      assert {:ok, {{:map, %{}}, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, {:map, %{}}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
     end
 
     test "map with atom keys" do
       ast = {:%{}, @meta, [name: "alice", age: 42]}
 
-      assert {:ok, {{:map, %{name: :binary, age: :number}}, @st_end}, %{}} =
+      assert {:ok, {:map, %{name: :binary, age: :number}}, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, ast)
     end
 
     test "map preserves session state" do
       ast = {:%{}, @meta, [x: 1]}
 
-      assert {:ok, {{:map, %{x: :number}}, @st_out}, %{}} =
+      assert {:ok, {:map, %{x: :number}}, @st_out, %{}} =
                TC.tc_expr(@ctx, %{}, @st_out, ast)
     end
   end
@@ -216,29 +216,29 @@ defmodule Maty.Typechecker.TCExprTest do
 
   describe "tc_expr/4 arithmetic operators" do
     test "addition of numbers" do
-      assert {:ok, {:number, @st_end}, %{}} =
+      assert {:ok, :number, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:+, 1, 2))
     end
 
     test "subtraction of numbers" do
-      assert {:ok, {:number, @st_end}, %{}} =
+      assert {:ok, :number, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:-, 5, 3))
     end
 
     test "multiplication" do
-      assert {:ok, {:number, @st_end}, %{}} =
+      assert {:ok, :number, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:*, 4, 3))
     end
 
     test "division" do
-      assert {:ok, {:number, @st_end}, %{}} =
+      assert {:ok, :number, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:/, 10, 2))
     end
 
     test "arithmetic with variables" do
       env = %{x: :number, y: :number}
 
-      assert {:ok, {:number, @st_end}, ^env} =
+      assert {:ok, :number, @st_end, ^env} =
                TC.tc_expr(@ctx, env, @st_end, erlang_op(:+, var(:x), var(:y)))
     end
 
@@ -252,39 +252,39 @@ defmodule Maty.Typechecker.TCExprTest do
     end
 
     test "arithmetic preserves session state" do
-      assert {:ok, {:number, @st_out}, %{}} =
+      assert {:ok, :number, @st_out, %{}} =
                TC.tc_expr(@ctx, %{}, @st_out, erlang_op(:+, 1, 2))
     end
   end
 
   describe "tc_expr/4 comparison operators" do
     test "less than" do
-      assert {:ok, {:boolean, @st_end}, %{}} =
+      assert {:ok, :boolean, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:<, 1, 2))
     end
 
     test "greater than" do
-      assert {:ok, {:boolean, @st_end}, %{}} =
+      assert {:ok, :boolean, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:>, 5, 3))
     end
 
     test "less than or equal" do
-      assert {:ok, {:boolean, @st_end}, %{}} =
+      assert {:ok, :boolean, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:<=, 1, 2))
     end
 
     test "greater than or equal" do
-      assert {:ok, {:boolean, @st_end}, %{}} =
+      assert {:ok, :boolean, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:>=, 5, 3))
     end
 
     test "equality" do
-      assert {:ok, {:boolean, @st_end}, %{}} =
+      assert {:ok, :boolean, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:==, 1, 1))
     end
 
     test "inequality" do
-      assert {:ok, {:boolean, @st_end}, %{}} =
+      assert {:ok, :boolean, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:!=, 1, 2))
     end
 
@@ -309,19 +309,19 @@ defmodule Maty.Typechecker.TCExprTest do
 
   describe "tc_expr/4 boolean operators" do
     test "and with booleans" do
-      assert {:ok, {:boolean, @st_end}, %{}} =
+      assert {:ok, :boolean, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, {:and, @meta, [true, false]})
     end
 
     test "or with booleans" do
-      assert {:ok, {:boolean, @st_end}, %{}} =
+      assert {:ok, :boolean, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, {:or, @meta, [true, false]})
     end
 
     test "and with variables" do
       env = %{a: :boolean, b: :boolean}
 
-      assert {:ok, {:boolean, @st_end}, ^env} =
+      assert {:ok, :boolean, @st_end, ^env} =
                TC.tc_expr(@ctx, env, @st_end, {:and, @meta, [var(:a), var(:b)]})
     end
 
@@ -337,14 +337,14 @@ defmodule Maty.Typechecker.TCExprTest do
 
   describe "tc_expr/4 not operator" do
     test "not boolean" do
-      assert {:ok, {:boolean, @st_end}, %{}} =
+      assert {:ok, :boolean, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, erlang_not(true))
     end
 
     test "not variable" do
       env = %{flag: :boolean}
 
-      assert {:ok, {:boolean, @st_end}, _env} =
+      assert {:ok, :boolean, @st_end, _env} =
                TC.tc_expr(@ctx, env, @st_end, erlang_not(var(:flag)))
     end
 
@@ -362,14 +362,14 @@ defmodule Maty.Typechecker.TCExprTest do
 
   describe "tc_expr/4 string concatenation" do
     test "binary <> binary" do
-      assert {:ok, {:binary, @st_end}, %{}} =
+      assert {:ok, :binary, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, string_concat("hello", " world"))
     end
 
     test "binary <> variable" do
       env = %{suffix: :binary}
 
-      assert {:ok, {:binary, @st_end}, _env} =
+      assert {:ok, :binary, @st_end, _env} =
                TC.tc_expr(@ctx, env, @st_end, string_concat("hello", var(:suffix)))
     end
 
@@ -388,14 +388,14 @@ defmodule Maty.Typechecker.TCExprTest do
   describe "tc_expr/4 match operator" do
     test "simple variable binding" do
       ast = match(var(:x), 42)
-      assert {:ok, {:number, @st_end}, env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, :number, @st_end, env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
       assert env[:x] == :number
     end
 
     test "rebinding a variable" do
       initial_env = %{x: :binary}
       ast = match(var(:x), 42)
-      assert {:ok, {:number, @st_end}, env} = TC.tc_expr(@ctx, initial_env, @st_end, ast)
+      assert {:ok, :number, @st_end, env} = TC.tc_expr(@ctx, initial_env, @st_end, ast)
       assert env[:x] == :number
     end
 
@@ -404,7 +404,7 @@ defmodule Maty.Typechecker.TCExprTest do
       pattern = {var(:a), var(:b)}
       ast = match(pattern, var(:pair))
 
-      assert {:ok, {{:tuple, [:number, :binary]}, @st_end}, result_env} =
+      assert {:ok, {:tuple, [:number, :binary]}, @st_end, result_env} =
                TC.tc_expr(@ctx, env, @st_end, ast)
 
       assert result_env[:a] == :number
@@ -413,7 +413,7 @@ defmodule Maty.Typechecker.TCExprTest do
 
     test "wildcard pattern" do
       ast = match({:_, @meta, nil}, 42)
-      assert {:ok, {:number, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, :number, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
     end
   end
 
@@ -428,7 +428,7 @@ defmodule Maty.Typechecker.TCExprTest do
           var(:y)
         ])
 
-      assert {:ok, {:binary, @st_end}, env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, :binary, @st_end, env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
       assert env[:x] == :number
       assert env[:y] == :binary
     end
@@ -441,14 +441,14 @@ defmodule Maty.Typechecker.TCExprTest do
           erlang_op(:+, var(:x), var(:y))
         ])
 
-      assert {:ok, {:number, @st_end}, env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, :number, @st_end, env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
       assert env[:x] == :number
       assert env[:y] == :number
     end
 
     test "single expression block" do
       ast = block([42])
-      assert {:ok, {:number, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, :number, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
     end
   end
 
@@ -464,7 +464,7 @@ defmodule Maty.Typechecker.TCExprTest do
           {2, "two"}
         ])
 
-      assert {:ok, {:binary, @st_end}, _env} = TC.tc_expr(@ctx, env, @st_end, ast)
+      assert {:ok, :binary, @st_end, _env} = TC.tc_expr(@ctx, env, @st_end, ast)
     end
 
     test "case with inconsistent branch types returns error" do
@@ -488,7 +488,7 @@ defmodule Maty.Typechecker.TCExprTest do
           {var(:n), var(:n)}
         ])
 
-      assert {:ok, {:number, @st_end}, _env} = TC.tc_expr(@ctx, env, @st_end, ast)
+      assert {:ok, :number, @st_end, _env} = TC.tc_expr(@ctx, env, @st_end, ast)
     end
 
     test "case with wildcard pattern" do
@@ -500,7 +500,7 @@ defmodule Maty.Typechecker.TCExprTest do
           {{:_, @meta, nil}, "other"}
         ])
 
-      assert {:ok, {:binary, @st_end}, _env} = TC.tc_expr(@ctx, env, @st_end, ast)
+      assert {:ok, :binary, @st_end, _env} = TC.tc_expr(@ctx, env, @st_end, ast)
     end
   end
 
@@ -509,17 +509,17 @@ defmodule Maty.Typechecker.TCExprTest do
   describe "tc_expr/4 anonymous functions" do
     test "fn with 1 arg" do
       ast = {:fn, @meta, [{:->, @meta, [[var(:x)], var(:x)]}]}
-      assert {:ok, {{:fun, 1}, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, {:fun, 1}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
     end
 
     test "fn with 2 args" do
       ast = {:fn, @meta, [{:->, @meta, [[var(:x), var(:y)], var(:x)]}]}
-      assert {:ok, {{:fun, 2}, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, {:fun, 2}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
     end
 
     test "fn with 0 args" do
       ast = {:fn, @meta, [{:->, @meta, [[], 42]}]}
-      assert {:ok, {{:fun, 0}, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, {:fun, 0}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
     end
   end
 
@@ -528,12 +528,12 @@ defmodule Maty.Typechecker.TCExprTest do
   describe "tc_expr/4 function captures" do
     test "remote function capture &Mod.fun/arity" do
       ast = {:&, @meta, [{:/, @meta, [{{:., @meta, [String, :length]}, @meta, []}, 1]}]}
-      assert {:ok, {{:fun, 1}, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, {:fun, 1}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
     end
 
     test "local function capture &fun/arity" do
       ast = {:&, @meta, [{:/, @meta, [:my_fun, 2]}]}
-      assert {:ok, {{:fun, 2}, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, {:fun, 2}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
     end
   end
 
@@ -558,11 +558,11 @@ defmodule Maty.Typechecker.TCExprTest do
 
   describe "tc_expr/4 atom literals" do
     test "plain atom without handler match" do
-      assert {:ok, {:atom, @st_end}, %{}} = TC.tc_expr(@ctx, %{}, @st_end, :some_atom)
+      assert {:ok, :atom, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, :some_atom)
     end
 
     test "atom preserves session state" do
-      assert {:ok, {:atom, @st_out}, %{}} = TC.tc_expr(@ctx, %{}, @st_out, :hello)
+      assert {:ok, :atom, @st_out, %{}} = TC.tc_expr(@ctx, %{}, @st_out, :hello)
     end
   end
 
@@ -572,27 +572,27 @@ defmodule Maty.Typechecker.TCExprTest do
     test "pure expressions don't alter session state" do
       st = ST.output_one(:client, :request, :binary, @st_end)
 
-      assert {:ok, {:number, ^st}, _} = TC.tc_expr(@ctx, %{}, st, 42)
-      assert {:ok, {:binary, ^st}, _} = TC.tc_expr(@ctx, %{}, st, "hello")
-      assert {:ok, {:boolean, ^st}, _} = TC.tc_expr(@ctx, %{}, st, true)
-      assert {:ok, {{:list, :number}, ^st}, _} = TC.tc_expr(@ctx, %{}, st, [1, 2, 3])
+      assert {:ok, :number, ^st, _} = TC.tc_expr(@ctx, %{}, st, 42)
+      assert {:ok, :binary, ^st, _} = TC.tc_expr(@ctx, %{}, st, "hello")
+      assert {:ok, :boolean, ^st, _} = TC.tc_expr(@ctx, %{}, st, true)
+      assert {:ok, {:list, :number}, ^st, _} = TC.tc_expr(@ctx, %{}, st, [1, 2, 3])
     end
 
     test "variable lookup preserves session state" do
       st = ST.input_one(:client, :request, :binary, @st_end)
       env = %{x: :number}
-      assert {:ok, {:number, ^st}, _} = TC.tc_expr(@ctx, env, st, var(:x))
+      assert {:ok, :number, ^st, _} = TC.tc_expr(@ctx, env, st, var(:x))
     end
 
     test "arithmetic preserves session state" do
       st = ST.output_one(:client, :request, :binary, @st_end)
-      assert {:ok, {:number, ^st}, _} = TC.tc_expr(@ctx, %{}, st, erlang_op(:+, 1, 2))
+      assert {:ok, :number, ^st, _} = TC.tc_expr(@ctx, %{}, st, erlang_op(:+, 1, 2))
     end
 
     test "match preserves session state" do
       st = ST.output_one(:client, :request, :binary, @st_end)
       ast = match(var(:x), 42)
-      assert {:ok, {:number, ^st}, _} = TC.tc_expr(@ctx, %{}, st, ast)
+      assert {:ok, :number, ^st, _} = TC.tc_expr(@ctx, %{}, st, ast)
     end
   end
 end

@@ -2,7 +2,7 @@
 defmodule Maty.HandlerExpansionTest do
   use ExUnit.Case
 
-  use Maty.Macros
+  use Maty.DSL
 
   # For type definitions in the specs
   @type session_ctx :: any()
