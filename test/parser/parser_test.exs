@@ -1,11 +1,13 @@
 defmodule Maty.ParserTest do
   alias Maty.ST
-  use Exnil.Case
+  alias Maty.Parser
+
+  use ExUnit.Case
 
   # Test the public API functions from Maty.Parser
-  describe "Maty.Parser.parse" do
+  describe "Parser.parse" do
     test "parses end type" do
-      assert {:ok, %ST.SEnd{}} = Maty.Parser.parse("end")
+      assert {:ok, %ST.SEnd{}} = Parser.parse("end")
     end
 
     test "parses input type with single branch" do
@@ -19,7 +21,7 @@ defmodule Maty.ParserTest do
                     continue_as: %ST.SEnd{}
                   }
                 ]
-              }} = Maty.Parser.parse("&Server:{ Ack(nil).end }")
+              }} = Parser.parse("&Server:{ Ack(nil).end }")
     end
 
     test "parses input type with multiple branches" do
@@ -38,7 +40,7 @@ defmodule Maty.ParserTest do
                     continue_as: %ST.SEnd{}
                   }
                 ]
-              }} = Maty.Parser.parse("&Server:{ Error(string).end, Ack(nil).end }")
+              }} = Parser.parse("&Server:{ Error(string).end, Ack(nil).end }")
     end
 
     test "parses output type with single branch" do
@@ -52,7 +54,7 @@ defmodule Maty.ParserTest do
                     continue_as: %ST.SEnd{}
                   }
                 ]
-              }} = Maty.Parser.parse("+Client:{ Request(string).end }")
+              }} = Parser.parse("+Client:{ Request(string).end }")
     end
 
     test "parses output type with complex payload" do
@@ -62,11 +64,11 @@ defmodule Maty.ParserTest do
                 branches: [
                   %ST.SBranch{
                     label: :data,
-                    payload: {:tuple, [:binary, {:list, [:boolean]}]},
+                    payload: {:tuple, [:binary, {:list, :boolean}]},
                     continue_as: %ST.SEnd{}
                   }
                 ]
-              }} = Maty.Parser.parse("+Peer:{ Data((string, boolean[])).end }")
+              }} = Parser.parse("+Peer:{ Data((string, boolean[])).end }")
     end
 
     test "parses nested session types" do
@@ -104,7 +106,7 @@ defmodule Maty.ParserTest do
                     }
                   }
                 ]
-              }} = Maty.Parser.parse(request_response)
+              }} = Parser.parse(request_response)
     end
 
     test "parses complex nested session types" do
@@ -132,7 +134,7 @@ defmodule Maty.ParserTest do
                       branches: [
                         %ST.SBranch{
                           label: :success,
-                          payload: {:tuple, [:number, {:list, [:binary]}]},
+                          payload: {:tuple, [:number, {:list, :binary}]},
                           continue_as: %ST.SOut{
                             to: :client,
                             branches: [
@@ -153,7 +155,7 @@ defmodule Maty.ParserTest do
                     }
                   }
                 ]
-              }} = Maty.Parser.parse(complex_type)
+              }} = Parser.parse(complex_type)
     end
 
     test "parses deep recursive session types" do
@@ -177,7 +179,7 @@ defmodule Maty.ParserTest do
       """
 
       # This validates the parser can handle complex recursive structures
-      {:ok, parsed} = Maty.Parser.parse(chat_protocol)
+      {:ok, parsed} = Parser.parse(chat_protocol)
 
       # Ensure the outermost type is an output to client
       assert %ST.SOut{to: :client} = parsed
@@ -199,47 +201,47 @@ defmodule Maty.ParserTest do
 
     test "handles whitespace variations" do
       # Minimal whitespace
-      assert {:ok, %ST.SOut{}} = Maty.Parser.parse("+Client:{Request(string).end}")
+      assert {:ok, %ST.SOut{}} = Parser.parse("+Client:{Request(string).end}")
 
       # Extra whitespace
-      assert {:ok, %ST.SOut{}} = Maty.Parser.parse("+Client:{ Request(string).end }")
+      assert {:ok, %ST.SOut{}} = Parser.parse("+Client:{ Request(string).end }")
     end
 
     test "returns error for invalid session types" do
       # Invalid input
       # Incomplete
-      assert {:error, _} = Maty.Parser.parse("&Server")
+      assert {:error, _} = Parser.parse("&Server")
       # Empty branches
-      assert {:error, _} = Maty.Parser.parse("&Server:{}")
+      assert {:error, _} = Parser.parse("&Server:{}")
 
       # Invalid output
       # Incomplete
-      assert {:error, _} = Maty.Parser.parse("+Client")
+      assert {:error, _} = Parser.parse("+Client")
       # Empty branches
-      assert {:error, _} = Maty.Parser.parse("+Client:{}")
+      assert {:error, _} = Parser.parse("+Client:{}")
 
       # Invalid branch
       # No input/output prefix
-      assert {:error, _} = Maty.Parser.parse("Request(string).end")
+      assert {:error, _} = Parser.parse("Request(string).end")
 
       # Invalid payload
       # Empty payload
-      assert {:error, _} = Maty.Parser.parse("+Client:{ Request().end }")
+      assert {:error, _} = Parser.parse("+Client:{ Request().end }")
 
       # Invalid type
-      assert {:error, _} = Maty.Parser.parse("+Client:{ Request(invalid).end }")
+      assert {:error, _} = Parser.parse("+Client:{ Request(invalid).end }")
 
       # Syntax errors
       # Comma instead of dot
-      assert {:error, _} = Maty.Parser.parse("+Client:{ Request(string),end }")
+      assert {:error, _} = Parser.parse("+Client:{ Request(string),end }")
       # Missing dot
-      assert {:error, _} = Maty.Parser.parse("+Client:{ Request(string) end }")
+      assert {:error, _} = Parser.parse("+Client:{ Request(string) end }")
     end
   end
 
-  describe "Maty.Parser.parse with named handlers" do
+  describe "Parser.parse with named handlers" do
     test "returns error for non-continuation handler reference" do
-      assert {:error, _} = Maty.Parser.parse("quote_handler")
+      assert {:ok, %ST.SName{handler: :quote_handler}} = Parser.parse("quote_handler")
     end
 
     test "parses session types with named handler continuations" do
@@ -270,7 +272,7 @@ defmodule Maty.ParserTest do
                     }
                   }
                 ]
-              }} = Maty.Parser.parse(protocol)
+              }} = Parser.parse(protocol)
     end
 
     test "handles complex protocol with named handlers" do
@@ -278,7 +280,7 @@ defmodule Maty.ParserTest do
       protocol =
         "+Client:{ Login(string).&Server:{ Success(nil).process_login, Error(string).end } }"
 
-      {:ok, parsed} = Maty.Parser.parse(protocol)
+      {:ok, parsed} = Parser.parse(protocol)
 
       # Verify the Success branch has a named handler
       success_branch =
@@ -292,9 +294,9 @@ defmodule Maty.ParserTest do
     end
   end
 
-  describe "Maty.Parser.parse!" do
+  describe "Parser.parse!" do
     test "returns parsed structure directly on success" do
-      assert %ST.SEnd{} = Maty.Parser.parse!("end")
+      assert %ST.SEnd{} = Parser.parse!("end")
 
       assert %ST.SIn{
                from: :server,
@@ -305,75 +307,75 @@ defmodule Maty.ParserTest do
                    continue_as: %ST.SEnd{}
                  }
                ]
-             } = Maty.Parser.parse!("&Server:{ Ack(nil).end }")
+             } = Parser.parse!("&Server:{ Ack(nil).end }")
     end
 
     test "raises exception on failure" do
-      assert_raise RuntimeError, fn -> Maty.Parser.parse!("invalid") end
-      assert_raise RuntimeError, fn -> Maty.Parser.parse!("&Server:{ Ack.end }") end
+      assert_raise RuntimeError, fn -> Parser.parse!("invalid!") end
+      assert_raise RuntimeError, fn -> Parser.parse!("&Server:{ Ack.end }") end
     end
   end
 
-  describe "Maty.Parser.parse_type" do
+  describe "Parser.parse_type" do
     test "parses basic types" do
-      assert {:ok, :binary} = Maty.Parser.parse_type("string")
-      assert {:ok, :number} = Maty.Parser.parse_type("number")
-      assert {:ok, nil} = Maty.Parser.parse_type("nil")
-      assert {:ok, :boolean} = Maty.Parser.parse_type("boolean")
+      assert {:ok, :binary} = Parser.parse_type("string")
+      assert {:ok, :number} = Parser.parse_type("number")
+      assert {:ok, nil} = Parser.parse_type("nil")
+      assert {:ok, :boolean} = Parser.parse_type("boolean")
     end
 
     test "parses list types" do
-      assert {:ok, {:list, [:binary]}} = Maty.Parser.parse_type("string[]")
-      assert {:ok, {:list, [:number]}} = Maty.Parser.parse_type("number[]")
-      assert {:ok, {:list, [:boolean]}} = Maty.Parser.parse_type("boolean[]")
+      assert {:ok, {:list, :binary}} = Parser.parse_type("string[]")
+      assert {:ok, {:list, :number}} = Parser.parse_type("number[]")
+      assert {:ok, {:list, :boolean}} = Parser.parse_type("boolean[]")
     end
 
     test "parses tuple types" do
-      assert {:ok, {:tuple, [:binary, :number]}} = Maty.Parser.parse_type("(string, number)")
+      assert {:ok, {:tuple, [:binary, :number]}} = Parser.parse_type("(string, number)")
 
-      assert {:ok, {:tuple, [:binary, {:list, [:boolean]}]}} =
-               Maty.Parser.parse_type("(string, boolean[])")
+      assert {:ok, {:tuple, [:binary, {:list, :boolean}]}} =
+               Parser.parse_type("(string, boolean[])")
 
-      assert {:ok, {:tuple, [nil]}} = Maty.Parser.parse_type("(nil)")
+      assert {:ok, {:tuple, [nil]}} = Parser.parse_type("(nil)")
     end
 
     test "parses nested tuple types" do
       assert {:ok, {:tuple, [:binary, {:tuple, [:number, :boolean]}]}} =
-               Maty.Parser.parse_type("(string, (number, boolean))")
+               Parser.parse_type("(string, (number, boolean))")
 
       assert {:ok, {:tuple, [:binary, {:tuple, [:number, {:tuple, [:boolean, nil]}]}]}} =
-               Maty.Parser.parse_type("(string, (number, (boolean, nil)))")
+               Parser.parse_type("(string, (number, (boolean, nil)))")
     end
 
     test "parses tuples with mixed types" do
-      assert {:ok, {:tuple, [:binary, {:list, [:number]}, :boolean]}} =
-               Maty.Parser.parse_type("(string, number[], boolean)")
+      assert {:ok, {:tuple, [:binary, {:list, :number}, :boolean]}} =
+               Parser.parse_type("(string, number[], boolean)")
     end
 
     test "returns error for invalid types" do
       # Unknown type
-      assert {:error, _} = Maty.Parser.parse_type("invalid")
+      assert {:error, _} = Parser.parse_type("invalid")
       # Empty list
-      assert {:error, _} = Maty.Parser.parse_type("[]")
+      assert {:error, _} = Parser.parse_type("[]")
       # Incomplete brackets
-      assert {:error, _} = Maty.Parser.parse_type("string[")
+      assert {:error, _} = Parser.parse_type("string[")
       # Incomplete tuple
-      assert {:error, _} = Maty.Parser.parse_type("(string,")
+      assert {:error, _} = Parser.parse_type("(string,")
       # Missing type after comma
-      assert {:error, _} = Maty.Parser.parse_type("(string, )")
+      assert {:error, _} = Parser.parse_type("(string, )")
     end
   end
 
-  describe "Maty.Parser.parse_type!" do
+  describe "Parser.parse_type!" do
     test "returns parsed type directly on success" do
-      assert :binary = Maty.Parser.parse_type!("string")
-      assert {:list, [:boolean]} = Maty.Parser.parse_type!("boolean[]")
-      assert {:tuple, [:binary, :number]} = Maty.Parser.parse_type!("(string, number)")
+      assert :binary = Parser.parse_type!("string")
+      assert {:list, :boolean} = Parser.parse_type!("boolean[]")
+      assert {:tuple, [:binary, :number]} = Parser.parse_type!("(string, number)")
     end
 
     test "raises exception on failure" do
-      assert_raise RuntimeError, fn -> Maty.Parser.parse_type!("invalid") end
-      assert_raise RuntimeError, fn -> Maty.Parser.parse_type!("(string,)") end
+      assert_raise RuntimeError, fn -> Parser.parse_type!("invalid") end
+      assert_raise RuntimeError, fn -> Parser.parse_type!("(string,)") end
     end
   end
 
@@ -406,7 +408,7 @@ defmodule Maty.ParserTest do
                     }
                   }
                 ]
-              }} = Maty.Parser.parse(ping_pong)
+              }} = Parser.parse(ping_pong)
     end
 
     test "parses authentication protocol" do
@@ -423,7 +425,7 @@ defmodule Maty.ParserTest do
       }
       """
 
-      {:ok, parsed} = Maty.Parser.parse(auth_protocol)
+      {:ok, parsed} = Parser.parse(auth_protocol)
 
       assert %ST.SOut{to: :client} = parsed
       [%ST.SBranch{label: :login}] = parsed.branches
@@ -452,7 +454,7 @@ defmodule Maty.ParserTest do
       """
 
       # Just verify it parses correctly
-      assert {:ok, %ST.SOut{}} = Maty.Parser.parse(transfer_protocol)
+      assert {:ok, %ST.SOut{}} = Parser.parse(transfer_protocol)
     end
   end
 
@@ -461,17 +463,17 @@ defmodule Maty.ParserTest do
 
   describe "Core.parse_session_type" do
     test "parses end type" do
-      assert {:ok, [%ST.SEnd{}], "", _, _, _} = Maty.Parser.Core.parse_session_type("end")
+      assert {:ok, [%ST.SEnd{}], "", _, _, _} = Parser.Core.parse_session_type("end")
     end
 
     test "parses input type" do
       assert {:ok, [%ST.SIn{}], _, _, _, _} =
-               Maty.Parser.Core.parse_session_type("&Server:{ Ack(nil).end }")
+               Parser.Core.parse_session_type("&Server:{ Ack(nil).end }")
     end
 
     test "parses output type" do
       assert {:ok, [%ST.SOut{}], _, _, _, _} =
-               Maty.Parser.Core.parse_session_type("+Client:{ Request(string).end }")
+               Parser.Core.parse_session_type("+Client:{ Request(string).end }")
     end
   end
 
@@ -484,7 +486,7 @@ defmodule Maty.ParserTest do
                   payload: :binary,
                   continue_as: %ST.SEnd{}
                 }
-              ], "", _, _, _} = Maty.Parser.Core.parse_branch("Request(string).end")
+              ], "", _, _, _} = Parser.Core.parse_branch("Request(string).end")
     end
 
     test "parses a branch with complex payload" do
@@ -492,10 +494,10 @@ defmodule Maty.ParserTest do
               [
                 %ST.SBranch{
                   label: :data,
-                  payload: {:tuple, [:binary, {:list, [:boolean]}]},
+                  payload: {:tuple, [:binary, {:list, :boolean}]},
                   continue_as: %ST.SEnd{}
                 }
-              ], "", _, _, _} = Maty.Parser.Core.parse_branch("Data((string, boolean[])).end")
+              ], "", _, _, _} = Parser.Core.parse_branch("Data((string, boolean[])).end")
     end
 
     test "parses a branch with nested continuation" do
@@ -515,9 +517,8 @@ defmodule Maty.ParserTest do
                     ]
                   }
                 }
-              ], "", _, _,
-              _} =
-               Maty.Parser.Core.parse_branch("Request(string).+Client:{ Response(number).end }")
+              ], "", _, _, _} =
+               Parser.Core.parse_branch("Request(string).+Client:{ Response(number).end }")
     end
   end
 
@@ -535,7 +536,7 @@ defmodule Maty.ParserTest do
                     }
                   ]
                 }
-              ], "", _, _, _} = Maty.Parser.Core.parse_input("&Server:{ Ack(nil).end }")
+              ], "", _, _, _} = Parser.Core.parse_input("&Server:{ Ack(nil).end }")
     end
 
     test "parses an input with multiple branches" do
@@ -556,8 +557,8 @@ defmodule Maty.ParserTest do
                     }
                   ]
                 }
-              ], "", _, _,
-              _} = Maty.Parser.Core.parse_input("&Server:{ Error(string).end, Ack(nil).end }")
+              ], "", _, _, _} =
+               Parser.Core.parse_input("&Server:{ Error(string).end, Ack(nil).end }")
     end
   end
 
@@ -575,7 +576,7 @@ defmodule Maty.ParserTest do
                     }
                   ]
                 }
-              ], "", _, _, _} = Maty.Parser.Core.parse_output("+Client:{ Request(string).end }")
+              ], "", _, _, _} = Parser.Core.parse_output("+Client:{ Request(string).end }")
     end
 
     test "parses an output with complex payload" do
@@ -586,69 +587,69 @@ defmodule Maty.ParserTest do
                   branches: [
                     %ST.SBranch{
                       label: :data,
-                      payload: {:tuple, [:binary, {:list, [:boolean]}]},
+                      payload: {:tuple, [:binary, {:list, :boolean}]},
                       continue_as: %ST.SEnd{}
                     }
                   ]
                 }
-              ], "", _, _,
-              _} = Maty.Parser.Core.parse_output("+Peer:{ Data((string, boolean[])).end }")
+              ], "", _, _, _} =
+               Parser.Core.parse_output("+Peer:{ Data((string, boolean[])).end }")
     end
   end
 
   describe "Core.payload_type" do
     test "parses basic types" do
-      assert {:ok, [:binary], "", _, _, _} = Maty.Parser.Core.payload_type("string")
-      assert {:ok, [:number], "", _, _, _} = Maty.Parser.Core.payload_type("number")
-      assert {:ok, [nil], "", _, _, _} = Maty.Parser.Core.payload_type("nil")
-      assert {:ok, [:boolean], "", _, _, _} = Maty.Parser.Core.payload_type("boolean")
+      assert {:ok, [:binary], "", _, _, _} = Parser.Core.payload_type("string")
+      assert {:ok, [:number], "", _, _, _} = Parser.Core.payload_type("number")
+      assert {:ok, [nil], "", _, _, _} = Parser.Core.payload_type("nil")
+      assert {:ok, [:boolean], "", _, _, _} = Parser.Core.payload_type("boolean")
     end
 
     test "parses list types" do
-      assert {:ok, [{:list, [:binary]}], "", _, _, _} = Maty.Parser.Core.payload_type("string[]")
-      assert {:ok, [{:list, [:number]}], "", _, _, _} = Maty.Parser.Core.payload_type("number[]")
+      assert {:ok, [{:list, :binary}], "", _, _, _} = Parser.Core.payload_type("string[]")
+      assert {:ok, [{:list, :number}], "", _, _, _} = Parser.Core.payload_type("number[]")
 
-      assert {:ok, [{:list, [:boolean]}], "", _, _, _} =
-               Maty.Parser.Core.payload_type("boolean[]")
+      assert {:ok, [{:list, :boolean}], "", _, _, _} =
+               Parser.Core.payload_type("boolean[]")
     end
 
     test "parses tuple types" do
       assert {:ok, [{:tuple, [:binary, :number]}], "", _, _, _} =
-               Maty.Parser.Core.payload_type("(string, number)")
+               Parser.Core.payload_type("(string, number)")
     end
   end
 
   describe "Core.parse_tuple" do
     test "parses simple tuples" do
       assert {:ok, [{:tuple, [:binary, :number]}], "", _, _, _} =
-               Maty.Parser.Core.parse_tuple("(string, number)")
+               Parser.Core.parse_tuple("(string, number)")
     end
 
     test "recognises tuple with list elements" do
-      assert {:ok, [{:tuple, [:binary, {:list, [:boolean]}]}], "", _, _, _} =
-               Maty.Parser.Core.parse_tuple("(string, boolean[])")
+      assert {:ok, [{:tuple, [:binary, {:list, :boolean}]}], "", _, _, _} =
+               Parser.Core.parse_tuple("(string, boolean[])")
     end
 
     test "recognises single element tuples" do
       assert {:ok, [{:tuple, [nil]}], "", _, _, _} =
-               Maty.Parser.Core.parse_tuple("(nil)")
+               Parser.Core.parse_tuple("(nil)")
     end
 
     test "recognises nested tuples" do
       assert {:ok, [{:tuple, [:binary, {:tuple, [:number, :boolean]}]}], "", _, _, _} =
-               Maty.Parser.Core.parse_tuple("(string, (number, boolean))")
+               Parser.Core.parse_tuple("(string, (number, boolean))")
     end
   end
 
   describe "Core.parse_name" do
     test "parses handler names" do
       assert {:ok, [%ST.SName{handler: :quote_handler}], "", _, _, _} =
-               Maty.Parser.Core.parse_name("quote_handler")
+               Parser.Core.parse_name("quote_handler")
     end
 
     test "parses compound handler names" do
       assert {:ok, [%ST.SName{handler: :process_user_request}], "", _, _, _} =
-               Maty.Parser.Core.parse_name("ProcessUserRequest")
+               Parser.Core.parse_name("ProcessUserRequest")
     end
   end
 end
