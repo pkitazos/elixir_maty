@@ -137,7 +137,8 @@ defmodule Maty.Typechecker.TC do
   end
 
   deftc tc_expr(ctx, env, st, items) when is_list(items) do
-    traverse(items, env, st, fn item, env, st -> tc_expr(ctx, env, st, item) end)
+    items
+    |> traverse(env, st, fn item, env, st -> tc_expr(ctx, env, st, item) end)
     |> bind(fn list_types, env, st ->
       list_types
       |> Helpers.unify_list_types()
@@ -169,7 +170,8 @@ defmodule Maty.Typechecker.TC do
   # n-Tuple Construction {v1, v2, ...} (Val-Tuple adaptation)
   # Preserves session state.
   deftc tc_expr(ctx, var_env, st_pre, {:{}, _, items}) when is_list(items) do
-    traverse(items, var_env, st_pre, fn item, env, st -> tc_expr(ctx, env, st, item) end)
+    items
+    |> traverse(var_env, st_pre, fn item, env, st -> tc_expr(ctx, env, st, item) end)
     |> map(fn types -> {:tuple, types} end)
   end
 
@@ -181,7 +183,8 @@ defmodule Maty.Typechecker.TC do
 
   # Clause for Non-Empty Map %{k1 => v1, ...}
   deftc tc_expr(ctx, env, st, {:%{}, meta, pairs}) when is_list(pairs) do
-    traverse(pairs, env, st, fn {key_ast, val_ast}, env, st ->
+    pairs
+    |> traverse(env, st, fn {key_ast, val_ast}, env, st ->
       thread do
         key_t <~ tc_expr(ctx, env, st, key_ast)
         _ <~ guard_atom(key_t, meta, ctx, env, st)
@@ -364,10 +367,10 @@ defmodule Maty.Typechecker.TC do
   # AST: {:case, meta, [scrutinee_ast, [do: clauses_list]]}
 
   deftc tc_expr(ctx, env, st, {:case, meta, [scrutinee_ast, [do: clauses_list]]}) do
-    st_pre = st
-
     tc_expr(ctx, env, st, scrutinee_ast)
     |> bind(fn scrutinee_type, env, st ->
+      st_pre = st
+
       case Helpers.check_st_unchanged(st_pre, st, meta) do
         :ok ->
           fan_out(clauses_list, env, st_pre, fn {:->, _, [[p_ast], e_ast]}, env, st ->
@@ -413,133 +416,133 @@ defmodule Maty.Typechecker.TC do
   # Matches call to Maty.DSL.internal_send/3 which the send/2 macro expands to
   deftc tc_expr(
           ctx,
-          var_env,
-          st_pre,
+          env,
+          %ST.SOut{to: expected_role, branches: branches} = st,
           {{:., meta, [Maty.DSL, :internal_send]}, _, [_session_ctx, recipient_ast, message_ast]}
         ) do
-    case st_pre do
-      %ST.SOut{to: expected_role, branches: branches} ->
-        with {:recipient, {:ok, :atom, recipient_st, recipient_env}} <-
-               {:recipient, tc_expr(ctx, var_env, st_pre, recipient_ast)},
-             # Ensure recipient check pure
-             :ok <- Helpers.check_st_unchanged(st_pre, recipient_st, meta),
+    thread do
+      _recipient_type
+      <~ (
+        st_pre = st
+        tc_expr(ctx, env, st, recipient_ast)
+      )
 
-             # Check recipient matches expected rol
-             {:role, [got: ^expected_role, expected: _expected_role], _st} <-
-               {:role, [got: recipient_ast, expected: expected_role], recipient_st},
+      # Ensure recipient check pure
+      :ok <~ Helpers.check_st_unchanged(st_pre, st, meta)
 
-             # 4. Check message structure {label, payload_expr}
-             #  pin - standardise helper function APIs
-             {:message_ok, literal_label, payload_expr_ast} <-
-               Helpers.check_message_structure(ctx, meta, message_ast),
+      # Check recipient matches expected role
+      _
+      <~ lift_bool(
+        recipient_ast == expected_role,
+        Error.ProtocolViolation.incorrect_target_participant(
+          ctx.module,
+          meta,
+          st_pre,
+          got: recipient_ast,
+          expected: expected_role
+        ),
+        env,
+        st
+      )
 
-             # Typecheck payload expression
-             {:payload, {:ok, actual_payload_type, payload_st, payload_env}} <-
-               {:payload, tc_expr(ctx, recipient_env, recipient_st, payload_expr_ast)},
+      # Check message structure {label, payload_expr}
+      {literal_label, payload_expr_ast}
+      <~ lift_result(Helpers.check_message_structure(ctx, meta, message_ast), env, st)
 
-             # 5. Find matching branch for the label
-             #  pin - this is really messy
-             {:branch, {:ok, matched_branch}, [got: _attempted_match, expected: _branches], _st} <-
-               {
-                 :branch,
-                 Helpers.find_matching_branch(branches, {literal_label, actual_payload_type}),
-                 [got: {literal_label, actual_payload_type}, expected: branches],
-                 payload_st
-               },
-             %{payload: expected_payload_type, continue_as: st_Sj} = matched_branch,
-             # Ensure payload check pure
-             :ok <- Helpers.check_st_unchanged(recipient_st, payload_st, meta),
-             # Check payload type matches expected
-             # todo: should try have it so that the shape of the data sent to the error branches is a little more standardised / uniform
-             {:payload, :ok, _st} <-
-               {:payload, Helpers.check_payload_type(actual_payload_type, expected_payload_type),
-                payload_st} do
-          # All checks passed!
-          # Result type is :atom, next session state is st_Sj
-          # Use env after payload check
-          {:ok, :atom, st_Sj, payload_env}
-        else
-          {:error, msg, env} ->
-            {:error, msg, env}
+      # Typecheck payload expression
+      actual_payload_type <~ tc_expr(ctx, env, st, payload_expr_ast)
+      # Ensure payload check pure
+      :ok <~ Helpers.check_st_unchanged(st_pre, st, meta)
 
-          {:error, msg} ->
-            {:error, msg, var_env}
+      # Find matching branch for the label
+      matched_branch
+      <~ case Helpers.find_matching_branch(branches, {literal_label, actual_payload_type}) do
+        {:ok, branch} ->
+          ok(branch, env, st)
 
-          {:branch, {:error, :label_mismatch}, [got: {label_received, _}, expected: branches], st} ->
-            branch_options = branches |> Enum.map(fn b -> b.label end)
+        {:error, :label_mismatch} ->
+          branch_options = Enum.map(branches, fn b -> b.label end)
 
-            error_msg =
-              Error.ProtocolViolation.incorrect_message_label(ctx.module, meta, st,
-                got: label_received,
-                expected: branch_options
-              )
-
-            {:error, error_msg, var_env}
-
-          # todo: try doing something about this situation. don't wanna have to check twice for the label violations
-          {:branch, {:error, :payload_mismatch},
-           [got: {label_received, payload_received}, expected: branches], st} ->
-            expected_branch =
-              branches
-              |> Enum.find(fn b -> b.label == label_received end)
-
-            case expected_branch do
-              nil ->
-                branch_options = branches |> Enum.map(fn b -> b.label end)
-
-                error_msg =
-                  Error.ProtocolViolation.incorrect_message_label(
-                    ctx.module,
-                    meta,
-                    st,
-                    got: label_received,
-                    expected: branch_options
-                  )
-
-                {:error, error_msg, var_env}
-
-              other ->
-                error_msg =
-                  Error.ProtocolViolation.incorrect_payload_type(
-                    ctx.module,
-                    meta,
-                    st,
-                    got: payload_received,
-                    expected: other.payload
-                  )
-
-                {:error, error_msg, var_env}
-            end
-
-          {:role, roles, st} ->
-            error_msg =
-              Error.ProtocolViolation.incorrect_target_participant(ctx.module, meta, st, roles)
-
-            {:error, error_msg, var_env}
-
-          {:payload, payloads, st} ->
-            error_msg =
-              Error.ProtocolViolation.incorrect_payload_type(ctx.module, meta, st, payloads)
-
-            {:error, error_msg, var_env}
-
-          # todo: fix this it
-          {label, e} when label in [:recipient, :message, :branch, :payload] ->
-            e
-        end
-
-      other_state ->
-        error_msg =
-          Error.ProtocolViolation.incorrect_action(
-            ctx.module,
-            meta,
-            # todo: try to render shape of message
-            [got: "MatyDSL.send(:#{recipient_ast}, message)"],
-            other_state
+          error(
+            Error.ProtocolViolation.incorrect_message_label(
+              ctx.module,
+              meta,
+              st_pre,
+              got: literal_label,
+              expected: branch_options
+            ),
+            env
           )
 
-        {:error, error_msg, var_env}
+        {:error, :payload_mismatch} ->
+          case Enum.find(branches, fn b -> b.label == literal_label end) do
+            nil ->
+              branch_options = Enum.map(branches, fn b -> b.label end)
+
+              error(
+                Error.ProtocolViolation.incorrect_message_label(
+                  ctx.module,
+                  meta,
+                  st_pre,
+                  got: literal_label,
+                  expected: branch_options
+                ),
+                env
+              )
+
+            other ->
+              error(
+                Error.ProtocolViolation.incorrect_payload_type(
+                  ctx.module,
+                  meta,
+                  st_pre,
+                  got: actual_payload_type,
+                  expected: other.payload
+                ),
+                env
+              )
+          end
+      end
+
+      # Check payload type matches expected
+      _
+      <~ lift_bool(
+        Helpers.check_payload_type(actual_payload_type, matched_branch.payload) == :ok,
+        Error.ProtocolViolation.incorrect_payload_type(
+          ctx.module,
+          meta,
+          st_pre,
+          got: actual_payload_type,
+          expected: matched_branch.payload
+        ),
+        env,
+        st
+      )
+
+      (
+        # to silence macro warning
+        _ = st
+        ok(:atom, env, matched_branch.continue_as)
+      )
     end
+  end
+
+  deftc tc_expr(
+          ctx,
+          env,
+          st,
+          {{:., meta, [Maty.DSL, :internal_send]}, _, [_session_ctx, recipient_ast, _message_ast]}
+        ) do
+    error(
+      Error.ProtocolViolation.incorrect_action(
+        ctx.module,
+        meta,
+        # todo: try to render shape of message
+        [got: "MatyDSL.send(:#{recipient_ast}, message)"],
+        st
+      ),
+      env
+    )
   end
 
   # --- Maty setState (T-Set) ---
@@ -610,62 +613,93 @@ defmodule Maty.Typechecker.TC do
   # Matches throw({:suspend, handler, state}) from Maty.DSL.suspend/2
   deftc tc_expr(
           ctx,
-          var_env,
-          st_pre,
+          env,
+          st,
           {{:., _, [:erlang, :throw]}, _,
            [{:{}, meta, [:suspend, handler_ast, {state_var, _, _} = state_ast]}]}
         ) do
-    # todo: threading of environment and st in with clause
-    with {:h, {:ok, handler_type, h_st, h_env}} <-
-           {:h, tc_expr(ctx, var_env, st_pre, handler_ast)},
-         # pin - maybe helper could return more standard type
-         :ok <- Helpers.check_st_unchanged(st_pre, h_st, meta),
-         # pin - maybe helper could return more standard type
-         {:suspension, :ok, [got: _], _st} <-
-           {:suspension, Helpers.check_handler_type(handler_type, meta), [got: handler_ast],
-            st_pre},
-         #
-         {:v, {:ok, state_type, v_st, v_env}} <- {:v, tc_expr(ctx, h_env, h_st, state_ast)},
-         # pin - maybe helper could return more standard type
-         :ok <- Helpers.check_st_unchanged(h_st, v_st, meta),
-         {:ok, _state_type} <- Helpers.check_maty_state_type(state_type),
-         {:st, %ST.SName{handler: expected_handler}, _state_var} <- {:st, v_st, state_var},
-         {:handler_name, [got: ^expected_handler, expected: _expected_handler], _st} <-
-           {:handler_name, [got: handler_ast, expected: expected_handler], v_st} do
-      {:ok, :no_return, {:st_bottom, :suspend}, v_env}
-    else
-      {:error, msg, env} ->
-        {:error, msg, env}
+    thread do
+      handler_type
+      <~ (
+        st_pre = st
+        tc_expr(ctx, env, st, handler_ast)
+      )
 
-      {:error, msg} ->
-        {:error, msg, var_env}
+      :ok <~ Helpers.check_st_unchanged(st_pre, st, meta)
 
-      {:st, other_st, state_var} ->
-        error_msg =
-          Error.ProtocolViolation.incorrect_action(
-            ctx.module,
-            meta,
-            [got: "MatyDSL.suspend(:#{handler_ast}, #{state_var})"],
-            other_st
+      _
+      <~ case Helpers.check_handler_type(handler_type) do
+        :ok ->
+          ok(nil, env, st)
+
+        :error ->
+          error(
+            Error.ProtocolViolation.suspend_invalid_handler_type(
+              ctx.module,
+              meta,
+              [got: handler_ast],
+              st
+            ),
+            env
           )
+      end
 
-        {:error, error_msg, var_env}
+      state_type
+      <~ (
+        st_pre = st
+        tc_expr(ctx, env, st, state_ast)
+      )
 
-      {:suspension, :error, [got: got], st} ->
-        error_msg =
-          Error.ProtocolViolation.suspend_invalid_handler_type(ctx.module, meta, [got: got], st)
+      :ok <~ Helpers.check_st_unchanged(st_pre, st, meta)
 
-        {:error, error_msg, var_env}
+      _
+      <~ lift_result(
+        Helpers.check_maty_state_type(state_type),
+        # todo: fix error stuff later
+        Error.TypeMismatch.invalid_maty_state_type(
+          ctx.module,
+          meta,
+          Error.TypeMismatch.invalid_maty_state_type(state_type)
+        ),
+        env,
+        st
+      )
 
-      {:maty_state_error, error_internal} ->
-        error_msg = Error.TypeMismatch.invalid_maty_state_type(ctx.module, meta, error_internal)
-        {:error, error_msg}
+      expected_handler
+      <~ case st do
+        %ST.SName{handler: expected_handler} ->
+          ok(expected_handler, env, st)
 
-      {:handler_name, handlers, st} ->
-        error_msg =
-          Error.ProtocolViolation.incorrect_handler_suspension(ctx.module, meta, st, handlers)
+        other_st ->
+          error(
+            Error.ProtocolViolation.incorrect_action(
+              ctx.module,
+              meta,
+              [got: "MatyDSL.suspend(:#{handler_ast}, #{state_var})"],
+              other_st
+            ),
+            env
+          )
+      end
 
-        {:error, error_msg, var_env}
+      _
+      <~ lift_bool(
+        expected_handler == handler_ast,
+        Error.ProtocolViolation.incorrect_handler_suspension(
+          ctx.module,
+          meta,
+          st,
+          got: handler_ast,
+          expected: expected_handler
+        ),
+        env,
+        st
+      )
+
+      (
+        _ = st
+        ok(:no_return, env, {:st_bottom, :suspend})
+      )
     end
   end
 
@@ -675,171 +709,136 @@ defmodule Maty.Typechecker.TC do
 
   deftc tc_expr(
           ctx,
-          var_env,
-          st_pre,
+          env,
+          st,
           {{:., _, [:erlang, :throw]}, meta, [done: {state_var, _, _} = state_ast]}
         ) do
-    with {:ok, state_type, v_st, v_env} <- tc_expr(ctx, var_env, st_pre, state_ast),
-         # pin - maybe helper could return more standard type
-         :ok <- Helpers.check_st_unchanged(st_pre, v_st, meta),
-         {:ok, _state_type} <- Helpers.check_maty_state_type(state_type),
-         {:st, %ST.SEnd{}, _state_var} <- {:st, v_st, state_var} do
-      {:ok, :no_return, {:st_bottom, :done}, v_env}
-    else
-      {:error, msg, env} ->
-        {:error, msg, env}
+    thread do
+      state_type
+      <~ (
+        st_pre = st
+        tc_expr(ctx, env, st, state_ast)
+      )
 
-      {:error, msg} ->
-        {:error, msg, var_env}
+      :ok <~ Helpers.check_st_unchanged(st_pre, st, meta)
 
-      {:maty_state_error, error_internal} ->
-        error_msg = Error.TypeMismatch.invalid_maty_state_type(ctx.module, meta, error_internal)
-        {:error, error_msg}
+      _
+      <~ lift_result(
+        Helpers.check_maty_state_type(state_type),
+        # todo: fix error stuff later
+        Error.TypeMismatch.invalid_maty_state_type(
+          ctx.module,
+          meta,
+          Error.TypeMismatch.invalid_maty_state_type(state_type)
+        ),
+        env,
+        st
+      )
 
-      {:st, other_st, state_var} ->
-        error_msg =
-          Error.ProtocolViolation.incorrect_action(
-            ctx.module,
-            meta,
-            [got: "MatyDSL.done(#{state_var})"],
-            other_st
+      _
+      <~ case st do
+        %ST.SEnd{} ->
+          ok(nil, env, st)
+
+        other_st ->
+          error(
+            Error.ProtocolViolation.incorrect_action(
+              ctx.module,
+              meta,
+              [got: "MatyDSL.done(#{state_var})"],
+              other_st
+            ),
+            env
           )
+      end
 
-        {:error, error_msg, var_env}
+      (
+        _ = st
+        ok(:no_return, env, {:st_bottom, :done})
+      )
     end
   end
 
   # --- Maty Register Operation (T-Register) V2 ---
   deftc tc_expr(
           ctx,
-          var_env,
-          st_pre,
+          env,
+          st,
           {{:., _m1, [Maty.DSL, :register]}, meta,
            [ap_pid_ast, role_ast, reg_info_ast, state_ast]}
         ) do
-    with :ok,
-         # is ap_pid_ast a PID?
-         {:ap, {:ok, :pid, ^st_pre, _}} <- {:ap, tc_expr(ctx, var_env, st_pre, ap_pid_ast)},
+    thread do
+      pid_type <~ tc_expr(ctx, env, st, ap_pid_ast)
+      # todo: better error
+      _ <~ lift_bool(pid_type == :pid, "AP must be a PID", env, st)
+      # todo: also check session type is not progressing
 
-         # is role_ast a role?
-         {:role, {:ok, :atom, ^st_pre, _}} <-
-           {:role, tc_expr(ctx, var_env, st_pre, role_ast)},
+      role_type <~ tc_expr(ctx, env, st, role_ast)
+      # todo: better error
+      _ <~ lift_bool(role_type == :atom, "role must be a atom", env, st)
+      # todo: also check session type is not progressing
 
-         # is init_handler a proper handler?
-         # have they provided the required args?
-         {:handler, {:ok, {:fun, _arity}, st_pre, var_env}} <-
-           {:handler, tc_expr(ctx, var_env, st_pre, reg_info_ast)},
+      init_handler_type <~ tc_expr(ctx, env, st, reg_info_ast)
+      # todo: better error
+      _ <~ lift_bool(match?({:fun, _}, init_handler_type), "handler must be a function", env, st)
+      # todo: also check session type is not progressing
 
-         # is state_ast an ActorState
-         {:state, {:ok, state_type, ^st_pre, _}} <-
-           {:state, tc_expr(ctx, var_env, st_pre, state_ast)},
-         {:ok, _state_type} <- Helpers.check_maty_state_type(state_type),
-         return_type = {:tuple, [:ok, Type.maty_actor_state()]} do
-      # all checks passed
+      state_type <~ tc_expr(ctx, env, st, state_ast)
+      # todo: fix error
+      maty_actor_state_type
+      <~ lift_result(
+        Helpers.check_maty_state_type(state_type),
+        Error.TypeMismatch.invalid_maty_state_type(
+          ctx.module,
+          meta,
+          Error.TypeMismatch.invalid_maty_state_type(state_type)
+        ),
+        env,
+        st
+      )
 
-      {:ok, return_type, st_pre, var_env}
-    else
-      {:ap, {:error, _msg, _var_env} = error} ->
-        error
+      # todo: also check session type is not progressing
 
-      {:role, {:error, _msg, _var_env} = error} ->
-        error
-
-      {:handler, {:error, _msg, _var_env} = error} ->
-        error
-
-      {:state, {:error, _msg, _var_env} = error} ->
-        error
-
-      {:maty_state_error, error_internal} ->
-        error_msg = Error.TypeMismatch.invalid_maty_state_type(ctx.module, meta, error_internal)
-        {:error, error_msg}
-
-      other ->
-        # pin - convert to new kind of error
-        {:error, Error.internal_error("Unexpected mismatch in register check: #{inspect(other)}"),
-         var_env}
+      ok({:tuple, [:ok, maty_actor_state_type]}, env, st)
     end
   end
 
   # --- Function Application (T-App) ---
   # Handles local function calls: f(arg1, arg2, ...)
-  deftc tc_expr(ctx, var_env, st_pre, {func_name, meta, arg_asts} = ast)
+  deftc tc_expr(ctx, env, st, {func_name, meta, arg_asts})
         when is_atom(func_name) and is_list(arg_asts) and meta != [] and
                func_name not in [:=, :%, :{}, :|, :<<>>] do
-    arity = length(arg_asts)
-    func_id = {func_name, arity}
+    func_id = {func_name, length(arg_asts)}
 
-    # todo: maybe make use of more helpers?
-    # get all the type signatures
     with {:ok, signatures} when is_list(signatures) and signatures != [] <-
            Map.fetch(ctx.psi, func_id) do
-      # go through each list of arguments
-      Enum.reduce_while(
-        arg_asts,
-        {:ok, [], st_pre, var_env},
-        fn arg_ast, {:ok, acc_arg_types, current_st, current_env} ->
-          case tc_expr(ctx, current_env, current_st, arg_ast) do
-            {:ok, actual_type, next_st, next_env} ->
-              # Accumulate actual types and pass state/env forward
-              # session type should remain unchanged from typechecking the individual arguments
-              # but we thread it through anyway
-              {:cont, {:ok, [actual_type | acc_arg_types], next_st, next_env}}
+      arg_asts
+      |> traverse(env, st, fn arg_ast, env, st -> tc_expr(ctx, env, st, arg_ast) end)
+      |> bind(fn arg_types, env, st ->
+        case Enum.find(signatures, fn {param_types, _return_type} -> arg_types == param_types end) do
+          {_param_types, return_type} ->
+            ok(return_type, env, st)
 
-            {:error, error, err_env} ->
-              # Halt on first argument error
-              {:halt, {:error, error, err_env}}
-          end
+          nil ->
+            error(
+              Error.FunctionCall.no_matching_function_clause(
+                ctx.module,
+                meta,
+                func_id,
+                arg_types
+              ),
+              env
+            )
         end
-      )
-      # if we make it here it means we were able to typecheck all asts
-      |> case do
-        {:ok, actual_arg_types_rev, final_st, final_env} ->
-          actual_arg_types = Enum.reverse(actual_arg_types_rev)
-
-          # match on the first matching signature
-          Enum.find(signatures, fn {param_types, _return_type} ->
-            # Check type compatibility for this signature
-            compatible? =
-              actual_arg_types
-              |> Enum.zip(param_types)
-              |> Enum.all?(fn {got, expected} -> got == expected end)
-
-            # Check arity
-            compatible? and length(actual_arg_types) == length(param_types)
-          end)
-          |> case do
-            {_param_types, return_type} ->
-              # match exists
-              {:ok, return_type, final_st, final_env}
-
-            nil ->
-              # match does not exist
-              Logger.error(inspect(ast))
-
-              error =
-                Error.FunctionCall.no_matching_function_clause(
-                  ctx.module,
-                  meta,
-                  func_id,
-                  actual_arg_types
-                )
-
-              {:error, error, final_env}
-          end
-
-        {:error, error, final_env} ->
-          # An error occurred during argument typechecking
-          {:error, error, final_env}
-      end
+      end)
     else
       {:ok, []} ->
         error = Error.FunctionCall.function_not_exist(ctx.module, meta, func_id)
-        {:error, error, var_env}
+        {:error, error, env}
 
       :error ->
         error = Error.FunctionCall.function_not_exist(ctx.module, meta, func_id)
-        {:error, error, var_env}
+        {:error, error, env}
     end
   end
 
@@ -1210,7 +1209,8 @@ defmodule Maty.Typechecker.TC do
   end
 
   def tc_expr_list(ctx, var_env, st_pre, ast_list) do
-    traverse(ast_list, var_env, st_pre, fn ast, env, st -> tc_expr(ctx, env, st, ast) end)
+    ast_list
+    |> traverse(var_env, st_pre, fn ast, env, st -> tc_expr(ctx, env, st, ast) end)
     |> map(&List.last/1)
   end
 

@@ -202,7 +202,7 @@ defmodule Maty.Typechecker.Helpers do
 
   def check_message_structure(_ctx, _meta, {label_atom, payload_expr_ast})
       when is_atom(label_atom) do
-    {:message_ok, label_atom, payload_expr_ast}
+    {:ok, {label_atom, payload_expr_ast}}
   end
 
   def check_message_structure(ctx, meta, other_ast) do
@@ -250,9 +250,9 @@ defmodule Maty.Typechecker.Helpers do
   end
 
   # Checks if a type is one of the valid handler types we defined earlier
-  def check_handler_type(:maty_handler_msg, _meta), do: :ok
-  def check_handler_type(:maty_handler_init, _meta), do: :ok
-  def check_handler_type(_other_type, _meta), do: :error
+  def check_handler_type(:maty_handler_msg), do: :ok
+  def check_handler_type(:maty_handler_init), do: :ok
+  def check_handler_type(_other_type), do: :error
 
   # Checks if a type is compatible with maty_actor_state
   def check_maty_state_type(state_type) do
