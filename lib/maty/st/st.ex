@@ -113,14 +113,29 @@ defmodule Maty.ST do
           }
   end
 
+  defmodule SBottom do
+    @moduledoc """
+    Represents a fully consumed session type (bottom).
+
+    Produced after a handler terminates via done or suspend.
+    """
+    @enforce_keys [:reason]
+    defstruct [:reason]
+
+    @type t :: %__MODULE__{
+            reason: :done | :suspend | :nothing
+          }
+  end
+
   @typedoc """
   A session type that can be:
   - An input type (receiving messages)
   - An output type (sending messages)
   - A termination marker
   - A named handler reference
+  - A bottom type (fully consumed session)
   """
-  @type t :: SIn.t() | SOut.t() | SEnd.t() | SName.t()
+  @type t :: SIn.t() | SOut.t() | SEnd.t() | SName.t() | SBottom.t()
 
   @typedoc """
   A payload type that can be:

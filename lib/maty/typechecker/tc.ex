@@ -697,7 +697,7 @@ defmodule Maty.Typechecker.TC do
 
       (
         _ = st
-        ok(:no_return, env, {:st_bottom, :suspend})
+        ok(:no_return, env, %ST.SBottom{reason: :suspend})
       )
     end
   end
@@ -753,7 +753,7 @@ defmodule Maty.Typechecker.TC do
 
       (
         _ = st
-        ok(:no_return, env, {:st_bottom, :done})
+        ok(:no_return, env, %ST.SBottom{reason: :done})
       )
     end
   end

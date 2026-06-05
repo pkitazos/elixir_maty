@@ -13,6 +13,9 @@ defmodule Maty.Typechecker.TC.WF do
 
   import Maty.Typechecker.PatternBinding, only: [tc_pattern: 4]
 
+  @typedoc "A function clause from debug info: {meta, args, guards, body}"
+  @type clause :: {Keyword.t(), [Macro.t()], [Macro.t()], Macro.t()}
+
   @doc """
   Checks if a function definition is well-formed according to WF-Func.
   Verifies argument patterns, body type, return type, and session state purity.
@@ -22,7 +25,7 @@ defmodule Maty.Typechecker.TC.WF do
   @spec check_wf_function(
           ctx :: Ctx.t(),
           func_id :: {atom(), non_neg_integer()},
-          clauses :: [Macro.t()]
+          clauses :: [clause()]
         ) ::
           [{:ok, Type.t()} | {:error, binary()}]
   def check_wf_function(ctx, {_name, arity} = func_id, clauses) do
@@ -71,7 +74,7 @@ defmodule Maty.Typechecker.TC.WF do
   @spec check_wf_message_handler_clause(
           ctx :: Ctx.t(),
           handler_label :: atom(),
-          handler_ast_clause :: Macro.t(),
+          handler_ast_clause :: clause(),
           st_pre :: ST.t(),
           type_signature :: tuple()
         ) :: {:ok, ST.SBranch.t()} | {:error, binary()}
@@ -139,7 +142,7 @@ defmodule Maty.Typechecker.TC.WF do
   @spec check_wf_init_handler_clause(
           ctx :: Ctx.t(),
           handler_label :: atom(),
-          handler_ast_clause :: Macro.t(),
+          handler_ast_clause :: clause(),
           st_pre :: ST.t(),
           type_signature :: tuple()
         ) ::
@@ -256,7 +259,7 @@ defmodule Maty.Typechecker.TC.WF do
     end
   end
 
-  defp check_handler_termination(_meta, _handler_label, :no_return, {:st_bottom, _}), do: :ok
+  defp check_handler_termination(_meta, _handler_label, :no_return, %ST.SBottom{}), do: :ok
 
   defp check_handler_termination(meta, handler_label, return_type, final_st) do
     {:error, Error.handler_body_wrong_termination(meta, handler_label, return_type, final_st)}

@@ -155,12 +155,12 @@ defmodule Maty.Typechecker.Helpers do
 
   @doc """
   Joins two session types according to the lattice rules (Q ⊔ Q = Q, ⊥ ⊔ Q = Q).
-  Uses {:st_bottom, _} to represent the bottom type ⊥_S.
+  Uses %ST.SBottom{} to represent the bottom type ⊥_S.
   Returns the joined type or :error_incompatible_session_types if they cannot be joined.
   """
   # @spec join_session_types(st1 :: ST.t() | atom, st2 :: ST.t() | atom) :: ST.t() | atom
-  def join_session_types({:st_bottom, _}, st2), do: st2
-  def join_session_types(st1, {:st_bottom, _}), do: st1
+  def join_session_types(%ST.SBottom{}, st2), do: st2
+  def join_session_types(st1, %ST.SBottom{}), do: st1
   # Use structural comparison for session types
   def join_session_types(st1, st2) when st1 == st2, do: st1
   # todo: any other join rules? (e.g., joining identical choices) - unlikely needed for now.
@@ -175,7 +175,7 @@ defmodule Maty.Typechecker.Helpers do
   end
 
   def join_branch_results([]) do
-    {:ok, {:no_return, {:st_bottom, :nothing}}}
+    {:ok, {:no_return, %ST.SBottom{reason: :nothing}}}
   end
 
   def join_branch_results([{t, q} | rest_results]) do
@@ -276,5 +276,4 @@ defmodule Maty.Typechecker.Helpers do
 
     found
   end
-
 end

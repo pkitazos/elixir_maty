@@ -3,6 +3,7 @@ defmodule Maty.Typechecker.Preprocessor do
 
   alias Maty.Typechecker.TypeSpecParser
   alias Maty.Typechecker.Error
+  alias Maty.Types.T, as: Type
   alias Maty.Utils
 
   # each handler definition includes valuable information that we will need when we are typechecking our actors
@@ -44,13 +45,16 @@ defmodule Maty.Typechecker.Preprocessor do
 
       # or that we were not able to parse the session type
       {:error, parse_error} ->
-        # ! it appears that this function expects to receive ane error struct, but instead receives a string
         error =
           Error.TypeSpecification.invalid_session_type_annotation(
             module,
             meta,
             handler_label,
-            parse_error
+            %Error.Internal{
+              title: "Session type parse error",
+              opts: "",
+              message: parse_error
+            }
           )
 
         Logger.error(error)

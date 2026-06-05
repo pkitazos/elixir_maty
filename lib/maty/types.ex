@@ -104,7 +104,7 @@ defmodule Maty.Types do
   @doc """
   Returns a list of all accepted types, including :number, :atom, ...
   """
-  @spec payload_types :: [atom]
+  @spec payload_types :: [atom | nil]
   def payload_types() do
     @supported_payload_types
   end
@@ -125,7 +125,16 @@ defmodule Maty.Types do
             | :no_return
             | :pid
             | :ref
-    # missing func, tuples, lists
+            | :maty_handler_msg
+            | :maty_handler_init
+            | {:fun, non_neg_integer()}
+            | {:tuple, [t()]}
+            | {:list, t()}
+            | {:map, %{atom() => t()}}
+            # todo: eventually eliminate bare :map
+            # getState should return the properly typed actor state
+            # which likely requires some form of type inference
+            | :map
 
     def session_id, do: :ref
     def init_token, do: :ref
