@@ -23,7 +23,7 @@ defmodule Maty.Typechecker do
     handler = Module.get_attribute(env.module, :handler)
 
     if not is_nil(handler) do
-      Preprocessor.process_handler_annotation(
+      Preprocessor.process_handler_annotation(%{
         module: env.module,
         function: {name, arity},
         handler_label: handler,
@@ -31,13 +31,13 @@ defmodule Maty.Typechecker do
         store: :delta_M,
         kind: :handler,
         meta: [line: env.line]
-      )
+      })
     end
 
     init_handler = Module.get_attribute(env.module, :init_handler)
 
     if not is_nil(init_handler) do
-      Preprocessor.process_handler_annotation(
+      Preprocessor.process_handler_annotation(%{
         module: env.module,
         function: {name, arity},
         handler_label: init_handler,
@@ -45,10 +45,10 @@ defmodule Maty.Typechecker do
         store: :delta_I,
         kind: :init_handler,
         meta: [line: env.line]
-      )
+      })
     end
 
-    Preprocessor.process_type_annotation(module: env.module, function: {name, args})
+    Preprocessor.process_type_annotation(%{module: env.module, function: {name, args}})
   end
 
   @doc """
