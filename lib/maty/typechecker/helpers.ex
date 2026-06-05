@@ -2,7 +2,7 @@ defmodule Maty.Typechecker.Helpers do
   require Logger
 
   alias Maty.ST
-  alias Maty.Typechecker.{Error, PatternBinding}
+  alias Maty.Typechecker.Error
   alias Maty.Types.T, as: Type
 
   # Helper to unify list element types (simple version)
@@ -277,83 +277,4 @@ defmodule Maty.Typechecker.Helpers do
     found
   end
 
-  # -------------- HELPERS sorta --------------------
-  # move
-  # pin - convert to new kind of error
-  def check_init_st(%ST.SIn{}), do: {:error, "Session precondition cannot be a receive"}
-  def check_init_st(_st), do: :ok
-
-  # move
-  def check_clause_arity(ctx, meta, func_id, arity, spec_args_types) do
-    if arity == length(spec_args_types) do
-      :ok
-    else
-      {:error,
-       Error.FunctionCall.arity_mismatch(ctx.module, meta, func_id,
-         expected: length(spec_args_types),
-         got: arity
-       )}
-    end
-  end
-
-  # move
-  def check_final_session_state(_ctx, _meta, _func_id, %ST.SEnd{}), do: :ok
-
-  def check_final_session_state(ctx, meta, func_id, other_st) do
-    error = Error.FunctionCall.function_altered_session_state(ctx.module, meta, func_id, other_st)
-    {:error, error}
-  end
-
-  # move
-  def check_return_type(ctx, meta, actual_return_type, spec_return_type) do
-    if actual_return_type == spec_return_type do
-      :ok
-    else
-      {:error,
-       Error.TypeMismatch.return_type_mismatch(ctx.module, meta,
-         expected: spec_return_type,
-         got: actual_return_type
-       )}
-    end
-  end
-
-  # move
-  def check_argument_patterns(ctx, meta, arg_pattern_asts, spec_args_types) do
-    initial_arg_env = %{}
-
-    args_check_result =
-      Enum.zip(arg_pattern_asts, spec_args_types)
-      |> Enum.reduce_while(
-        {:ok, %{}, initial_arg_env},
-        fn {p_ast, expected_type}, {:ok, acc_bindings, current_env} ->
-          case PatternBinding.tc_pattern(ctx, p_ast, expected_type, current_env) do
-            {:ok, new_bindings, updated_env} ->
-              case check_and_merge_bindings(
-                     ctx.module,
-                     meta,
-                     acc_bindings,
-                     new_bindings,
-                     current_env
-                   ) do
-                {:ok, merged_bindings, _env_ignored} ->
-                  {:cont, {:ok, merged_bindings, updated_env}}
-
-                {:error, msg, _env} ->
-                  {:halt, {:error, msg}}
-              end
-
-            {:error, msg, _env} ->
-              {:halt, {:error, msg}}
-          end
-        end
-      )
-
-    case args_check_result do
-      {:ok, _final_bindings, body_var_env} ->
-        {:ok, body_var_env}
-
-      {:error, msg} ->
-        {:error, msg}
-    end
-  end
 end

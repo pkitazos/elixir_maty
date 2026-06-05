@@ -125,6 +125,7 @@ defmodule Maty.Types do
             | :no_return
             | :pid
             | :ref
+    # missing func, tuples, lists
 
     def session_id, do: :ref
     def init_token, do: :ref
