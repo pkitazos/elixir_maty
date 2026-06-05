@@ -6,7 +6,7 @@ defmodule Maty.Typechecker do
   - Delegates detailed checks to submodules
   """
 
-  alias Maty.Utils
+  alias Maty.{Utils, ST}
   alias Maty.Typechecker.{Ctx, Delta, TC, Error, Preprocessor}
 
   require Logger
@@ -19,7 +19,7 @@ defmodule Maty.Typechecker do
   def handle_on_definition(env, _kind, name, args, _guards, _body) do
     arity = length(args)
 
-    session_types = Maty.Utils.Env.get_map(env.module, :st)
+    session_types = Utils.Env.get_map(env.module, :st)
     handler = Module.get_attribute(env.module, :handler)
 
     if not is_nil(handler) do
@@ -140,7 +140,7 @@ defmodule Maty.Typechecker do
                     type_signature
                   )
                   |> case do
-                    {:ok, %Maty.ST.SBranch{}} -> :ok
+                    {:ok, %ST.SBranch{}} -> :ok
                     {:error, error_msg} -> error_msg
                   end
                 end
@@ -166,7 +166,7 @@ defmodule Maty.Typechecker do
                     )
                     |> case do
                       # this means that after typechecking a clause, we record the session branch we went down
-                      {:ok, %Maty.ST.SBranch{} = branch} -> branch
+                      {:ok, %ST.SBranch{} = branch} -> branch
                       {:error, _msg} -> :error
                     end
                   end
@@ -185,7 +185,7 @@ defmodule Maty.Typechecker do
                   |> MapSet.to_list()
 
                 # we format the missing branches into their string representation
-                missing_st = Maty.ST.repr(%{handler_M.st | branches: missing_branches})
+                missing_st = ST.repr(%{handler_M.st | branches: missing_branches})
 
                 # and report an error stating that we have violated the protocol definition
                 error_msg =
@@ -388,5 +388,4 @@ defmodule Maty.Typechecker do
   def display_error({func_id, error_msg}) do
     "[#{Utils.to_func(func_id)}] #{error_msg}"
   end
-
 end

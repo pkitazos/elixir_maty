@@ -18,7 +18,7 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     """
   end
 
-  def use_of_native_communication(module, [line: line], op: op) do
+  def use_of_native_communication(module, [{:line, line} | _], op: op) do
     comm_op =
       case op do
         :send -> "send/2"

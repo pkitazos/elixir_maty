@@ -70,7 +70,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     """
   end
 
-  def incorrect_target_participant(module, [line: line], st,
+  def incorrect_target_participant(module, [{:line, line} | _], st,
         got: role_received,
         expected: role_expected
       ) do
@@ -86,7 +86,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     """
   end
 
-  def incorrect_handler_suspension(module, [line: line], st,
+  def incorrect_handler_suspension(module, [{:line, line} | _], st,
         got: handler_received,
         expected: handler_expected
       ) do
@@ -102,7 +102,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     """
   end
 
-  def incorrect_message_label(module, [line: line], st,
+  def incorrect_message_label(module, [{:line, line} | _], st,
         got: label_received,
         expected: labels_expected
       ) do
@@ -120,7 +120,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     """
   end
 
-  def incorrect_payload_type(module, [line: line], st,
+  def incorrect_payload_type(module, [{:line, line} | _], st,
         got: payload_received,
         expected: payload_expected
       ) do
@@ -148,7 +148,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     """
   end
 
-  def suspend_invalid_handler_type(module, [line: line], [got: got], st) do
+  def suspend_invalid_handler_type(module, [{:line, line} | _], [got: got], st) do
     """
     \n\n** (ElixirMatyTypeError) Protocol Violation: Suspended with Invalid Handler
       Module: #{module}
