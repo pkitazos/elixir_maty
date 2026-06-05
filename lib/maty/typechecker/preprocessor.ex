@@ -68,20 +68,18 @@ defmodule Maty.Typechecker.Preprocessor do
   # each definition also requires a type-spec annotation
 
   def process_type_annotation(module: module, function: func_id = {name, args}) do
+    arity = length(args)
+
     # we fetch the spec definitions associated with the function we're typechecking
     case Module.get_attribute(module, :spec) do
       [{:spec, {:"::", meta, [{spec_name, _, args_asts}, return_ast]}, _module} | _] ->
-        arity = length(args)
-
         # we check that:
         # - the arity and name match
         # - the args are typed properly
         # - the return type is parsed properly
         with {:info, {^name, ^arity}} <- {:info, {spec_name, length(args_asts)}},
-             {:args_ok, parsed_arg_types} <-
-               {:args_ok, parse_spec_args(args_asts)},
-             {:return_ok, {:ok, parsed_return_type}} <-
-               {:return_ok, TypeSpecParser.parse(return_ast)} do
+             {:args, {:ok, parsed_arg_types}} <- {:args, parse_spec_args(args_asts)},
+             {:return, {:ok, parsed_return_type}} <- {:return, TypeSpecParser.parse(return_ast)} do
           # if all looks good, we save the info to our Ψ environment
           Utils.Env.prepend_to_key(
             module,
@@ -105,7 +103,7 @@ defmodule Maty.Typechecker.Preprocessor do
             Logger.error(error)
             Module.put_attribute(module, :spec_errors, {{name, arity}, error})
 
-          {:args_ok, {:error, {failed_index, internal_error}}} ->
+          {:args, {:error, {failed_index, internal_error}}} ->
             # in this particular point, because any one of the arguments could be malformed,
             # we return the index of those arguments so as to give the user more info
             error =
@@ -121,7 +119,7 @@ defmodule Maty.Typechecker.Preprocessor do
             Logger.error(error)
             Module.put_attribute(module, :spec_errors, {{name, arity}, error})
 
-          {:return_ok, {:error, parse_error}} ->
+          {:return, {:error, parse_error}} ->
             error =
               Error.TypeSpecification.spec_return_not_well_typed(
                 module,
@@ -133,32 +131,29 @@ defmodule Maty.Typechecker.Preprocessor do
 
             Logger.error(error)
             Module.put_attribute(module, :spec_errors, {{name, arity}, error})
-
-          # this branch should not be reachable
-          unreachable ->
-            error = Error.internal_error(func_id, unreachable)
-
-            Logger.error(error)
-            Module.put_attribute(module, :spec_errors, {{name, arity}, error})
         end
 
-      # this branch should also be unreachable
-      # if we get anything other than a correct spec annotation, we return silently
       _ ->
-        :ok
+        error = Error.TypeSpecification.no_spec_for_function(module, func_id)
+        Logger.error(error)
+        Module.put_attribute(module, :spec_errors, {{name, arity}, error})
     end
   end
 
-  @spec parse_spec_args(Macro.t()) :: list(Type.t()) | {:error, Error.Internal.t()}
+  @spec parse_spec_args(Macro.t()) ::
+          {:ok, list(Type.t())} | {:error, {non_neg_integer(), Error.Internal.t()}}
   defp parse_spec_args(asts) do
-    parsed_results = Enum.map(asts, &TypeSpecParser.parse/1)
-    failed_index = Enum.find_index(parsed_results, fn res -> match?({:error, _}, res) end)
-
-    if is_nil(failed_index) do
-      Enum.map(parsed_results, fn {:ok, type} -> type end)
-    else
-      {:error, parsed_error} = Enum.at(parsed_results, failed_index)
-      {:error, {failed_index, parsed_error}}
+    asts
+    |> Enum.with_index()
+    |> Enum.reduce_while([], fn {ast, idx}, acc ->
+      case TypeSpecParser.parse(ast) do
+        {:ok, type} -> {:cont, [type | acc]}
+        {:error, err} -> {:halt, {:error, {idx, err}}}
+      end
+    end)
+    |> case do
+      {:error, _} = err -> err
+      types -> {:ok, Enum.reverse(types)}
     end
   end
 end

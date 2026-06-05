@@ -186,8 +186,26 @@ defmodule Maty.Typechecker.TC do
     |> traverse(env, st, fn {key_ast, val_ast}, env, st ->
       thread do
         key_t <~ tc_expr(ctx, env, st, key_ast)
-        _ <~ guard_atom(key_t, meta, ctx, env, st)
-        literal_key <~ lift_literal(key_ast, meta, ctx, env, st)
+
+        _
+        <~ lift_bool(
+          key_t == :atom,
+          Error.PatternMatching.invalid_map_key_type(ctx.module, meta,
+            expected: :atom,
+            got: key_t
+          ),
+          env,
+          st
+        )
+
+        literal_key
+        <~ lift_result(
+          Helpers.ast_to_literal(key_ast),
+          Error.PatternMatching.complex_map_key(ctx.module, meta, key_ast),
+          env,
+          st
+        )
+
         val_t <~ tc_expr(ctx, env, st, val_ast)
         ok({literal_key, val_t}, env, st)
       end
@@ -355,10 +373,7 @@ defmodule Maty.Typechecker.TC do
     thread do
       type_a <~ tc_expr(ctx, env, st, expr1_ast)
 
-      case tc_pattern(ctx, pattern_ast, type_a, env) do
-        {:ok, _bindings, env2} -> ok(type_a, env2, st)
-        {:error, msg, env2} -> error(msg, env2)
-      end
+      lift_pattern(ctx, pattern_ast, type_a, env, st) |> map(fn _ -> type_a end)
     end
   end
 
@@ -895,27 +910,6 @@ defmodule Maty.Typechecker.TC do
   end
 
   # --- Private helpers for tc_expr ---
-
-  defp guard_atom(type, meta, ctx, env, st) do
-    lift_bool(
-      type == :atom,
-      Error.PatternMatching.invalid_map_key_type(ctx.module, meta,
-        expected: :atom,
-        got: type
-      ),
-      env,
-      st
-    )
-  end
-
-  defp lift_literal(key_ast, meta, ctx, env, st) do
-    lift_result(
-      Helpers.ast_to_literal(key_ast),
-      Error.PatternMatching.complex_map_key(ctx.module, meta, key_ast),
-      env,
-      st
-    )
-  end
 
   defp lift_pattern(ctx, pattern_ast, scrutinee_type, env, st) do
     case tc_pattern(ctx, pattern_ast, scrutinee_type, env) do
