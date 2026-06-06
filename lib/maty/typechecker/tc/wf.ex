@@ -7,7 +7,7 @@ defmodule Maty.Typechecker.TC.WF do
   type specifications and session type annotations.
   """
 
-  alias Maty.ST
+  alias Maty.ST.SBottom
   alias Maty.Types.T, as: Type
   alias Maty.Typechecker.{TC, Error, Ctx, Helpers}
 
@@ -259,7 +259,7 @@ defmodule Maty.Typechecker.TC.WF do
     end
   end
 
-  defp check_handler_termination(_meta, _handler_label, :no_return, %ST.SBottom{}), do: :ok
+  defp check_handler_termination(_meta, _handler_label, :no_return, %SBottom{}), do: :ok
 
   defp check_handler_termination(meta, handler_label, return_type, final_st) do
     {:error, Error.handler_body_wrong_termination(meta, handler_label, return_type, final_st)}

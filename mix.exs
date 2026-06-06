@@ -33,7 +33,7 @@ defmodule Maty.MixProject do
   defp deps do
     [
       {:dialyxir, "~> 1.4", only: [:dev, :test], runtime: false},
-      {:nimble_parsec, "~> 1.4.2"}
+      {:st_parser, "~> 0.5.0"}
     ]
   end
 end

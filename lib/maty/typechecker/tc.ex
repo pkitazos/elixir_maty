@@ -2,7 +2,7 @@ defmodule Maty.Typechecker.TC do
   require Logger
 
   import Maty.Typechecker.TC.Thread
-  alias Maty.ST
+  alias Maty.ST.SBottom
   alias Maty.Typechecker.{Error, Helpers, TC, Ctx, Judgment}
 
   import Maty.Typechecker.TC.Bind
@@ -712,7 +712,7 @@ defmodule Maty.Typechecker.TC do
 
       (
         _ = st
-        ok(:no_return, env, %ST.SBottom{reason: :suspend})
+        ok(:no_return, env, %SBottom{reason: :suspend})
       )
     end
   end
@@ -768,7 +768,7 @@ defmodule Maty.Typechecker.TC do
 
       (
         _ = st
-        ok(:no_return, env, %ST.SBottom{reason: :done})
+        ok(:no_return, env, %SBottom{reason: :done})
       )
     end
   end

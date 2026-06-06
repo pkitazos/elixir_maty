@@ -21,7 +21,6 @@ defmodule Maty.Typechecker.TC.Bind do
   """
 
   alias Maty.Typechecker.Judgment
-  alias Maty.ST
 
   @type var_env :: Judgment.var_env()
   @type result(a) :: Judgment.result(a)

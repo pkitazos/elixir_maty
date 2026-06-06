@@ -2,8 +2,6 @@ defmodule Maty.Typechecker.TCExprTest do
   use ExUnit.Case
 
   alias Maty.Typechecker.{TC, Ctx}
-  alias Maty.ST
-
   @st_end %ST.SEnd{}
   @st_out ST.output_one(:server, :msg, :binary, @st_end)
   @ctx %Ctx{module: nil, meta: [line: 0], delta_M: %{}, delta_I: %{}, psi: %{}}

@@ -89,11 +89,11 @@ defmodule Maty.Typechecker.Preprocessor do
   # where `e` describes either a missing handler label or a parse failure.
   @doc false
   @spec validate_handler_annotation(module(), atom(), %{atom() => String.t()}, keyword()) ::
-          {:ok, Maty.ST.t()} | {:error, String.t()}
+          {:ok, ST.t()} | {:error, String.t()}
   def validate_handler_annotation(module, handler_label, session_types, meta) do
     # we perform some cursory checks, does a session type exist under such a name? and can we parse it?
     with {:ok, session_type} <- Map.fetch(session_types, handler_label),
-         {:ok, st} <- Maty.Parser.parse(session_type) do
+         {:ok, st} <- ST.Parser.parse(session_type) do
       {:ok, st}
     else
       # this is not a valid name for a handler

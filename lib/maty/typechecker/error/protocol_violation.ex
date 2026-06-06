@@ -1,12 +1,11 @@
 defmodule Maty.Typechecker.Error.ProtocolViolation do
-  alias Maty.ST
 
   defp render_atom(elt) when is_atom(elt), do: ":#{elt}"
   defp render_atom(elt), do: "#{inspect(elt)}"
 
   def incorrect_action(module, meta, [got: got], st) do
     line = Keyword.fetch!(meta, :line)
-    actions = ST.get_action(st)
+    actions = Maty.ST.get_action(st)
 
     """
     \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Action
@@ -16,7 +15,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
       Tried: #{got}
       Current permitted actions: #{actions}
       --
-      Session Type: #{ST.repr(st)}
+      Session Type: #{Maty.ST.repr(st)}
     """
   end
 
@@ -32,7 +31,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
       Got: #{render_atom(role_received)}
       Expected: #{render_atom(role_expected)}
       --
-      Session Type: #{ST.repr(st)}
+      Session Type: #{Maty.ST.repr(st)}
     """
   end
 
@@ -50,7 +49,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
       Got: #{render_atom(label_received)}
       Expected: #{acceptable_labels}
       --
-      Session Type: #{ST.repr(st)}
+      Session Type: #{Maty.ST.repr(st)}
     """
   end
 
@@ -66,7 +65,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
       Got: #{render_atom(payload_received)}
       Expected: #{render_atom(payload_expected)}
       --
-      Session Type: #{ST.repr(st)}
+      Session Type: #{Maty.ST.repr(st)}
     """
   end
 
@@ -82,7 +81,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
       Got: #{render_atom(role_received)}
       Expected: #{render_atom(role_expected)}
       --
-      Session Type: #{ST.repr(st)}
+      Session Type: #{Maty.ST.repr(st)}
     """
   end
 
@@ -98,7 +97,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
       Got: #{render_atom(handler_received)}
       Expected: #{render_atom(handler_expected)}
       --
-      Session Type: #{ST.repr(st)}
+      Session Type: #{Maty.ST.repr(st)}
     """
   end
 
@@ -116,7 +115,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
       Got: #{render_atom(label_received)}
       Expected: #{acceptable_labels}
       --
-      Session Type: #{ST.repr(st)}
+      Session Type: #{Maty.ST.repr(st)}
     """
   end
 
@@ -132,7 +131,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
       Got: #{render_atom(payload_received)}
       Expected: #{render_atom(payload_expected)}
       --
-      Session Type: #{ST.repr(st)}
+      Session Type: #{Maty.ST.repr(st)}
     """
   end
 
@@ -144,7 +143,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
       --
       Missing implementation for branches: #{missing_branches}
       --
-      Session Type: #{ST.repr(st)}
+      Session Type: #{Maty.ST.repr(st)}
     """
   end
 
@@ -156,7 +155,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
       --
       Tried: #{got}
       --
-      Session Type: #{ST.repr(st)}
+      Session Type: #{Maty.ST.repr(st)}
     """
   end
 
@@ -170,7 +169,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
       --
       Tried: #{got}
       --
-      Session Type: #{ST.repr(st)}
+      Session Type: #{Maty.ST.repr(st)}
     """
   end
 end

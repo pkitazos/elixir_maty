@@ -6,7 +6,7 @@ defmodule Maty.Typechecker do
   - Delegates detailed checks to submodules
   """
 
-  alias Maty.{Utils, ST}
+  alias Maty.Utils
   alias Maty.Typechecker.{Ctx, Delta, TC, Error, Preprocessor}
 
   require Logger
@@ -185,7 +185,7 @@ defmodule Maty.Typechecker do
                   |> MapSet.to_list()
 
                 # we format the missing branches into their string representation
-                missing_st = ST.repr(%{handler_M.st | branches: missing_branches})
+                missing_st = Maty.ST.repr(%{handler_M.st | branches: missing_branches})
 
                 # and report an error stating that we have violated the protocol definition
                 error_msg =

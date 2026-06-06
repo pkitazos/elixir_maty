@@ -8,7 +8,6 @@ defmodule Maty.Typechecker.Judgment do
 
   The fixed per-module part (Ψ; Δ) is `Maty.Typechecker.Ctx`.
   """
-  alias Maty.ST
   alias Maty.Types.T, as: Type
 
   @type var_env :: %{atom() => Type.t()}
