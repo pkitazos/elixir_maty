@@ -86,40 +86,49 @@ defmodule Maty.Typechecker.PreprocessorTest do
     test "no spec attribute" do
       assert :no_spec = Preprocessor.validate_type_annotation(nil, @module, {:my_func, 1})
     end
+
+    test "tuple return type" do
+      attr = spec_attr(:my_func, [type_ast(:atom)], {type_ast(:atom), type_ast(:number)})
+
+      assert {:ok, {[:atom], {:tuple, [:atom, :number]}}} =
+               Preprocessor.validate_type_annotation(attr, @module, {:my_func, 1})
+    end
+
+    test "zero-arg function" do
+      attr = spec_attr(:my_func, [], type_ast(:atom))
+
+      assert {:ok, {[], :atom}} =
+               Preprocessor.validate_type_annotation(attr, @module, {:my_func, 0})
+    end
   end
 
   # --- validate_handler_annotation ---
 
-  describe "validate_handler_annotation/5" do
-    test "happy path - label exists and session type parses" do
-      session_types = %{ping: "+Client:{Ping(number).end}"}
+  describe "validate_handler_annotation/3" do
+    test "happy path - label exists, returns session type" do
+      st = %ST.SEnd{}
+      session_types = %{ping: st}
 
-      assert {:ok, _st} =
-               Preprocessor.validate_handler_annotation(
-                 @module, :ping, session_types, @meta
-               )
+      assert {:ok, ^st} =
+               Preprocessor.validate_handler_annotation(:ping, session_types, @meta)
     end
 
     test "missing handler label" do
       session_types = %{}
 
       assert {:error, error} =
-               Preprocessor.validate_handler_annotation(
-                 @module, :ping, session_types, @meta
-               )
+               Preprocessor.validate_handler_annotation(:ping, session_types, @meta)
 
       assert error =~ "ping"
     end
 
-    test "unparseable session type string" do
-      session_types = %{ping: "not a valid session type!!!"}
+    test "label with string session type passes through" do
+      session_types = %{ping: "+Client:{Ping(number).end}"}
 
-      assert {:error, error} =
-               Preprocessor.validate_handler_annotation(
-                 @module, :ping, session_types, @meta
-               )
+      assert {:ok, st_string} =
+               Preprocessor.validate_handler_annotation(:ping, session_types, @meta)
 
-      assert error =~ "Session type parse error"
+      assert is_binary(st_string)
     end
   end
 end
