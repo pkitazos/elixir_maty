@@ -43,23 +43,9 @@ defmodule Maty.Typechecker.TC.Bind do
   def bind({:ok, value, st, env}, fun), do: fun.(value, env, st)
   def bind({:error, _, _} = err, _fun), do: err
 
-  # Tolerated so a chain doesn't crash on the few WF-check functions that still return a bare {:error, reason}.
-  # todo: normalise those to the 3-tuple.
-  def bind({:error, reason}, _fun), do: {:error, reason}
-
   @doc "Transform the produced value, leaving env and st untouched."
   @spec map(t(a), (a -> b)) :: t(b) when a: var, b: var
   def map(result, fun), do: bind(result, fn v, env, st -> ok(fun.(v), env, st) end)
-
-  @doc """
-  Fold a side assertion that returns `:ok | {:error, reason}` (e.g.
-  `Helpers.check_st_unchanged/3`, `check_maty_state_type/1`) into a chain.
-  Produces `nil` as its value so the following `bind` ignores it.
-  `env` and `st` pass through unchanged.
-  """
-  @spec assert_ok(:ok | {:error, term()}, var_env(), Maty.ST.t()) :: t(nil)
-  def assert_ok(:ok, env, st), do: ok(nil, env, st)
-  def assert_ok({:error, reason}, env, _st), do: error(reason, env)
 
   @doc """
   Thread `env` and `st` left-to-right across `items`, applying
@@ -109,10 +95,6 @@ defmodule Maty.Typechecker.TC.Bind do
         when a: var
   def lift_result({:ok, val}, env, st), do: ok(val, env, st)
   def lift_result({:error, reason}, env, _st), do: error(reason, env)
-
-  @spec lift_maybe(a | nil, term(), var_env(), Maty.ST.t()) :: result(a) when a: var
-  def lift_maybe(nil, error, env, _st), do: error(error, env)
-  def lift_maybe(val, _error, env, st), do: ok(val, env, st)
 
   @spec lift_bool(boolean(), term(), var_env(), Maty.ST.t()) :: result(nil) when a: var
   def lift_bool(true, _error, env, st), do: ok(nil, env, st)
