@@ -3,10 +3,10 @@ defmodule TwoBuyer.Participants.Buyer2 do
 
   @role :buyer2
 
-  @st {:install, "share_handler"}
+  @st {:install, ~q"share_handler"}
   @st {:share_handler,
-       "&buyer1:{share(number).+seller:{address(binary).date_handler, quit(nil).end}}"}
-  @st {:date_handler, "&seller:{date(date).end}"}
+       ~q"&buyer1:{share(number).+seller:{address(binary).date_handler, quit(nil).end}}"}
+  @st {:date_handler, ~q"&seller:{date(date).end}"}
 
   on_link ap_pid :: pid(), initial_state do
     MatyDSL.register(

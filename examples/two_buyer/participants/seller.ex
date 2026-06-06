@@ -3,9 +3,9 @@ defmodule TwoBuyer.Participants.Seller do
 
   @role :seller
 
-  @st {:install, "title_handler"}
-  @st {:title_handler, "&buyer1:{title(binary).+buyer1:{quote(number).decision_handler}}"}
-  @st {:decision_handler, "&buyer2:{address(binary).+buyer2:{date(date).end},quit(nil).end}"}
+  @st {:install, ~q"title_handler"}
+  @st {:title_handler, ~q"&buyer1:{title(binary).+buyer1:{quote(number).decision_handler}}"}
+  @st {:decision_handler, ~q"&buyer2:{address(binary).+buyer2:{date(date).end},quit(nil).end}"}
 
   on_link ap_pid :: pid(), initial_state do
     MatyDSL.register(

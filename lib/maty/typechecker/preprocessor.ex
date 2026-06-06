@@ -52,7 +52,7 @@ defmodule Maty.Typechecker.Preprocessor do
           required(:module) => module(),
           required(:function) => {atom(), arity()},
           required(:handler_label) => atom(),
-          required(:session_types) => %{atom() => String.t()},
+          required(:session_types) => %{atom() => ST.t()},
           required(:store) => atom(),
           required(:kind) => atom(),
           required(:meta) => keyword()
@@ -66,7 +66,7 @@ defmodule Maty.Typechecker.Preprocessor do
         kind: handler_kind,
         meta: meta
       }) do
-    case validate_handler_annotation(module, handler_label, session_types, meta) do
+    case validate_handler_annotation(handler_label, session_types, meta) do
       {:ok, st} ->
         Utils.Env.add_at_key(
           module,
@@ -88,31 +88,14 @@ defmodule Maty.Typechecker.Preprocessor do
   # session type string parses. Returns `{:ok, parsed_st}`, or `{:error, e}`
   # where `e` describes either a missing handler label or a parse failure.
   @doc false
-  @spec validate_handler_annotation(module(), atom(), %{atom() => String.t()}, keyword()) ::
+  @spec validate_handler_annotation(atom(), %{atom() => String.t()}, keyword()) ::
           {:ok, ST.t()} | {:error, String.t()}
-  def validate_handler_annotation(module, handler_label, session_types, meta) do
+  def validate_handler_annotation(handler_label, session_types, meta) do
     # we perform some cursory checks, does a session type exist under such a name? and can we parse it?
-    with {:ok, session_type} <- Map.fetch(session_types, handler_label),
-         {:ok, st} <- ST.Parser.parse(session_type) do
-      {:ok, st}
-    else
+    case Map.fetch(session_types, handler_label) do
+      {:ok, st} -> {:ok, st}
       # this is not a valid name for a handler
-      :error ->
-        {:error, Error.missing_handler(handler_label, meta)}
-
-      # we were not able to parse the session type
-      {:error, parse_error} ->
-        {:error,
-         Error.TypeSpecification.invalid_session_type_annotation(
-           module,
-           meta,
-           handler_label,
-           %Error.Internal{
-             title: "Session type parse error",
-             opts: "",
-             message: parse_error
-           }
-         )}
+      :error -> {:error, Error.missing_handler(handler_label, meta)}
     end
   end
 

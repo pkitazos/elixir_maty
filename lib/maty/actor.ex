@@ -8,6 +8,7 @@ defmodule Maty.Actor do
     quote do
       use Maty.Hook
       use Maty.DSL
+      import ST.Sigils
       require Maty.DSL
       require Maty.DSL.State
       @behaviour Maty.Actor
@@ -50,7 +51,12 @@ defmodule Maty.Actor do
             case apply(module, handler_label, [from, msg, actor_state, {session, to}]) do
               {:suspend, next, intermediate_state} ->
                 expected = module.__handler_expects__(next)
-                put_in(intermediate_state, [:sessions, session.id, :handlers, to], {next, expected})
+
+                put_in(
+                  intermediate_state,
+                  [:sessions, session.id, :handlers, to],
+                  {next, expected}
+                )
 
               {:done, intermediate_state} ->
                 update_in(intermediate_state, [:sessions], &Map.delete(&1, session.id))
@@ -80,7 +86,11 @@ defmodule Maty.Actor do
         expected_role = module.__handler_expects__(handler_name)
 
         updated_actor_state =
-          put_in(intermediate_state, [:sessions, session_id, :handlers, role], {handler_name, expected_role})
+          put_in(
+            intermediate_state,
+            [:sessions, session_id, :handlers, role],
+            {handler_name, expected_role}
+          )
 
         loop(module, updated_actor_state)
 

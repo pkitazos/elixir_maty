@@ -11,7 +11,7 @@ defmodule Maty.Typechecker.TC.Bind do
   to Q₂, while producing a type `T`.
   The success/failure shape is the one the typechecker already uses:
 
-      {:ok, {value, st}, env}      # value :: Type.t(), st :: ST.t(), env :: var_env()
+      {:ok, {value, st}, env}      # value :: Type.t(), st :: Maty.ST.t(), env :: var_env()
       {:error, reason, env}
 
   These helpers thread `env` and `st` so individual clauses stop passing them
@@ -27,7 +27,7 @@ defmodule Maty.Typechecker.TC.Bind do
   @type t(a) :: result(a)
 
   @doc "Lift a value into a successful result, leaving env and st untouched (pure / return)."
-  @spec ok(a, var_env(), ST.t()) :: t(a) when a: var
+  @spec ok(a, var_env(), Maty.ST.t()) :: t(a) when a: var
   def ok(value, env, st), do: {:ok, value, st, env}
 
   @doc "Build a failure carrying the current env."
@@ -39,7 +39,7 @@ defmodule Maty.Typechecker.TC.Bind do
   unpacked result of the first step; on failure, short-circuits. `fun` must
   return a `t()`.
   """
-  @spec bind(t(a), (a, var_env(), ST.t() -> t(b))) :: t(b) when a: var, b: var
+  @spec bind(t(a), (a, var_env(), Maty.ST.t() -> t(b))) :: t(b) when a: var, b: var
   def bind({:ok, value, st, env}, fun), do: fun.(value, env, st)
   def bind({:error, _, _} = err, _fun), do: err
 
@@ -57,7 +57,7 @@ defmodule Maty.Typechecker.TC.Bind do
   Produces `nil` as its value so the following `bind` ignores it.
   `env` and `st` pass through unchanged.
   """
-  @spec assert_ok(:ok | {:error, term()}, var_env(), ST.t()) :: t(nil)
+  @spec assert_ok(:ok | {:error, term()}, var_env(), Maty.ST.t()) :: t(nil)
   def assert_ok(:ok, env, st), do: ok(nil, env, st)
   def assert_ok({:error, reason}, env, _st), do: error(reason, env)
 
@@ -66,7 +66,7 @@ defmodule Maty.Typechecker.TC.Bind do
   `fun.(item, env, st)` to each and collecting the produced values in order.
   Short-circuits on the first error (returning it with the env at that point).
   """
-  @spec traverse([a], var_env(), ST.t(), (a, var_env(), ST.t() -> t(b))) :: t([b])
+  @spec traverse([a], var_env(), Maty.ST.t(), (a, var_env(), Maty.ST.t() -> t(b))) :: t([b])
         when a: var, b: var
   def traverse(items, env, st, fun) do
     items
@@ -98,23 +98,23 @@ defmodule Maty.Typechecker.TC.Bind do
     end
   end
 
-  @spec lift_result({:ok, a} | {:error, term()}, term(), var_env(), ST.t()) :: result(a)
+  @spec lift_result({:ok, a} | {:error, term()}, term(), var_env(), Maty.ST.t()) :: result(a)
         when a: var
   def lift_result({:error, _reason}, error, env, _st), do: error(error, env)
   def lift_result(:error, error, env, _st), do: error(error, env)
   def lift_result({:ok, val}, _error, env, st), do: ok(val, env, st)
 
   @doc "Like lift_result/4 but preserves the original error reason."
-  @spec lift_result({:ok, a} | {:error, term()}, var_env(), ST.t()) :: result(a)
+  @spec lift_result({:ok, a} | {:error, term()}, var_env(), Maty.ST.t()) :: result(a)
         when a: var
   def lift_result({:ok, val}, env, st), do: ok(val, env, st)
   def lift_result({:error, reason}, env, _st), do: error(reason, env)
 
-  @spec lift_maybe(a | nil, term(), var_env(), ST.t()) :: result(a) when a: var
+  @spec lift_maybe(a | nil, term(), var_env(), Maty.ST.t()) :: result(a) when a: var
   def lift_maybe(nil, error, env, _st), do: error(error, env)
   def lift_maybe(val, _error, env, st), do: ok(val, env, st)
 
-  @spec lift_bool(boolean(), term(), var_env(), ST.t()) :: result(nil) when a: var
+  @spec lift_bool(boolean(), term(), var_env(), Maty.ST.t()) :: result(nil) when a: var
   def lift_bool(true, _error, env, st), do: ok(nil, env, st)
   def lift_bool(false, error, env, _st), do: error(error, env)
 end

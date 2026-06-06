@@ -27,7 +27,7 @@ defmodule Maty.Typechecker.TC do
     - `{:ok, elixir_type, next_session_state, var_env}` on success
     - `{:error, error_message, var_env}` on failure
   """
-  @spec tc_expr(ctx :: Ctx.t(), var_env :: var_env(), st_pre :: ST.t(), ast :: ast()) ::
+  @spec tc_expr(ctx :: Ctx.t(), var_env :: var_env(), st_pre :: Maty.ST.t(), ast :: ast()) ::
           result()
 
   # --- Revised Value Typing Clauses ---
@@ -894,7 +894,7 @@ defmodule Maty.Typechecker.TC do
   @spec tc_expr_list(
           ctx :: Ctx.t(),
           var_env :: var_env(),
-          st_pre :: ST.t(),
+          st_pre :: Maty.ST.t(),
           ast_list :: [ast()]
         ) ::
           result()

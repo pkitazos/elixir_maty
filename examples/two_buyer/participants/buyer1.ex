@@ -3,8 +3,8 @@ defmodule TwoBuyer.Participants.Buyer1 do
 
   @role :buyer1
 
-  @st {:install, "+seller:{title(binary).quote_handler}"}
-  @st {:quote_handler, "&seller:{quote(number).+buyer2:{share(number).end}}"}
+  @st {:install, ~q/+seller:{title(binary).quote_handler}/}
+  @st {:quote_handler, ~q/&seller:{quote(number).+buyer2:{share(number).end}}/}
 
   on_link {ap_pid, title} :: {pid(), binary()}, initial_state do
     MatyDSL.register(
