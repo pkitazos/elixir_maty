@@ -20,7 +20,7 @@ defmodule Maty.Typechecker.TC.Bind do
   and so can the `{:v1, ...}` / `{:e1, ...}` disambiguation tags in the `with` blocks.
   """
 
-  alias Maty.Typechecker.Judgment
+  alias Maty.Typechecker.{Error, Judgment}
 
   @type var_env :: Judgment.var_env()
   @type result(a) :: Judgment.result(a)
@@ -99,4 +99,19 @@ defmodule Maty.Typechecker.TC.Bind do
   @spec lift_bool(boolean(), term(), var_env(), Maty.ST.t()) :: result(nil) when a: var
   def lift_bool(true, _error, env, st), do: ok(nil, env, st)
   def lift_bool(false, error, env, _st), do: error(error, env)
+
+  @doc """
+  Prepend a context frame (see `Maty.Typechecker.Error.frame/0`) onto any
+  structured error bubbling through this result, so the reporting site can
+  show the propagation path.
+  """
+  @spec with_frame(t(a) | {:error, term()} | :ok, Error.frame()) :: t(a) | {:error, term()} | :ok
+        when a: var
+  def with_frame({:error, %Error{} = e, env}, frame),
+    do: {:error, %{e | trace: [frame | e.trace]}, env}
+
+  def with_frame({:error, %Error{} = e}, frame),
+    do: {:error, %{e | trace: [frame | e.trace]}}
+
+  def with_frame(other, _frame), do: other
 end

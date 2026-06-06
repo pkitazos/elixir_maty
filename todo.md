@@ -42,8 +42,6 @@ All:
 
 ## tasks
 
-- [ ] bind should only accept result (no 2-tuple) which means I gotta go fix whatever produces the 2-tuple errors or we have a proper lift?
-- [ ] prune un-used bind combinators (assert_ok)
 - [ ] proper map type support for actor state and destructuring in the DSL
 
 ## Questions
