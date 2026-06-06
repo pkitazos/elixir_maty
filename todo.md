@@ -40,12 +40,14 @@ All:
 - [ ] [typechecker/error/type_mismatch](./lib/maty/typechecker/error/type_mismatch.ex)
 - [ ] [typechecker/error/type_specification](./lib/maty/typechecker/error/type_specification.ex)
 
+## tasks
 
+- [ ] bind should only accept result (no 2-tuple) which means I gotta go fix whatever produces the 2-tuple errors or we have a proper lift?
+- [ ] prune un-used bind combinators (assert_ok)
+- [ ] proper map type support for actor state and destructuring in the DSL
 
 ## Questions
 
 - How do I cut up a recursive session type? 
 
 tl;dr - unfold once and inline
-
-
