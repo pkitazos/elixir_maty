@@ -17,10 +17,10 @@ Visited so far:
 
 All:
 
-- [ ] [typechecker/type_spec_parser](./lib/maty/typechecker/type_spec_parser.ex)
-- [ ] [typechecker/tc](./lib/maty/typechecker/tc.ex)
+- [x] [typechecker/type_spec_parser](./lib/maty/typechecker/type_spec_parser.ex)
+- [x] [typechecker/tc](./lib/maty/typechecker/tc.ex)
 - [ ] [typechecker/helpers](./lib/maty/typechecker/helpers.ex)
-- [ ] [typechecker/pattern_binding](./lib/maty/typechecker/pattern_binding.ex)
+- [x] [typechecker/pattern_binding](./lib/maty/typechecker/pattern_binding.ex)
 
 - [ ] [access_point](./lib/maty/access_point.ex)
 - [ ] [actor](./lib/maty/actor.ex)
@@ -29,8 +29,8 @@ All:
 - [ ] [dsl/handlers](./lib/maty/dsl/handlers.ex)
 - [ ] [dsl/state](./lib/maty/dsl/state.ex)
 
-- [ ] [parser/core](./lib/maty/parser/core.ex)
-- [ ] [parser/parser](./lib/maty/parser/parser.ex)
+- [x] [parser/core](./lib/maty/parser/core.ex)
+- [x] [parser/parser](./lib/maty/parser/parser.ex)
 
 - [ ] [typechecker/error/internal](./lib/maty/typechecker/error/internal.ex)
 - [ ] [typechecker/error/framework_usage](./lib/maty/typechecker/error/framework_usage.ex)

@@ -30,7 +30,7 @@ defmodule Maty.Typechecker.PatternBinding do
 
   # Pat-Var: Pattern is a variable 'x'
   deftc tc_pattern(_ctx, {var_name, _meta, context}, expected_type, var_env)
-       when is_atom(var_name) and (is_atom(context) or is_nil(context)) do
+        when is_atom(var_name) and (is_atom(context) or is_nil(context)) do
     new_bindings = %{var_name => expected_type}
     updated_env = Map.merge(var_env, new_bindings)
     {:ok, new_bindings, updated_env}
@@ -42,19 +42,19 @@ defmodule Maty.Typechecker.PatternBinding do
   end
 
   deftc tc_pattern(
-         _ctx,
-         {:when, _,
-          [
-            {:x, _, Kernel},
-            {{:., _, [:erlang, :orelse]}, _,
-             [
-               {{:., _, [:erlang, :"=:="]}, _, [{:x, _, Kernel}, false]},
-               {{:., _, [:erlang, :"=:="]}, _, [{:x, _, Kernel}, nil]}
-             ]}
-          ]},
-         _expected_type,
-         var_env
-       ) do
+          _ctx,
+          {:when, _,
+           [
+             {:x, _, Kernel},
+             {{:., _, [:erlang, :orelse]}, _,
+              [
+                {{:., _, [:erlang, :"=:="]}, _, [{:x, _, Kernel}, false]},
+                {{:., _, [:erlang, :"=:="]}, _, [{:x, _, Kernel}, nil]}
+              ]}
+           ]},
+          _expected_type,
+          var_env
+        ) do
     {:ok, %{}, var_env}
   end
 
@@ -64,10 +64,10 @@ defmodule Maty.Typechecker.PatternBinding do
 
   # Pat-Value: Pattern is a literal value 'v'
   deftc tc_pattern(ctx, literal_pattern, expected_type, var_env)
-       when is_number(literal_pattern) or
-              is_binary(literal_pattern) or
-              is_boolean(literal_pattern) or
-              is_atom(literal_pattern) do
+        when is_number(literal_pattern) or
+               is_binary(literal_pattern) or
+               is_boolean(literal_pattern) or
+               is_atom(literal_pattern) do
     case Helpers.get_literal_type(literal_pattern) do
       {:ok, literal_type} ->
         if literal_type == expected_type or literal_type == :atom do
@@ -305,44 +305,48 @@ defmodule Maty.Typechecker.PatternBinding do
           pairs,
           initial_acc,
           fn {key_ast, p_ast}, {:ok, acc_bindings, current_env} ->
-            literal_key = Helpers.ast_to_literal(key_ast)
-
-            if not is_atom(literal_key) do
-              {:halt,
-               {:error, Error.PatternMatching.pattern_map_key_not_atom(ctx.module, meta, key_ast),
-                current_env}}
+            with {:ok, literal_key} when is_atom(literal_key) <- Helpers.ast_to_literal(key_ast),
+                 # check if key exists in expected type map and get expected value type
+                 {:key, {:ok, p_expected_type}, _} <-
+                   {:key, Map.fetch(expected_type_map, literal_key), literal_key},
+                 {:ok, new_bindings, updated_env} <-
+                   tc_pattern(ctx, p_ast, p_expected_type, current_env),
+                 # check disjointedness and merge
+                 {:ok, merged_bindings, _env_ignored} <-
+                   Helpers.check_and_merge_bindings(
+                     ctx.module,
+                     meta,
+                     acc_bindings,
+                     new_bindings,
+                     current_env
+                   ) do
+              {:cont, {:ok, merged_bindings, updated_env}}
             else
-              # check if key exists in expected type map and get expected value type
-              case Map.fetch(expected_type_map, literal_key) do
-                {:ok, p_expected_type} ->
-                  case tc_pattern(ctx, p_ast, p_expected_type, current_env) do
-                    {:ok, new_bindings, updated_env} ->
-                      # check disjointedness and merge
-                      case Helpers.check_and_merge_bindings(
-                             ctx.module,
-                             meta,
-                             acc_bindings,
-                             new_bindings,
-                             current_env
-                           ) do
-                        {:ok, merged_bindings, _env_ignored} ->
-                          {:cont, {:ok, merged_bindings, updated_env}}
+              :error ->
+                {:halt,
+                 {:error,
+                  Error.PatternMatching.pattern_map_key_not_atom(ctx.module, meta, key_ast),
+                  current_env}}
 
-                        {:error, msg, _env} ->
-                          {:halt, {:error, msg, current_env}}
-                      end
+              {:ok, _non_atom_key} ->
+                {:halt,
+                 {:error,
+                  Error.PatternMatching.pattern_map_key_not_atom(ctx.module, meta, key_ast),
+                  current_env}}
 
-                    {:error, msg, _env} ->
-                      {:halt, {:error, msg, current_env}}
-                  end
+              {:key, :error, literal_key} ->
+                # key from pattern not found in expected map type
+                error =
+                  Error.PatternMatching.pattern_map_key_not_found(
+                    ctx.module,
+                    meta,
+                    literal_key
+                  )
 
-                :error ->
-                  # key from pattern not found in expected map type
-                  error =
-                    Error.PatternMatching.pattern_map_key_not_found(ctx.module, meta, literal_key)
+                {:halt, {:error, error, current_env}}
 
-                  {:halt, {:error, error, current_env}}
-              end
+              {:error, msg, _env} ->
+                {:halt, {:error, msg, current_env}}
             end
           end
         )
