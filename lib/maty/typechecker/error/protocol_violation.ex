@@ -1,175 +1,172 @@
 defmodule Maty.Typechecker.Error.ProtocolViolation do
-
-  defp render_atom(elt) when is_atom(elt), do: ":#{elt}"
-  defp render_atom(elt), do: "#{inspect(elt)}"
+  alias Maty.Typechecker.Error
 
   def incorrect_action(module, meta, [got: got], st) do
-    line = Keyword.fetch!(meta, :line)
-    actions = Maty.ST.get_action(st)
-
-    """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Action
-      Module: #{module}
-      Line: #{line}
-      --
-      Tried: #{got}
-      Current permitted actions: #{actions}
-      --
-      Session Type: #{Maty.ST.repr(st)}
-    """
+    %Error{
+      category: :protocol_violation,
+      kind: :incorrect_action,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: got},
+      st: st
+    }
   end
 
   def incorrect_recipient_participant(module, handler, st,
         got: role_received,
         expected: role_expected
       ) do
-    """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Incoming Participant
-      Module: #{module}
-      Handler: #{handler}
-      --
-      Got: #{render_atom(role_received)}
-      Expected: #{render_atom(role_expected)}
-      --
-      Session Type: #{Maty.ST.repr(st)}
-    """
+    %Error{
+      category: :protocol_violation,
+      kind: :incorrect_recipient_participant,
+      module: module,
+      handler: handler,
+      details: %{got: role_received, expected: role_expected},
+      st: st
+    }
   end
 
   def incorrect_incoming_message_label(module, handler, st,
         got: label_received,
         expected: labels_expected
       ) do
-    acceptable_labels = labels_expected |> Enum.map(&render_atom/1) |> Enum.join(" | ")
-
-    """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Incoming Message Label
-      Module: #{module}
-      Handler: #{handler}
-      --
-      Got: #{render_atom(label_received)}
-      Expected: #{acceptable_labels}
-      --
-      Session Type: #{Maty.ST.repr(st)}
-    """
+    %Error{
+      category: :protocol_violation,
+      kind: :incorrect_incoming_message_label,
+      module: module,
+      handler: handler,
+      details: %{got: label_received, expected: labels_expected},
+      st: st
+    }
   end
 
   def incorrect_incoming_payload_type(module, handler, st,
         got: payload_received,
         expected: payload_expected
       ) do
-    """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Incoming Payload Type
-      Module: #{module}
-      Handler: #{handler}
-      --
-      Got: #{render_atom(payload_received)}
-      Expected: #{render_atom(payload_expected)}
-      --
-      Session Type: #{Maty.ST.repr(st)}
-    """
+    %Error{
+      category: :protocol_violation,
+      kind: :incorrect_incoming_payload_type,
+      module: module,
+      handler: handler,
+      details: %{got: payload_received, expected: payload_expected},
+      st: st
+    }
   end
 
-  def incorrect_target_participant(module, [{:line, line} | _], st,
+  def incorrect_target_participant(module, meta, st,
         got: role_received,
         expected: role_expected
       ) do
-    """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Target Participant
-      Module: #{module}
-      Line: #{line}
-      --
-      Got: #{render_atom(role_received)}
-      Expected: #{render_atom(role_expected)}
-      --
-      Session Type: #{Maty.ST.repr(st)}
-    """
+    %Error{
+      category: :protocol_violation,
+      kind: :incorrect_target_participant,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: role_received, expected: role_expected},
+      st: st
+    }
   end
 
-  def incorrect_handler_suspension(module, [{:line, line} | _], st,
+  def incorrect_handler_suspension(module, meta, st,
         got: handler_received,
         expected: handler_expected
       ) do
-    """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Handler Suspension
-      Module: #{module}
-      Line: #{line}
-      --
-      Got: #{render_atom(handler_received)}
-      Expected: #{render_atom(handler_expected)}
-      --
-      Session Type: #{Maty.ST.repr(st)}
-    """
+    %Error{
+      category: :protocol_violation,
+      kind: :incorrect_handler_suspension,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: handler_received, expected: handler_expected},
+      st: st
+    }
   end
 
-  def incorrect_message_label(module, [{:line, line} | _], st,
+  def incorrect_message_label(module, meta, st,
         got: label_received,
         expected: labels_expected
       ) do
-    acceptable_labels = labels_expected |> Enum.map(&render_atom/1) |> Enum.join(" | ")
-
-    """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Message Label
-      Module: #{module}
-      Line: #{line}
-      --
-      Got: #{render_atom(label_received)}
-      Expected: #{acceptable_labels}
-      --
-      Session Type: #{Maty.ST.repr(st)}
-    """
+    %Error{
+      category: :protocol_violation,
+      kind: :incorrect_message_label,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: label_received, expected: labels_expected},
+      st: st
+    }
   end
 
-  def incorrect_payload_type(module, [{:line, line} | _], st,
+  def incorrect_payload_type(module, meta, st,
         got: payload_received,
         expected: payload_expected
       ) do
-    """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Payload Type
-      Module: #{module}
-      Line: #{line}
-      --
-      Got: #{render_atom(payload_received)}
-      Expected: #{render_atom(payload_expected)}
-      --
-      Session Type: #{Maty.ST.repr(st)}
-    """
+    %Error{
+      category: :protocol_violation,
+      kind: :incorrect_payload_type,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: payload_received, expected: payload_expected},
+      st: st
+    }
   end
 
   def incorrect_choice_implementation(module, handler, missing_branches, st) do
-    """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incomplete Message Handler Implementation
-      Module: #{module}
-      Handler: #{handler}
-      --
-      Missing implementation for branches: #{missing_branches}
-      --
-      Session Type: #{Maty.ST.repr(st)}
-    """
+    %Error{
+      category: :protocol_violation,
+      kind: :incorrect_choice_implementation,
+      module: module,
+      handler: handler,
+      details: %{missing_branches: missing_branches},
+      st: st
+    }
   end
 
-  def suspend_invalid_handler_type(module, [{:line, line} | _], [got: got], st) do
-    """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Suspended with Invalid Handler
-      Module: #{module}
-      Line: #{line}
-      --
-      Tried: #{got}
-      --
-      Session Type: #{Maty.ST.repr(st)}
-    """
+  def suspend_invalid_handler_type(module, meta, [got: got], st) do
+    %Error{
+      category: :protocol_violation,
+      kind: :suspend_invalid_handler_type,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: got},
+      st: st
+    }
   end
 
-  def send_invalid_state(module, meta, [got: got], st) do
-    line = Keyword.fetch!(meta, :line)
+  # Fired by Helpers.check_st_unchanged/3 when the scrutinee of a `case` (or any
+  # expression required to be pure) advances the session type. `from`/`to` are
+  # the session types before and after, carried so the Formatter can repr them.
+  #
+  # todo: deprecate - I think it's actually kinda weird that I don't let all
+  # expressions happen in all contexts. I guess it doesn't really make too much
+  # sense to try and pattern match on a send result, since it always returns :ok
+  # but that's the user's problem
+  def case_scrutinee_altered_state(meta, from: from, to: to) do
+    %Error{
+      category: :protocol_violation,
+      kind: :case_scrutinee_altered_state,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{from: from, to: to}
+    }
+  end
 
-    """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Action
-      Module: #{module}
-      Line: #{line}
-      --
-      Tried: #{got}
-      --
-      Session Type: #{Maty.ST.repr(st)}
-    """
+  # Fired when a message-handler body finishes without terminating the session
+  # (it should reduce to ⊥ via suspend/done). `got_return` is the body's value
+  # type; `st` carries the residual session type that was left unconsumed.
+  #
+  # MATY_ERROR_KIND_REVIEW
+  # this currently conflates two failures: (1) final_st ≠ ⊥, the session wasn't
+  # consumed, and (2) return_type ≠ :no_return, the body returned a value instead
+  # of yielding via suspend/done
+  #
+  # todo: (2) is arguably a :framework_usage shape rule
+  def handler_body_wrong_termination(meta, handler_label, return_type, final_st) do
+    %Error{
+      category: :protocol_violation,
+      kind: :handler_body_wrong_termination,
+      handler: handler_label,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got_return: return_type},
+      st: final_st
+    }
   end
 end

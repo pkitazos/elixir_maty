@@ -262,7 +262,13 @@ defmodule Maty.Typechecker.TC.WF do
   defp check_handler_termination(_meta, _handler_label, :no_return, %SBottom{}), do: :ok
 
   defp check_handler_termination(meta, handler_label, return_type, final_st) do
-    {:error, Error.handler_body_wrong_termination(meta, handler_label, return_type, final_st)}
+    {:error,
+     Error.ProtocolViolation.handler_body_wrong_termination(
+       meta,
+       handler_label,
+       return_type,
+       final_st
+     )}
   end
 
   defp check_on_link_session_state(%ST.SEnd{}), do: :ok

@@ -65,11 +65,8 @@ defmodule Maty.Typechecker.Error do
     "an unexpected error occurred"
   end
 
-  def case_scrutinee_altered_state(_a, _b), do: "case_scrutinee_altered_state"
-
-  def handler_body_wrong_termination(_a, _b, _c, _d), do: "handler_body_wrong_termination"
-
   # -----------------------------------------------------------------
+
   def internal_error(a), do: "Internal Error: #{a}"
 
   def internal_error(a, b), do: "Internal Error: #{inspect(a)} - #{inspect(b)}"

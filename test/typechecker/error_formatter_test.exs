@@ -10,7 +10,7 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
 
   describe "format/1" do
     test "renders :incorrect_recipient_participant identically to the legacy builder" do
-      legacy =
+      built =
         Error.ProtocolViolation.incorrect_recipient_participant(
           TwoBuyer.Seller,
           :title_handler,
@@ -19,16 +19,28 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
           expected: :buyer1
         )
 
-      error = %Error{
-        category: :protocol_violation,
-        kind: :incorrect_recipient_participant,
-        module: TwoBuyer.Seller,
-        handler: :title_handler,
-        st: @st_in,
-        details: %{got: :buyer2, expected: :buyer1}
-      }
+      assert %Error{
+               category: :protocol_violation,
+               kind: :incorrect_recipient_participant,
+               module: TwoBuyer.Seller,
+               handler: :title_handler,
+               st: @st_in,
+               details: %{got: :buyer2, expected: :buyer1}
+             } = built
 
-      assert Formatter.format(error) == legacy
+      expected =
+        """
+        \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Incoming Participant
+          Module: #{TwoBuyer.Seller}
+          Handler: title_handler
+          --
+          Got: :buyer2
+          Expected: :buyer1
+          --
+          Session Type: #{Maty.ST.repr(@st_in)}
+        """
+
+      assert Formatter.format(built) == expected
     end
 
     test "raises on an unknown {category, kind}" do
@@ -58,7 +70,6 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
       assert rendered =~ "  Trace:\n"
       assert rendered =~ "    via process_title/2 (line 40)\n"
       assert rendered =~ "    in clause #1 of title_handler/4"
-      # the trace comes after the error body
       assert rendered =~ ~r/Session Type: .*\n  Trace:/s
     end
   end

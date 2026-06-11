@@ -170,7 +170,7 @@ defmodule Maty.Typechecker.Helpers do
     if st_pre == st_post do
       :ok
     else
-      {:error, Error.case_scrutinee_altered_state(meta, from: st_pre, to: st_post)}
+      {:error, Error.ProtocolViolation.case_scrutinee_altered_state(meta, from: st_pre, to: st_post)}
     end
   end
 

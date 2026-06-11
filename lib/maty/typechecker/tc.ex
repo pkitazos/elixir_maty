@@ -387,11 +387,13 @@ defmodule Maty.Typechecker.TC do
 
       case Helpers.check_st_unchanged(st_pre, st, meta) do
         :ok ->
-          fan_out(clauses_list, env, st_pre, fn {:->, _, [[p_ast], e_ast]}, env, st ->
-            thread do
-              _ <~ lift_pattern(ctx, p_ast, scrutinee_type, env, st)
-              tc_expr(ctx, env, st, e_ast)
-            end
+          fan_out(Enum.with_index(clauses_list, 1), env, st_pre, fn
+            {{:->, _, [[p_ast], e_ast]}, index}, env, st ->
+              thread do
+                _ <~ lift_pattern(ctx, p_ast, scrutinee_type, env, st)
+                tc_expr(ctx, env, st, e_ast)
+              end
+              |> with_frame({:case_branch, index, Keyword.take(meta, [:line, :column])})
           end)
           |> bind(fn branch_results, env, _st ->
             case Helpers.join_branch_results(branch_results) do
@@ -845,6 +847,7 @@ defmodule Maty.Typechecker.TC do
             )
         end
       end)
+      |> with_frame({:call, func_id, Keyword.take(meta, [:line, :column])})
     else
       {:ok, []} ->
         error = Error.FunctionCall.function_not_exist(ctx.module, meta, func_id)

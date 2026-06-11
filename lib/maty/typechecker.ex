@@ -8,6 +8,7 @@ defmodule Maty.Typechecker do
 
   alias Maty.Utils
   alias Maty.Typechecker.{Ctx, Delta, TC, Error, Preprocessor}
+  alias Maty.Typechecker.Error.Formatter
 
   require Logger
 
@@ -290,7 +291,7 @@ defmodule Maty.Typechecker do
         else
           {_, error_msg} = err
           # we log each error in its module
-          Logger.error(error_msg, ansi_color: :light_red)
+          Logger.error(normalise_error(error_msg), ansi_color: :light_red)
         end
       end
     else
@@ -386,6 +387,12 @@ defmodule Maty.Typechecker do
   end
 
   def display_error({func_id, error_msg}) do
-    "[#{Utils.to_func(func_id)}] #{error_msg}"
+    "[#{Utils.to_func(func_id)}] #{normalise_error(error_msg)}"
   end
+
+  # During the migration to structured errors, results may carry either a
+  # pre-formatted string (legacy) or an %Error{} struct.
+  # Normalise both to the final report text here, will eventually kill this
+  defp normalise_error(error_msg) when is_binary(error_msg), do: error_msg
+  defp normalise_error(%Error{} = error), do: Formatter.format(error)
 end

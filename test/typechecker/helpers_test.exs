@@ -289,7 +289,11 @@ defmodule Maty.Typechecker.HelpersTest do
 
     test "changed state returns error" do
       assert {:error, msg} = Helpers.check_st_unchanged(@st_end, @st_out, @meta)
-      assert is_binary(msg)
+
+      assert %Maty.Typechecker.Error{
+               category: :protocol_violation,
+               kind: :case_scrutinee_altered_state
+             } = msg
     end
   end
 
