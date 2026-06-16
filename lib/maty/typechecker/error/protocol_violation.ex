@@ -51,15 +51,16 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
   end
 
   def incorrect_recipient_participant(module, handler, st,
-        got: role_received,
-        expected: role_expected
+        received: received,
+        declared: declared,
+        expected: expected
       ) do
     %Error{
       category: :protocol_violation,
       kind: :incorrect_recipient_participant,
       module: module,
       handler: handler,
-      details: %{got: role_received, expected: role_expected},
+      details: %{received: received, declared: declared, expected: expected},
       st: st
     }
   end

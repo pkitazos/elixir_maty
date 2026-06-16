@@ -15,7 +15,8 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
           TwoBuyer.Seller,
           :title_handler,
           @st_in,
-          got: :buyer2,
+          received: :buyer2,
+          declared: :buyer1,
           expected: :buyer1
         )
 
@@ -25,7 +26,7 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
                module: TwoBuyer.Seller,
                handler: :title_handler,
                st: @st_in,
-               details: %{got: :buyer2, expected: :buyer1}
+               details: %{received: :buyer2, declared: :buyer1, expected: :buyer1}
              } = built
 
       expected =
@@ -34,8 +35,9 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
           Module: #{TwoBuyer.Seller}
           Handler: title_handler
           --
-          Got: :buyer2
-          Expected: :buyer1
+          Received role (handler arg): :buyer2
+          Declared role (@spec): :buyer1
+          Expected role (session type): :buyer1
           --
           Session Type: #{Maty.ST.repr(@st_in)}
         """
@@ -58,7 +60,7 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
         module: TwoBuyer.Seller,
         handler: :title_handler,
         st: @st_in,
-        details: %{got: :buyer2, expected: :buyer1},
+        details: %{received: :buyer2, declared: :buyer1, expected: :buyer1},
         trace: [
           {:call, {:process_title, 2}, [line: 40]},
           {:clause, {:title_handler, 4}, 1}

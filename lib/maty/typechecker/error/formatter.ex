@@ -70,15 +70,16 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   # todo: add line
   defp render(%Error{category: :protocol_violation, kind: :incorrect_recipient_participant} = e) do
-    %{got: role_received, expected: role_expected} = e.details
+    %{received: received, declared: declared, expected: expected} = e.details
 
     """
     \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Incoming Participant
       Module: #{e.module}
       Handler: #{e.handler}
       --
-      Got: #{render_atom(role_received)}
-      Expected: #{render_atom(role_expected)}
+      Received role (handler arg): #{render_atom(received)}
+      Declared role (@spec): #{render_atom(declared)}
+      Expected role (session type): #{render_atom(expected)}
       --
       Session Type: #{Maty.ST.repr(e.st)}
     """

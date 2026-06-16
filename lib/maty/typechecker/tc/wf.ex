@@ -215,14 +215,13 @@ defmodule Maty.Typechecker.TC.WF do
     if received_role == expected_role and declared_role == expected_role do
       :ok
     else
-      got = if received_role != expected_role, do: received_role, else: declared_role
-
       {:error,
        Error.ProtocolViolation.incorrect_recipient_participant(
          ctx.module,
          handler_label,
          st,
-         got: got,
+         received: received_role,
+         declared: declared_role,
          expected: expected_role
        )}
     end
