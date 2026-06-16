@@ -5,6 +5,7 @@ defmodule Maty.Typechecker.Error.Formatter do
   """
 
   alias Maty.Typechecker.Error
+  alias Maty.Utils
 
   @spec format(Error.t()) :: String.t()
   def format(%Error{} = error) do
@@ -478,6 +479,105 @@ defmodule Maty.Typechecker.Error.Formatter do
       Key expression: #{inspect(key_ast)}
       --
       Map pattern keys must be literal atoms.
+    """
+  end
+
+  # --- :function_call
+
+  defp render(%Error{category: :function_call, kind: :function_not_exist} = e) do
+    %{func_id: func_id} = e.details
+    func_str = Utils.to_func(func_id)
+
+    """
+    \n\n** (ElixirMatyTypeError) Function Call Error: Function Does Not Exist
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Function: #{func_str}
+      --
+      The function #{func_str} is not defined in this module.
+    """
+  end
+
+  defp render(%Error{category: :function_call, kind: :arity_mismatch} = e) do
+    %{func_id: func_id, expected: expected, got: got} = e.details
+    func_str = Utils.to_func(func_id)
+
+    """
+    \n\n** (ElixirMatyTypeError) Function Call Error: Arity Mismatch
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Function: #{func_str}
+      Expected arity: #{expected}
+      Got arity: #{got}
+      --
+      Arity mismatch between function spec and function definition.
+    """
+  end
+
+  defp render(%Error{category: :function_call, kind: :no_matching_function_clause} = e) do
+    %{func_id: func_id, arg_types: arg_types} = e.details
+    func_str = Utils.to_func(func_id)
+    formatted_args = arg_types |> Enum.map(&render_type/1) |> Enum.join(", ")
+
+    """
+    \n\n** (ElixirMatyTypeError) Function Call Error: No Matching Function Clause
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Function: #{func_str}
+      Called with argument types: (#{formatted_args})
+      --
+      No function clause matches the provided argument types.
+    """
+  end
+
+  defp render(%Error{category: :function_call, kind: :function_altered_session_state} = e) do
+    %{func_id: func_id, final_state: final_state} = e.details
+    func_str = Utils.to_func(func_id)
+
+    """
+    \n\n** (ElixirMatyTypeError) Function Call Error: Function Altered Session State
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Function: #{func_str}
+      Final state: #{inspect(final_state)}
+      --
+      Function altered the session state when it should remain unchanged.
+    """
+  end
+
+  defp render(%Error{category: :function_call, kind: :wrong_number_of_clauses} = e) do
+    %{func_id: func_id, expected: expected, got: got} = e.details
+    func_str = Utils.to_func(func_id)
+
+    """
+    \n\n** (ElixirMatyTypeError) Function Call Error: Wrong Number of Clauses
+      Module: #{e.module}
+      Function: #{func_str}
+      --
+      Expected clauses: #{expected}
+      Got clauses: #{got}
+      --
+      Incompatible number of clauses defined for function.
+    """
+  end
+
+  defp render(%Error{category: :function_call, kind: :wrong_number_of_specs} = e) do
+    %{func_id: func_id, expected: expected, got: got} = e.details
+    func_str = Utils.to_func(func_id)
+
+    """
+    \n\n** (ElixirMatyTypeError) Function Call Error: Wrong Number of Specs
+      Module: #{e.module}
+      Function: #{func_str}
+      --
+      Expected specs: #{expected}
+      Got specs: #{got}
+      --
+      Incompatible number of @spec annotations defined for function.
     """
   end
 
