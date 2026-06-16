@@ -14,6 +14,8 @@ defmodule Maty.Typechecker do
 
   @debug []
 
+  @app Mix.Project.config()[:app]
+
   @doc """
   Called by Hook when a function definition is encountered (`@on_definition`).
   """
@@ -58,9 +60,7 @@ defmodule Maty.Typechecker do
   def handle_before_compile(env) do
     # todo: potentially reverse the type_specs here
 
-    if Enum.member?(@debug, :before) do
-      show_function_signatures(env.module)
-    end
+    Logger.debug(format_function_signatures(env.module))
 
     spec_errors = Module.get_attribute(env.module, :spec_errors)
 
@@ -300,13 +300,16 @@ defmodule Maty.Typechecker do
     end
   end
 
-  # this could be made to not blow up ig
-  def fetch_module_definitions!(bytecode) do
-    read_debug_info!(bytecode)
+  @typedoc "A top-level definition from debug_info: `{func_id, kind, meta, clauses}`."
+  @type definition :: {{atom(), arity()}, atom(), keyword(), [tuple()]}
+
+  @spec fetch_module_definitions!(binary()) :: [definition()]
+  defp fetch_module_definitions!(bytecode) do
+    bytecode
+    |> read_debug_info!()
     |> Map.fetch!(:definitions)
     |> Enum.reject(fn {func_id, _, meta, _} ->
-      Keyword.get(meta, :context) == Maty.Actor or
-        match?({:__handler_expects__, _}, func_id)
+      Keyword.get(meta, :context) == Maty.Actor or match?({:__handler_expects__, _}, func_id)
     end)
   end
 
@@ -314,76 +317,35 @@ defmodule Maty.Typechecker do
   #
   # Adapted from: https://github.com/gertab/ElixirST by Gerard Tabone
   # License: GPL-3.0 license
-  @spec read_debug_info!(binary()) :: map() | no_return()
+  @spec read_debug_info!(binary()) :: map()
   defp read_debug_info!(bytecode) do
-    try do
-      try do
-        chunks =
-          case :beam_lib.chunks(bytecode, [:debug_info]) do
-            {:ok, {_mod, chunks}} -> chunks
-            {:error, _, error} -> throw({:error, inspect(error)})
-          end
+    with {:ok, {_mod, chunks}} <- :beam_lib.chunks(bytecode, [:debug_info]),
+         {:debug_info_v1, :elixir_erl, metadata} <- chunks[:debug_info],
+         {:metadata, {:elixir_v1, map, _}} <- {:metadata, metadata} do
+      map
+    else
+      {:error, _, reason} ->
+        raise "[#{@app}] could not read :debug_info from bytecode: #{inspect(reason)}"
 
-        # Gets the (extended) Elixir abstract syntax tree from debug_info chunk
-        case chunks[:debug_info] do
-          {:debug_info_v1, :elixir_erl, metadata} ->
-            case metadata do
-              {:elixir_v1, map, _} -> map
-              {version, _, _} -> throw({:error, Error.version_mismatch(:elixir_v1, version)})
-            end
+      {:metadata, {version, _, _}} ->
+        raise "[#{@app}] got unexpected debug_info version #{inspect(version)}, expected :elixir_v1"
 
-          x ->
-            throw({:error, inspect(x)})
-        end
-      catch
-        _ -> throw({:error, :oops})
-      end
-    catch
-      :error, error ->
-        throw({:error, inspect(error)})
+      other ->
+        raise "[#{@app}] got unexpected debug_info shape: #{inspect(other)}"
     end
   end
 
-  # defp log_typechecking_results(func_id, res, label: label) do
-  #   out = fn x -> "#{label}: #{inspect(func_id)}\n#{inspect(x)}" end
-
-  #   for clause_res <- res do
-  #     case clause_res do
-  #       {:error, error} -> out.(error) |> Logger.error()
-  #       {:ok, return} -> out.(return) |> Logger.debug()
-  #     end
-  #   end
-  # end
-
-  # defp extract_errors(res) do
-  #   case res do
-  #     {:ok, _} ->
-  #       []
-
-  #     {:error, error} ->
-  #       [error]
-
-  #     list when is_list(list) ->
-  #       Enum.flat_map(list, fn
-  #         {:ok, _} -> []
-  #         {:error, error} -> [error]
-  #       end)
-  #   end
-  # end
-
   # this could be moved elsewhere
-  defp show_function_signatures(module) do
-    attr = Module.get_attribute(module, :psi)
-
+  defp format_function_signatures(module) do
     module_header =
-      "\n-------------------- #{inspect(module)} -------------------"
+      "-------------------- #{inspect(module)} -------------------"
 
     display =
-      Enum.map_join(attr, "\n\n", fn {k, v} ->
-        "#{inspect(k)} --> \n#{inspect(v)}"
-      end)
+      module
+      |> Module.get_attribute(:psi)
+      |> Enum.map_join("\n\n", fn {k, v} -> "#{inspect(k)} --> \n#{inspect(v)}" end)
 
-    IO.puts(module_header <> "\n" <> display <> "\n")
+    "\n" <> module_header <> "\n" <> display <> "\n"
   end
 
   def display_error({func_id, error_msg}) do

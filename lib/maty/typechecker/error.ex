@@ -39,14 +39,6 @@ defmodule Maty.Typechecker.Error do
           trace: [frame()]
         }
 
-  def version_mismatch(expected, got) do
-    %__MODULE__{
-      category: :internal,
-      kind: :version_mismatch,
-      details: %{message: "Found version #{got} but expected #{expected}."}
-    }
-  end
-
   def internal_error(a) do
     %__MODULE__{category: :internal, kind: :internal_error, details: %{message: "#{a}"}}
   end
