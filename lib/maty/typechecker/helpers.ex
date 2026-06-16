@@ -110,7 +110,7 @@ defmodule Maty.Typechecker.Helpers do
           bindings2 :: map(),
           current_env :: map()
         ) ::
-          {:ok, map(), map()} | {:error, String.t(), map()}
+          {:ok, map(), map()} | {:error, Error.t(), map()}
   def check_and_merge_bindings(module, meta, bindings1, bindings2, current_env) do
     keys1 = Map.keys(bindings1) |> MapSet.new()
     keys2 = Map.keys(bindings2) |> MapSet.new()

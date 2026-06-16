@@ -1,7 +1,7 @@
 defmodule Maty.Typechecker.PatternBindingTest do
   use ExUnit.Case
 
-  alias Maty.Typechecker.{PatternBinding, Ctx}
+  alias Maty.Typechecker.{PatternBinding, Ctx, Error}
 
   @meta [line: 0]
   @ctx %Ctx{module: TestModule, meta: @meta}
@@ -69,7 +69,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
 
     test "number vs binary mismatch" do
       assert {:error, msg, %{}} = PatternBinding.tc_pattern(@ctx, 42, :binary, %{})
-      assert is_binary(msg)
+      assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
     end
   end
 
@@ -86,7 +86,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
 
     test "fails against non-list type" do
       assert {:error, msg, %{}} = PatternBinding.tc_pattern(@ctx, [], :number, %{})
-      assert is_binary(msg)
+      assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
     end
   end
 
@@ -106,7 +106,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
       assert {:error, msg, %{}} =
                PatternBinding.tc_pattern(@ctx, {:{}, @meta, []}, :number, %{})
 
-      assert is_binary(msg)
+      assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
     end
   end
 
@@ -126,7 +126,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
       assert {:error, msg, %{}} =
                PatternBinding.tc_pattern(@ctx, {:%{}, @meta, []}, :number, %{})
 
-      assert is_binary(msg)
+      assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
     end
   end
 
@@ -143,7 +143,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
     test "fails against non-list type" do
       pattern = {:|, @meta, [var(:h), var(:t)]}
       assert {:error, msg, %{}} = PatternBinding.tc_pattern(@ctx, pattern, :number, %{})
-      assert is_binary(msg)
+      assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
     end
 
     test "wildcard head" do
@@ -167,7 +167,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
     test "fails against non-tuple type" do
       pattern = {var(:a), var(:b)}
       assert {:error, msg, %{}} = PatternBinding.tc_pattern(@ctx, pattern, :number, %{})
-      assert is_binary(msg)
+      assert %Error{category: :pattern_matching, kind: :pattern_not_tuple} = msg
     end
 
     test "fails with wrong arity" do
@@ -181,7 +181,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
                  %{}
                )
 
-      assert is_binary(msg)
+      assert %Error{category: :pattern_matching, kind: :tuple_arity_mismatch} = msg
     end
 
     test "nested tuple" do
@@ -232,7 +232,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
                  %{}
                )
 
-      assert is_binary(msg)
+      assert %Error{category: :pattern_matching, kind: :pattern_arity_mismatch} = msg
     end
 
     test "non-tuple expected type" do
@@ -241,7 +241,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
       assert {:error, msg, %{}} =
                PatternBinding.tc_pattern(@ctx, pattern, :number, %{})
 
-      assert is_binary(msg)
+      assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
     end
   end
 
@@ -271,7 +271,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
                  %{}
                )
 
-      assert msg =~ "Map Key Not Found"
+      assert %Error{category: :pattern_matching, kind: :pattern_map_key_not_found} = msg
     end
 
     test "multiple keys all matching" do
@@ -296,7 +296,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
       assert {:error, msg, %{}} =
                PatternBinding.tc_pattern(@ctx, pattern, :number, %{})
 
-      assert is_binary(msg)
+      assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
     end
   end
 end

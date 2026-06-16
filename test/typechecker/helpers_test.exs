@@ -194,7 +194,10 @@ defmodule Maty.Typechecker.HelpersTest do
                  %{}
                )
 
-      assert is_binary(msg)
+      assert %Maty.Typechecker.Error{
+               category: :pattern_matching,
+               kind: :conflicting_pattern_bindings
+             } = msg
     end
 
     test "merges into existing env" do

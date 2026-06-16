@@ -347,6 +347,140 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :pattern_matching, kind: :conflicting_pattern_bindings} = e) do
+    %{conflicting_vars: conflicting_vars} = e.details
+
+    """
+    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Conflicting Pattern Bindings
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Conflicting variables: #{conflicting_vars}
+      --
+      The same variable is bound multiple times in this pattern, which is not allowed.
+    """
+  end
+
+  defp render(%Error{category: :pattern_matching, kind: :pattern_type_mismatch} = e) do
+    %{pattern: pattern, expected: expected, got: got} = e.details
+
+    """
+    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Pattern Type Mismatch
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Pattern: #{render_pattern(pattern)}
+      Expected type: #{render_type(expected)}
+      Got type: #{render_type(got)}
+      --
+      The pattern does not match the expected type.
+    """
+  end
+
+  defp render(%Error{category: :pattern_matching, kind: :pattern_arity_mismatch} = e) do
+    %{pattern_type: pattern_type, expected: expected, got: got} = e.details
+
+    """
+    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Pattern Arity Mismatch
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Pattern type: #{pattern_type}
+      Expected arity: #{expected}
+      Got arity: #{got}
+      --
+      The pattern has a different number of elements than expected.
+    """
+  end
+
+  defp render(%Error{category: :pattern_matching, kind: :tuple_arity_mismatch} = e) do
+    %{pattern_arity: pattern_arity, expected: expected} = e.details
+
+    """
+    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Tuple Arity Mismatch
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Pattern: #{pattern_arity}-tuple
+      Expected: #{expected}-tuple
+      --
+      The tuple pattern has #{pattern_arity} elements but expected #{expected} elements.
+    """
+  end
+
+  defp render(%Error{category: :pattern_matching, kind: :pattern_not_tuple} = e) do
+    %{got: got} = e.details
+
+    """
+    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Pattern Type Mismatch
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Pattern: 2-tuple
+      Expected: tuple
+      Got: #{render_type(got)}
+      --
+      Expected a tuple but got a different type.
+    """
+  end
+
+  defp render(%Error{category: :pattern_matching, kind: :complex_map_key} = e) do
+    %{key_ast: key_ast} = e.details
+
+    """
+    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Complex Map Key
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Key expression: #{inspect(key_ast)}
+      --
+      Map patterns require literal atom keys. Complex expressions are not allowed as map keys.
+    """
+  end
+
+  defp render(%Error{category: :pattern_matching, kind: :invalid_map_key_type} = e) do
+    %{got: got, expected: expected} = e.details
+
+    """
+    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Invalid Map Key Type
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Expected key type: #{render_type(expected)}
+      Got key type: #{render_type(got)}
+      --
+      Map pattern keys must be atoms.
+    """
+  end
+
+  defp render(%Error{category: :pattern_matching, kind: :pattern_map_key_not_found} = e) do
+    %{missing_key: missing_key} = e.details
+
+    """
+    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Map Key Not Found
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Missing key: #{render_pattern(missing_key)}
+      --
+      The pattern references a map key that is not present in the expected map type.
+    """
+  end
+
+  defp render(%Error{category: :pattern_matching, kind: :pattern_map_key_not_atom} = e) do
+    %{key_ast: key_ast} = e.details
+
+    """
+    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Map Key Not Atom
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Key expression: #{inspect(key_ast)}
+      --
+      Map pattern keys must be literal atoms.
+    """
+  end
+
   defp render(%Error{category: category, kind: kind}) do
     # todo: eventually kill this
     raise ArgumentError,
@@ -376,6 +510,13 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render_atom(elt) when is_atom(elt), do: ":#{elt}"
   defp render_atom(elt), do: "#{inspect(elt)}"
+
+  defp render_pattern(pattern) when is_atom(pattern), do: ":#{pattern}"
+  defp render_pattern(pattern) when is_binary(pattern), do: "\"#{pattern}\""
+  defp render_pattern(pattern) when is_number(pattern), do: "#{pattern}"
+  defp render_pattern(pattern) when is_boolean(pattern), do: "#{pattern}"
+  defp render_pattern(nil), do: "nil"
+  defp render_pattern(pattern), do: "#{inspect(pattern)}"
 
   defp render_type(type) when is_atom(type), do: ":#{type}"
   defp render_type(type), do: "#{inspect(type)}"
