@@ -759,7 +759,7 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # --- Maty Register Operation (T-Register) V2 ---
+  # --- Maty Register Operation (T-Register) ---
   deftc tc_expr(
           ctx,
           env,
@@ -767,6 +767,11 @@ defmodule Maty.Typechecker.TC do
           {{:., _m1, [Maty.DSL, :register]}, meta,
            [ap_pid_ast, role_ast, reg_info_ast, state_ast]}
         ) do
+    # MATY_ERROR_KIND_REVIEW
+    #
+    # I still havn't migrated the three errors returned by the lift_bool checks
+    # There's gonna be a more comprehensive register / init_handler rework soon
+    # So I'll come back and sort these out then, when I'm a little more clean on things
     thread do
       pid_type <~ tc_expr(ctx, env, st, ap_pid_ast)
       # todo: better error

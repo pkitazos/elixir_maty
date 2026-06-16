@@ -28,6 +28,17 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     }
   end
 
+  # a message handler session type must begin with a receive (SIn)
+  def message_handler_not_receive(module, handler, st) do
+    %Error{
+      category: :protocol_violation,
+      kind: :message_handler_not_receive,
+      module: module,
+      handler: handler,
+      st: st
+    }
+  end
+
   def incorrect_action(module, meta, [got: got], st) do
     %Error{
       category: :protocol_violation,

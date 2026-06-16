@@ -39,6 +39,19 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :protocol_violation, kind: :message_handler_not_receive} = e) do
+    """
+    \n\n** (ElixirMatyTypeError) Protocol Violation: Message Handler Does Not Receive
+      Module: #{e.module}
+      Handler: #{e.handler}
+      --
+      A message handler runs when a message is received, so its session type must
+      begin with a receive. This handler's session type does not.
+      --
+      Session Type: #{Maty.ST.repr(e.st)}
+    """
+  end
+
   defp render(%Error{category: :protocol_violation, kind: :incorrect_action} = e) do
     %{got: got} = e.details
     actions = Maty.ST.get_action(e.st)

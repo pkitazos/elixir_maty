@@ -88,11 +88,11 @@ defmodule Maty.Typechecker.TC.WF do
            {state_var, _, _},
            _session_ctx_var_ast
          ], _guards, body_block},
-        st_pre,
+        %ST.SIn{from: expected_role, branches: branches} = st_pre,
         {[declared_role, {:tuple, [_, payload_type]} = message_type, _state, _session_ctx],
          _return_type}
       ) do
-    with %ST.SIn{from: expected_role, branches: branches} <- st_pre,
+    with nil,
          # check handler and session type roles align
          :ok <-
            check_handler_roles(
@@ -125,9 +125,15 @@ defmodule Maty.Typechecker.TC.WF do
       {:error, msg} ->
         {:error, msg}
 
-      other_st ->
-        {:error, Error.internal_error("Expected SIn session type, got: #{inspect(other_st)}")}
+      other ->
+        {:error,
+         Error.internal_error("unexpected result in message handler check: #{inspect(other)}")}
     end
+  end
+
+  def check_wf_message_handler_clause(ctx, handler_label, _, st_pre, _) do
+    {:error,
+     Error.ProtocolViolation.message_handler_not_receive(ctx.module, handler_label, st_pre)}
   end
 
   @doc """
@@ -147,6 +153,11 @@ defmodule Maty.Typechecker.TC.WF do
           type_signature :: tuple()
         ) ::
           :ok | {:error, binary()}
+  def check_wf_init_handler_clause(ctx, handler_label, _, %ST.SIn{} = st_pre, _) do
+    {:error,
+     Error.ProtocolViolation.init_handler_starts_with_receive(ctx.module, handler_label, st_pre)}
+  end
+
   def check_wf_init_handler_clause(
         ctx,
         handler_label,
@@ -159,8 +170,6 @@ defmodule Maty.Typechecker.TC.WF do
          {:ok, _bindings, env} <- tc_pattern(ctx, arg_pattern_ast, args_types, %{}),
          # extend env with state variable binding
          env = Map.put(env, state_var, Type.maty_actor_state()),
-         # session type must not be SIn (should be SOut or Suspend)
-         :ok <- check_init_st(ctx, handler_label, st_pre),
          # typecheck the handler body
          {:ok, return_type, st, _} <-
            TC.tc_expr_list(ctx, env, st_pre, extract_body(body_block)),
@@ -312,13 +321,6 @@ defmodule Maty.Typechecker.TC.WF do
 
   # --- Private helpers ---
   # todo: figure out what stays and what moves
-
-  defp check_init_st(ctx, handler_label, %ST.SIn{} = st) do
-    {:error,
-     Error.ProtocolViolation.init_handler_starts_with_receive(ctx.module, handler_label, st)}
-  end
-
-  defp check_init_st(_ctx, _handler_label, _st), do: :ok
 
   defp check_clause_arity(ctx, meta, func_id, arity, spec_args_types) do
     if arity == length(spec_args_types) do
