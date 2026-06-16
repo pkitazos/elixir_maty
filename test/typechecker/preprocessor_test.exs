@@ -59,9 +59,11 @@ defmodule Maty.Typechecker.PreprocessorTest do
       assert {:error, error} =
                Preprocessor.validate_type_annotation(attr, @module, {:my_func, 1})
 
-      assert error =~ "Spec Mismatch"
-      assert error =~ "other_func"
-      assert error =~ "my_func"
+      assert %Error{
+               category: :type_specification,
+               kind: :function_spec_info_mismatch,
+               details: %{spec_id: {:other_func, 1}, func_id: {:my_func, 1}}
+             } = error
     end
 
     test "arg parse failure - regression test for Bug 1" do
@@ -70,8 +72,11 @@ defmodule Maty.Typechecker.PreprocessorTest do
       assert {:error, error} =
                Preprocessor.validate_type_annotation(attr, @module, {:my_func, 2})
 
-      assert error =~ "Invalid Spec Argument"
-      assert error =~ "#2"
+      assert %Error{
+               category: :type_specification,
+               kind: :spec_args_parse_error_at,
+               details: %{failed_index: 1}
+             } = error
     end
 
     test "return type parse failure" do
@@ -80,7 +85,10 @@ defmodule Maty.Typechecker.PreprocessorTest do
       assert {:error, error} =
                Preprocessor.validate_type_annotation(attr, @module, {:my_func, 1})
 
-      assert error =~ "Invalid Spec Return Type"
+      assert %Error{
+               category: :type_specification,
+               kind: :spec_return_not_well_typed
+             } = error
     end
 
     test "no spec attribute" do
@@ -104,29 +112,33 @@ defmodule Maty.Typechecker.PreprocessorTest do
 
   # --- validate_handler_annotation ---
 
-  describe "validate_handler_annotation/3" do
+  describe "validate_handler_annotation/4" do
     test "happy path - label exists, returns session type" do
       st = %ST.SEnd{}
       session_types = %{ping: st}
 
       assert {:ok, ^st} =
-               Preprocessor.validate_handler_annotation(:ping, session_types, @meta)
+               Preprocessor.validate_handler_annotation(@module, :ping, session_types, @meta)
     end
 
     test "missing handler label" do
       session_types = %{}
 
       assert {:error, error} =
-               Preprocessor.validate_handler_annotation(:ping, session_types, @meta)
+               Preprocessor.validate_handler_annotation(@module, :ping, session_types, @meta)
 
-      assert error =~ "ping"
+      assert %Error{
+               category: :protocol_violation,
+               kind: :missing_handler,
+               handler: :ping
+             } = error
     end
 
     test "label with string session type passes through" do
       session_types = %{ping: "+Client:{Ping(number).end}"}
 
       assert {:ok, st_string} =
-               Preprocessor.validate_handler_annotation(:ping, session_types, @meta)
+               Preprocessor.validate_handler_annotation(@module, :ping, session_types, @meta)
 
       assert is_binary(st_string)
     end

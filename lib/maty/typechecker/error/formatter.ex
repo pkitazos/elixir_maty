@@ -14,6 +14,18 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   # --- :protocol_violation
 
+  # todo: potentially rename
+  defp render(%Error{category: :protocol_violation, kind: :missing_handler} = e) do
+    """
+    \n\n** (ElixirMatyTypeError) Protocol Violation: Missing Handler
+      Module: #{e.module}
+      Handler: #{e.handler}
+      Line: #{e.meta[:line]}
+      --
+      No session type is declared for this handler's label.
+    """
+  end
+
   defp render(%Error{category: :protocol_violation, kind: :incorrect_action} = e) do
     %{got: got} = e.details
     actions = Maty.ST.get_action(e.st)
@@ -581,6 +593,99 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  # --- :type_specification
+
+  defp render(%Error{category: :type_specification, kind: :function_spec_info_mismatch} = e) do
+    %{spec_id: spec_id, func_id: func_id} = e.details
+    spec_str = Utils.to_func(spec_id)
+    func_str = Utils.to_func(func_id)
+
+    """
+    \n\n** (ElixirMatyTypeError) Type Specification Error: Function Spec Mismatch
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      @spec signature: #{spec_str}
+      Function signature: #{func_str}
+      --
+      The @spec annotation does not match the function definition.
+    """
+  end
+
+  defp render(%Error{category: :type_specification, kind: :spec_args_parse_error_at} = e) do
+    %{func_id: func_id, failed_index: failed_index, args_asts: args_asts, internal: internal} =
+      e.details
+
+    %Error.Internal{title: title, opts: opts, message: message} = internal
+    func_str = Utils.to_func(func_id)
+
+    """
+    \n\n** (ElixirMatyTypeError) Type Specification Error: Invalid Spec Argument
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Function: #{func_str}
+      Argument types: #{render_type_list(args_asts)}
+      Error at argument: ##{failed_index + 1}
+      Parse error: #{title}
+      #{opts}
+      --
+      Failed to parse type specification for function argument.
+
+      Details: #{message}
+    """
+  end
+
+  defp render(%Error{category: :type_specification, kind: :spec_return_not_well_typed} = e) do
+    %{spec_name: spec_name, return_ast: return_ast, internal: internal} = e.details
+    %Error.Internal{title: title, opts: opts, message: message} = internal
+
+    """
+    \n\n** (ElixirMatyTypeError) Type Specification Error: Invalid Spec Return Type
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Function: #{spec_name}
+      Return type: #{inspect(return_ast)}
+      Parse error: #{title}
+      #{opts}
+      --
+      The return type specification is invalid.
+
+      Details: #{message}
+    """
+  end
+
+  defp render(%Error{category: :type_specification, kind: :no_spec_for_function} = e) do
+    %{func_id: func_id} = e.details
+    func_str = Utils.to_func(func_id)
+
+    """
+    \n\n** (ElixirMatyTypeError) Type Specification Error: Missing Function Spec
+      Module: #{e.module}
+      --
+      Function: #{func_str}
+      --
+      No @spec annotation found for this function. All functions require type specifications.
+    """
+  end
+
+  # --- :name_resolution
+
+  defp render(%Error{category: :name_resolution, kind: :variable_not_exist} = e) do
+    %{var: var} = e.details
+
+    """
+    \n\n** (ElixirMatyTypeError) Name Resolution Error: Unbound Variable
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Variable: #{var}
+      --
+      This variable is not bound in the current scope.
+    """
+  end
+
   defp render(%Error{category: category, kind: kind}) do
     # todo: eventually kill this
     raise ArgumentError,
@@ -623,4 +728,10 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render_operator(op) when is_atom(op), do: "#{op}"
   defp render_operator(op), do: "#{inspect(op)}"
+
+  defp render_type_list(types) when is_list(types) do
+    Enum.map(types, &inspect/1) |> Enum.join(", ")
+  end
+
+  defp render_type_list(type), do: inspect(type)
 end

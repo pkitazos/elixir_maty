@@ -18,6 +18,7 @@ defmodule Maty.Typechecker.Error do
           | :function_call
           | :type_specification
           | :framework_usage
+          | :name_resolution
           | :internal
 
   @type t :: %__MODULE__{
@@ -40,17 +41,6 @@ defmodule Maty.Typechecker.Error do
 
   def version_mismatch(expected, got) do
     "Found version #{got} but expected #{expected}."
-  end
-
-  def missing_handler(handler, meta) do
-    with_meta(
-      meta,
-      "Handler #{handler} uses label not available in this module's @st annotations"
-    )
-  end
-
-  def variable_not_exist(meta, var) do
-    with_meta(meta, "variable #{var} doesn't exist")
   end
 
   def no_raw_receive(meta) do

@@ -1,14 +1,5 @@
 defmodule Maty.Typechecker.Error.TypeSpecification do
-  alias Maty.Utils
   alias Maty.Typechecker.Error
-
-  defp render_type_list(types) when is_list(types) do
-    types
-    |> Enum.map(&inspect/1)
-    |> Enum.join(", ")
-  end
-
-  defp render_type_list(type), do: inspect(type)
 
   # external functions
   def invalid_session_type_annotation(module, meta, handler_label, %Error.Internal{
@@ -33,83 +24,48 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
     """
   end
 
-  def spec_return_not_well_typed(module, meta, spec_name, return_ast, %Error.Internal{
-        title: title,
-        opts: opts,
-        message: message
-      }) do
-    line = Keyword.fetch!(meta, :line)
-
-    """
-    \n\n** (ElixirMatyTypeError) Type Specification Error: Invalid Spec Return Type
-      Module: #{module}
-      Line: #{line}
-      --
-      Function: #{spec_name}
-      Return type: #{inspect(return_ast)}
-      Parse error: #{title}
-      #{opts}
-      --
-      The return type specification is invalid.
-
-      Details: #{message}
-    """
+  def spec_return_not_well_typed(module, meta, spec_name, return_ast, %Error.Internal{} = internal) do
+    %Error{
+      category: :type_specification,
+      kind: :spec_return_not_well_typed,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{spec_name: spec_name, return_ast: return_ast, internal: internal}
+    }
   end
 
-  def spec_args_parse_error_at(module, meta, func_id, failed_index, args_asts, %Error.Internal{
-        title: title,
-        opts: opts,
-        message: message
-      }) do
-    line = Keyword.fetch!(meta, :line)
-    func_str = Utils.to_func(func_id)
-
-    """
-    \n\n** (ElixirMatyTypeError) Type Specification Error: Invalid Spec Argument
-      Module: #{module}
-      Line: #{line}
-      --
-      Function: #{func_str}
-      Argument types: #{render_type_list(args_asts)}
-      Error at argument: ##{failed_index + 1}
-      Parse error: #{title}
-      #{opts}
-      --
-      Failed to parse type specification for function argument.
-
-      Details: #{message}
-    """
+  def spec_args_parse_error_at(module, meta, func_id, failed_index, args_asts, %Error.Internal{} = internal) do
+    %Error{
+      category: :type_specification,
+      kind: :spec_args_parse_error_at,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{
+        func_id: func_id,
+        failed_index: failed_index,
+        args_asts: args_asts,
+        internal: internal
+      }
+    }
   end
 
   def function_spec_info_mismatch(module, meta, spec_id: spec_id, func_id: func_id) do
-    line = Keyword.fetch!(meta, :line)
-
-    spec_str = Utils.to_func(spec_id)
-    func_str = Utils.to_func(func_id)
-
-    """
-    \n\n** (ElixirMatyTypeError) Type Specification Error: Function Spec Mismatch
-      Module: #{module}
-      Line: #{line}
-      --
-      @spec signature: #{spec_str}
-      Function signature: #{func_str}
-      --
-      The @spec annotation does not match the function definition.
-    """
+    %Error{
+      category: :type_specification,
+      kind: :function_spec_info_mismatch,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{spec_id: spec_id, func_id: func_id}
+    }
   end
 
   def no_spec_for_function(module, func_id) do
-    func_str = Utils.to_func(func_id)
-
-    """
-    \n\n** (ElixirMatyTypeError) Type Specification Error: Missing Function Spec
-      Module: #{module}
-      --
-      Function: #{func_str}
-      --
-      No @spec annotation found for this function. All functions require type specifications.
-    """
+    %Error{
+      category: :type_specification,
+      kind: :no_spec_for_function,
+      module: module,
+      details: %{func_id: func_id}
+    }
   end
 
   # internal functions

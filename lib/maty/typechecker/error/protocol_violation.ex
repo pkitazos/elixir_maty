@@ -1,6 +1,20 @@
 defmodule Maty.Typechecker.Error.ProtocolViolation do
   alias Maty.Typechecker.Error
 
+  # todo: verify when this is returned
+  #
+  # I think this is currentl used when a handler is annotated with a label that
+  # has no declared session type
+  def missing_handler(module, handler, meta) do
+    %Error{
+      category: :protocol_violation,
+      kind: :missing_handler,
+      module: module,
+      handler: handler,
+      meta: Keyword.take(meta, [:line, :column])
+    }
+  end
+
   def incorrect_action(module, meta, [got: got], st) do
     %Error{
       category: :protocol_violation,

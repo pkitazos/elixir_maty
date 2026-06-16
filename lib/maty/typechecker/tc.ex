@@ -849,14 +849,13 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # Variable Lookup (TV-Var adaptation)
-  # Looking up a variable is pure; preserves session state.
-  deftc tc_expr(_ctx, env, st, {var_name, meta, context})
+  # --- Variable Lookup (TV-Var) ---
+  # Looking up a variable is session pure
+  deftc tc_expr(ctx, env, st, {var_name, meta, context})
         when is_atom(var_name) and (is_nil(context) or is_list(context)) do
     case Map.fetch(env, var_name) do
       {:ok, type} -> ok(type, env, st)
-      # pin - convert to new kind of error
-      :error -> error(Error.variable_not_exist(meta, var_name), env)
+      :error -> error(Error.NameResolution.variable_not_exist(ctx.module, meta, var_name), env)
     end
   end
 

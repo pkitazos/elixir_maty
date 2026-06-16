@@ -93,7 +93,12 @@ defmodule Maty.Typechecker.TCExprTest do
 
     test "unbound variable returns error" do
       assert {:error, msg, %{}} = TC.tc_expr(@ctx, %{}, @st_end, var(:unknown_var))
-      assert msg =~ "unknown_var"
+
+      assert %Error{
+               category: :name_resolution,
+               kind: :variable_not_exist,
+               details: %{var: :unknown_var}
+             } = msg
     end
 
     test "variable preserves session state" do

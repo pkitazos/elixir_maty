@@ -66,7 +66,7 @@ defmodule Maty.Typechecker.Preprocessor do
         kind: handler_kind,
         meta: meta
       }) do
-    case validate_handler_annotation(handler_label, session_types, meta) do
+    case validate_handler_annotation(module, handler_label, session_types, meta) do
       {:ok, st} ->
         Utils.Env.add_at_key(
           module,
@@ -87,15 +87,18 @@ defmodule Maty.Typechecker.Preprocessor do
   # Checks that `handler_label` names a session type in scope and that the
   # session type string parses. Returns `{:ok, parsed_st}`, or `{:error, e}`
   # where `e` describes either a missing handler label or a parse failure.
+  # todo: check whether 2 different errors are being conflated
+  #   1. a session type has n branches but m handlers where m < n
+  #   2. a handler is given a name which does not have a matching session type at all
   @doc false
-  @spec validate_handler_annotation(atom(), %{atom() => String.t()}, keyword()) ::
-          {:ok, ST.t()} | {:error, String.t()}
-  def validate_handler_annotation(handler_label, session_types, meta) do
+  @spec validate_handler_annotation(module(), atom(), %{atom() => String.t()}, keyword()) ::
+          {:ok, ST.t()} | {:error, Error.t()}
+  def validate_handler_annotation(module, handler_label, session_types, meta) do
     # we perform some cursory checks, does a session type exist under such a name? and can we parse it?
     case Map.fetch(session_types, handler_label) do
       {:ok, st} -> {:ok, st}
       # this is not a valid name for a handler
-      :error -> {:error, Error.missing_handler(handler_label, meta)}
+      :error -> {:error, Error.ProtocolViolation.missing_handler(module, handler_label, meta)}
     end
   end
 
