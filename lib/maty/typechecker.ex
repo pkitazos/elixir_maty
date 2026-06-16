@@ -62,13 +62,12 @@ defmodule Maty.Typechecker do
 
     Logger.debug(format_function_signatures(env.module))
 
-    spec_errors = Module.get_attribute(env.module, :spec_errors)
+    errors =
+      Module.get_attribute(env.module, :spec_errors) ++
+        Module.get_attribute(env.module, :handler_errors)
 
-    if (err_count = length(spec_errors)) > 0 do
-      out =
-        for err <- spec_errors, reduce: "" do
-          acc -> acc <> "#{inspect(err)}\n"
-        end
+    if (err_count = length(errors)) > 0 do
+      out = Enum.reduce(errors, "", fn err, acc -> acc <> inspect(err) <> "\n" end)
 
       Logger.error(out)
       throw({:phase_1, "#{err_count} errors you need to fix"})

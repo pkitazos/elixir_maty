@@ -16,8 +16,9 @@ defmodule Maty.Typechecker.Preprocessor do
 
   They both consume module attributes (deleting them once handled) and write
   their results into the per-module environment via `Maty.Utils.Env`.
-  Validation failures are logged; spec failures are additionally recorded
-  in `:spec_errors` so the typechecker can report them to the user.
+  Validation failures are recorded so the typechecker can report them to the
+  user: spec failures in `:spec_errors`, handler-annotation failures in
+  `:handler_errors`.
   """
   require Logger
 
@@ -43,7 +44,8 @@ defmodule Maty.Typechecker.Preprocessor do
     * `:meta` - source location used in error messages
 
   On success, stores `%{function: {name, arity}, st: parsed_session_type}`
-  under `handler_label`. On failure the error is logged only.
+  under `handler_label`. On failure the error is accumulated in `:handler_errors`
+  for the typechecker to report.
 
   Either way the `:kind` attribute is deleted before returning, so this is
   called for its side effects.
@@ -76,7 +78,7 @@ defmodule Maty.Typechecker.Preprocessor do
         )
 
       {:error, error} ->
-        Logger.error(error)
+        Module.put_attribute(module, :handler_errors, {{name, arity}, error})
     end
 
     # and then we delete this attribute from the module

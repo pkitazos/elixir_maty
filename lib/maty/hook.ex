@@ -16,6 +16,7 @@ defmodule Maty.Hook do
       Utils.Env.setup(__MODULE__, :delta_I)
       Utils.Env.setup(__MODULE__, :psi)
       Utils.Env.setup(__MODULE__, :spec_errors)
+      Utils.Env.setup(__MODULE__, :handler_errors)
 
       @compile :debug_info
 
