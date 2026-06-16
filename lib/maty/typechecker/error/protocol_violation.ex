@@ -15,6 +15,19 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     }
   end
 
+  # An init handler must initiate the actors role in a session
+  # if they are the first actor to send a message then the handler should send
+  # otherwise the handler suspends into their first receive
+  def init_handler_starts_with_receive(module, handler, st) do
+    %Error{
+      category: :protocol_violation,
+      kind: :init_handler_starts_with_receive,
+      module: module,
+      handler: handler,
+      st: st
+    }
+  end
+
   def incorrect_action(module, meta, [got: got], st) do
     %Error{
       category: :protocol_violation,

@@ -2,29 +2,31 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
   alias Maty.Typechecker.Error
 
   # external functions
-  def invalid_session_type_annotation(module, meta, handler_label, %Error.Internal{
-        title: title,
-        opts: opts,
-        message: message
-      }) do
-    line = Keyword.fetch!(meta, :line)
 
-    """
-    \n\n** (ElixirMatyTypeError) Type Specification Error: Invalid Session Type Annotation
-      Module: #{module}
-      Line: #{line}
-      --
-      Handler: #{handler_label}
-      Parse error: #{title}
-      #{opts}
-      --
-      The @st annotation contains an invalid session type string that cannot be parsed.
-
-      Details: #{message}
-    """
+  # MATY_ERROR_KIND_REVIEW
+  # this isn't currently wired anywhere, but it's a real error
+  # that should be invoked where session-type strings are parsed (in the pre-processor)
+  #
+  # the @st annotation string may fail to parse in which case we
+  # should wrap the parse error we get from st_parser with some meta info
+  def invalid_session_type_annotation(module, meta, handler_label, %Error.Internal{} = internal) do
+    %Error{
+      category: :type_specification,
+      kind: :invalid_session_type_annotation,
+      module: module,
+      handler: handler_label,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{internal: internal}
+    }
   end
 
-  def spec_return_not_well_typed(module, meta, spec_name, return_ast, %Error.Internal{} = internal) do
+  def spec_return_not_well_typed(
+        module,
+        meta,
+        spec_name,
+        return_ast,
+        %Error.Internal{} = internal
+      ) do
     %Error{
       category: :type_specification,
       kind: :spec_return_not_well_typed,
@@ -34,7 +36,14 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
     }
   end
 
-  def spec_args_parse_error_at(module, meta, func_id, failed_index, args_asts, %Error.Internal{} = internal) do
+  def spec_args_parse_error_at(
+        module,
+        meta,
+        func_id,
+        failed_index,
+        args_asts,
+        %Error.Internal{} = internal
+      ) do
     %Error{
       category: :type_specification,
       kind: :spec_args_parse_error_at,

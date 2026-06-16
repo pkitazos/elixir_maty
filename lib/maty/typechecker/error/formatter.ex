@@ -26,6 +26,19 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :protocol_violation, kind: :init_handler_starts_with_receive} = e) do
+    """
+    \n\n** (ElixirMatyTypeError) Protocol Violation: Init Handler Starts With a Receive
+      Module: #{e.module}
+      Handler: #{e.handler}
+      --
+      An init handler must initiate the session (send or suspend), but the protocol
+      for this role begins by receiving. That first step needs a message handler.
+      --
+      Session Type: #{Maty.ST.repr(e.st)}
+    """
+  end
+
   defp render(%Error{category: :protocol_violation, kind: :incorrect_action} = e) do
     %{got: got} = e.details
     actions = Maty.ST.get_action(e.st)
@@ -595,6 +608,24 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   # --- :type_specification
 
+  defp render(%Error{category: :type_specification, kind: :invalid_session_type_annotation} = e) do
+    %{internal: %Error.Internal{title: title, opts: opts, message: message}} = e.details
+
+    """
+    \n\n** (ElixirMatyTypeError) Type Specification Error: Invalid Session Type Annotation
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Handler: #{e.handler}
+      Parse error: #{title}
+      #{opts}
+      --
+      The @st annotation contains an invalid session type string that cannot be parsed.
+
+      Details: #{message}
+    """
+  end
+
   defp render(%Error{category: :type_specification, kind: :function_spec_info_mismatch} = e) do
     %{spec_id: spec_id, func_id: func_id} = e.details
     spec_str = Utils.to_func(spec_id)
@@ -683,6 +714,80 @@ defmodule Maty.Typechecker.Error.Formatter do
       Variable: #{var}
       --
       This variable is not bound in the current scope.
+    """
+  end
+
+  # --- :framework_usage
+
+  defp render(%Error{category: :framework_usage, kind: :missing_session_registration} = e) do
+    """
+    \n\n** (ElixirMatyTypeError) Framework Usage Violation: Missing Session Registration
+      Module: #{e.module}
+      --
+      Actor does not register in a session in the on_link/2 callback
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :on_link_altered_session_state} = e) do
+    %{got: got} = e.details
+
+    """
+    \n\n** (ElixirMatyTypeError) Framework Usage Violation: Session State Altered in on_link
+      Module: #{e.module}
+      --
+      The on_link/2 callback must not advance the session type.
+      Final state: #{inspect(got)}
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :on_link_bad_return} = e) do
+    %{got: got} = e.details
+
+    """
+    \n\n** (ElixirMatyTypeError) Framework Usage Violation: Invalid on_link Return
+      Module: #{e.module}
+      --
+      The on_link/2 callback must return {:ok, actor_state}.
+      Got: #{inspect(got)}
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :invalid_init_handler} = e) do
+    """
+    \n\n** (ElixirMatyTypeError) Framework Usage Violation: Invalid Initialisation Handler
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Actor tries to register with an invalid initialisation handler.
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :no_native_send} = e) do
+    """
+    \n\n** (ElixirMatyTypeError) Framework Usage Violation: Attempted Native Communication
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Actor attempted communication using send/2
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :no_native_receive} = e) do
+    """
+    \n\n** (ElixirMatyTypeError) Framework Usage Violation: Attempted Native Communication
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Actor attempted communication using a receive block
+    """
+  end
+
+  # --- :internal (one generic clause for all internal diagnostics)
+
+  defp render(%Error{category: :internal} = e) do
+    """
+    \n\n** (ElixirMatyTypeError) Internal Error
+      #{e.details[:message]}
     """
   end
 

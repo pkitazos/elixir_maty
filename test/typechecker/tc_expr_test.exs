@@ -546,14 +546,14 @@ defmodule Maty.Typechecker.TCExprTest do
     test "raw receive is rejected" do
       ast = {:receive, @meta, [[do: [{:->, @meta, [[var(:msg)], var(:msg)]}]]]}
       assert {:error, msg, _env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
-      assert is_binary(msg)
+      assert %Error{category: :framework_usage, kind: :no_native_receive} = msg
     end
 
     test "raw erlang send is rejected" do
       ast = {{:., @meta, [:erlang, :send]}, @meta, [var(:pid), "message"]}
       env = %{pid: :pid}
       assert {:error, msg, _env} = TC.tc_expr(@ctx, env, @st_end, ast)
-      assert is_binary(msg)
+      assert %Error{category: :framework_usage, kind: :no_native_send} = msg
     end
   end
 

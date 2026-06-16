@@ -40,31 +40,14 @@ defmodule Maty.Typechecker.Error do
         }
 
   def version_mismatch(expected, got) do
-    "Found version #{got} but expected #{expected}."
+    %__MODULE__{
+      category: :internal,
+      kind: :version_mismatch,
+      details: %{message: "Found version #{got} but expected #{expected}."}
+    }
   end
 
-  def no_raw_receive(meta) do
-    with_meta(meta, "Raw receive is not allowed in a Maty.Actor.")
-  end
-
-  def no_raw_send(meta) do
-    with_meta(meta, "Raw send(...) is not allowed in a Maty.Actor.")
-  end
-
-  def unexpected do
-    "an unexpected error occurred"
-  end
-
-  # -----------------------------------------------------------------
-
-  def internal_error(a), do: "Internal Error: #{a}"
-
-  def internal_error(a, b), do: "Internal Error: #{inspect(a)} - #{inspect(b)}"
-
-  # -----------------------------------------------------------------
-
-  defp with_meta(meta, str) do
-    meta = Keyword.take(meta, [:line, :column])
-    "#{inspect(meta)} #{str}"
+  def internal_error(a) do
+    %__MODULE__{category: :internal, kind: :internal_error, details: %{message: "#{a}"}}
   end
 end

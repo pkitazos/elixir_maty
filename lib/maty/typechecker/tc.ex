@@ -105,8 +105,7 @@ defmodule Maty.Typechecker.TC do
     if Map.has_key?(ctx.delta_I, init_handler) do
       ok({:fun, length(args_ast)}, env, st)
     else
-      # pin - convert to new kind of error
-      error("Trying to register with invalid init_handler", env)
+      error(Error.FrameworkUsage.invalid_init_handler(ctx.module, ctx.meta), env)
     end
   end
 
@@ -115,8 +114,7 @@ defmodule Maty.Typechecker.TC do
     if Map.has_key?(ctx.delta_I, init_handler) do
       ok({:fun, 0}, env, st)
     else
-      # pin - convert to new kind of error
-      error("Trying to register with invalid init_handler", env)
+      error(Error.FrameworkUsage.invalid_init_handler(ctx.module, ctx.meta), env)
     end
   end
 
@@ -124,8 +122,7 @@ defmodule Maty.Typechecker.TC do
     if Map.has_key?(ctx.delta_I, init_handler) do
       ok({:fun, 0}, env, st)
     else
-      # pin - convert to new kind of error
-      error("Trying to register with invalid init_handler", env)
+      error(Error.FrameworkUsage.invalid_init_handler(ctx.module, ctx.meta), env)
     end
   end
 
@@ -313,23 +310,20 @@ defmodule Maty.Typechecker.TC do
   # --- Raw Communication Checks ---
 
   # Disallow raw 'receive'
-  deftc tc_expr(_ctx, env, _st, {:receive, meta, _}) do
-    # pin - convert to new kind of error
-    error(Error.no_raw_receive(meta), env)
+  deftc tc_expr(ctx, env, _st, {:receive, meta, _}) do
+    error(Error.FrameworkUsage.no_native_receive(ctx.module, meta), env)
   end
 
   # Disallow raw 'send' (Kernel.send/2 or :erlang.send/2)
-  deftc tc_expr(_ctx, env, _st, {{:., meta, [:erlang, :send]}, _, args})
+  deftc tc_expr(ctx, env, _st, {{:., meta, [:erlang, :send]}, _, args})
         when length(args) in [2, 3] do
-    # pin - convert to new kind of error
-    error(Error.no_raw_send(meta), env)
+    error(Error.FrameworkUsage.no_native_send(ctx.module, meta), env)
   end
 
   # Check for Kernel.send/2
-  deftc tc_expr(_ctx, env, _st, {{:., meta, [:Kernel, :send]}, _, args})
+  deftc tc_expr(ctx, env, _st, {{:., meta, [:Kernel, :send]}, _, args})
         when length(args) == 2 do
-    # pin - convert to new kind of error
-    error(Error.no_raw_send(meta), env)
+    error(Error.FrameworkUsage.no_native_send(ctx.module, meta), env)
   end
 
   # --- Anonymous Functions and Captures ---

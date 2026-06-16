@@ -90,15 +90,6 @@ defmodule Maty.Typechecker.Helpers do
   # If the AST node doesn't match a simple literal form
   def ast_to_literal(_other_ast), do: :error
 
-  def get_literal_type(nil), do: {:ok, nil}
-  def get_literal_type(literal) when is_boolean(literal), do: {:ok, :boolean}
-  def get_literal_type(literal) when is_number(literal), do: {:ok, :number}
-  def get_literal_type(literal) when is_binary(literal), do: {:ok, :binary}
-  def get_literal_type(literal) when is_atom(literal), do: {:ok, :atom}
-
-  # Not a recognised simple literal
-  def get_literal_type(_), do: :error
-
   @doc """
   Merges two maps of new variable bindings, checking for conflicting keys.
   If successful, returns the merged new bindings and the fully updated env.

@@ -68,29 +68,19 @@ defmodule Maty.Typechecker.PatternBinding do
                is_binary(literal_pattern) or
                is_boolean(literal_pattern) or
                is_atom(literal_pattern) do
-    case Helpers.get_literal_type(literal_pattern) do
-      {:ok, literal_type} ->
-        if literal_type == expected_type or literal_type == :atom do
-          {:ok, %{}, var_env}
-        else
-          error =
-            Error.PatternMatching.pattern_type_mismatch(ctx.module, ctx.meta,
-              pattern: literal_pattern,
-              expected: expected_type,
-              got: literal_type
-            )
+    literal_type = literal_type(literal_pattern)
 
-          {:error, error, var_env}
-        end
+    if literal_type == expected_type or literal_type == :atom do
+      {:ok, %{}, var_env}
+    else
+      error =
+        Error.PatternMatching.pattern_type_mismatch(ctx.module, ctx.meta,
+          pattern: literal_pattern,
+          expected: expected_type,
+          got: literal_type
+        )
 
-      :error ->
-        error =
-          Error.internal_error(
-            ctx.meta,
-            "Could not get type for literal pattern #{inspect(literal_pattern)}"
-          )
-
-        {:error, error, var_env}
+      {:error, error, var_env}
     end
   end
 
@@ -366,4 +356,11 @@ defmodule Maty.Typechecker.PatternBinding do
         {:error, error, var_env}
     end
   end
+
+  # Maps a literal pattern value to its base Maty type.
+  defp literal_type(nil), do: nil
+  defp literal_type(v) when is_boolean(v), do: :boolean
+  defp literal_type(v) when is_number(v), do: :number
+  defp literal_type(v) when is_binary(v), do: :binary
+  defp literal_type(v) when is_atom(v), do: :atom
 end

@@ -141,36 +141,6 @@ defmodule Maty.Typechecker.HelpersTest do
     end
   end
 
-  # --- get_literal_type/1 ---
-
-  describe "get_literal_type/1" do
-    test "nil returns nil type" do
-      assert {:ok, nil} = Helpers.get_literal_type(nil)
-    end
-
-    test "boolean returns :boolean" do
-      assert {:ok, :boolean} = Helpers.get_literal_type(true)
-      assert {:ok, :boolean} = Helpers.get_literal_type(false)
-    end
-
-    test "number returns :number" do
-      assert {:ok, :number} = Helpers.get_literal_type(42)
-      assert {:ok, :number} = Helpers.get_literal_type(3.14)
-    end
-
-    test "binary returns :binary" do
-      assert {:ok, :binary} = Helpers.get_literal_type("hello")
-    end
-
-    test "atom returns :atom" do
-      assert {:ok, :atom} = Helpers.get_literal_type(:hello)
-    end
-
-    test "non-literal returns error" do
-      assert :error = Helpers.get_literal_type([1, 2])
-    end
-  end
-
   # --- check_and_merge_bindings/5 ---
 
   describe "check_and_merge_bindings/5" do

@@ -160,7 +160,7 @@ defmodule Maty.Typechecker.TC.WF do
          # extend env with state variable binding
          env = Map.put(env, state_var, Type.maty_actor_state()),
          # session type must not be SIn (should be SOut or Suspend)
-         :ok <- check_init_st(st_pre),
+         :ok <- check_init_st(ctx, handler_label, st_pre),
          # typecheck the handler body
          {:ok, return_type, st, _} <-
            TC.tc_expr_list(ctx, env, st_pre, extract_body(body_block)),
@@ -188,11 +188,11 @@ defmodule Maty.Typechecker.TC.WF do
          # typecheck the body (calls to register etc.)
          {:ok, return_type, final_st, _env} <- TC.tc_expr_list(ctx, env, %ST.SEnd{}, body),
          # session state must not change
-         :ok <- check_on_link_session_state(final_st),
+         :ok <- check_on_link_session_state(ctx, final_st),
          # must contain at least one call to Maty.DSL.register
-         :ok <- check_contains_register(body),
+         :ok <- check_contains_register(ctx, body),
          # must return {:ok, actor_state}
-         :ok <- check_on_link_return_type(return_type) do
+         :ok <- check_on_link_return_type(ctx, return_type) do
       :ok
     else
       {:error, msg, _env} -> {:error, msg}
@@ -271,23 +271,23 @@ defmodule Maty.Typechecker.TC.WF do
      )}
   end
 
-  defp check_on_link_session_state(%ST.SEnd{}), do: :ok
+  defp check_on_link_session_state(_ctx, %ST.SEnd{}), do: :ok
 
-  defp check_on_link_session_state(other_st) do
-    {:error, "on_link callback altered session state: #{inspect(other_st)}"}
+  defp check_on_link_session_state(ctx, other_st) do
+    {:error, Error.FrameworkUsage.on_link_altered_session_state(ctx.module, other_st)}
   end
 
-  defp check_contains_register(body) do
+  defp check_contains_register(ctx, body) do
     if Helpers.contains_register_call?(body),
       do: :ok,
-      else: {:error, "on_link callback must contain at least one call to register"}
+      else: {:error, Error.FrameworkUsage.missing_session_registration(ctx.module)}
   end
 
-  defp check_on_link_return_type(return_type) do
+  defp check_on_link_return_type(ctx, return_type) do
     if return_type == {:tuple, [:ok, Type.maty_actor_state()]} do
       :ok
     else
-      {:error, "on_link callback must return {:ok, actor_state}, got: #{inspect(return_type)}"}
+      {:error, Error.FrameworkUsage.on_link_bad_return(ctx.module, return_type)}
     end
   end
 
@@ -310,11 +310,15 @@ defmodule Maty.Typechecker.TC.WF do
 
   defp extract_body(expr) when not is_list(expr), do: [expr]
 
-  # --- Private helpers (from helpers.ex) ---
+  # --- Private helpers ---
+  # todo: figure out what stays and what moves
 
-  # pin - convert to new kind of error
-  defp check_init_st(%ST.SIn{}), do: {:error, "Session precondition cannot be a receive"}
-  defp check_init_st(_st), do: :ok
+  defp check_init_st(ctx, handler_label, %ST.SIn{} = st) do
+    {:error,
+     Error.ProtocolViolation.init_handler_starts_with_receive(ctx.module, handler_label, st)}
+  end
+
+  defp check_init_st(_ctx, _handler_label, _st), do: :ok
 
   defp check_clause_arity(ctx, meta, func_id, arity, spec_args_types) do
     if arity == length(spec_args_types) do
