@@ -1,7 +1,7 @@
 defmodule Maty.Typechecker.TCExprTest do
   use ExUnit.Case
 
-  alias Maty.Typechecker.{TC, Ctx}
+  alias Maty.Typechecker.{TC, Ctx, Error}
   @st_end %ST.SEnd{}
   @st_out ST.output_one(:server, :msg, :binary, @st_end)
   @ctx %Ctx{module: nil, meta: [line: 0], delta_M: %{}, delta_I: %{}, psi: %{}}
@@ -125,7 +125,7 @@ defmodule Maty.Typechecker.TCExprTest do
 
     test "heterogeneous list returns error" do
       assert {:error, msg, _env} = TC.tc_expr(@ctx, %{}, @st_end, [1, "two"])
-      assert is_binary(msg)
+      assert %Error{category: :type_mismatch, kind: :list_elements_incompatible} = msg
     end
 
     test "single element list" do
@@ -246,7 +246,7 @@ defmodule Maty.Typechecker.TCExprTest do
       assert {:error, msg, _env} =
                TC.tc_expr(@ctx, env, @st_end, erlang_op(:+, var(:x), var(:y)))
 
-      assert is_binary(msg)
+      assert %Error{category: :type_mismatch, kind: :binary_operator_type_mismatch} = msg
     end
 
     test "arithmetic preserves session state" do
@@ -292,7 +292,7 @@ defmodule Maty.Typechecker.TCExprTest do
       assert {:error, msg, _env} =
                TC.tc_expr(@ctx, env, @st_end, erlang_op(:<, var(:x), var(:y)))
 
-      assert is_binary(msg)
+      assert %Error{category: :type_mismatch, kind: :binary_operator_type_mismatch} = msg
     end
 
     test "equality type error: different types" do
@@ -301,7 +301,7 @@ defmodule Maty.Typechecker.TCExprTest do
       assert {:error, msg, _env} =
                TC.tc_expr(@ctx, env, @st_end, erlang_op(:==, var(:x), var(:y)))
 
-      assert is_binary(msg)
+      assert %Error{category: :type_mismatch, kind: :binary_operator_type_mismatch} = msg
     end
   end
 
@@ -329,7 +329,7 @@ defmodule Maty.Typechecker.TCExprTest do
       assert {:error, msg, _env} =
                TC.tc_expr(@ctx, env, @st_end, {:and, @meta, [var(:x), var(:y)]})
 
-      assert is_binary(msg)
+      assert %Error{category: :type_mismatch, kind: :logical_operator_type_mismatch} = msg
     end
   end
 
@@ -352,7 +352,7 @@ defmodule Maty.Typechecker.TCExprTest do
       assert {:error, msg, _env} =
                TC.tc_expr(@ctx, env, @st_end, erlang_not(var(:x)))
 
-      assert is_binary(msg)
+      assert %Error{category: :type_mismatch, kind: :logical_operator_requires_boolean} = msg
     end
   end
 
@@ -377,7 +377,7 @@ defmodule Maty.Typechecker.TCExprTest do
       assert {:error, msg, _env} =
                TC.tc_expr(@ctx, env, @st_end, string_concat(var(:x), "world"))
 
-      assert is_binary(msg)
+      assert %Error{category: :type_mismatch, kind: :binary_operator_type_mismatch} = msg
     end
   end
 
@@ -475,7 +475,7 @@ defmodule Maty.Typechecker.TCExprTest do
         ])
 
       assert {:error, msg, _env} = TC.tc_expr(@ctx, env, @st_end, ast)
-      assert is_binary(msg)
+      assert %Error{category: :type_mismatch, kind: :case_branches_incompatible} = msg
     end
 
     test "case with variable binding in patterns" do

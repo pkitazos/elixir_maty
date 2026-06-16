@@ -400,19 +400,9 @@ defmodule Maty.Typechecker.TC do
               {:ok, {branch_type, joined_st}} ->
                 ok(branch_type, env, joined_st)
 
-              {:error, [t1: _b1, t2: _b2] = error_branches} ->
+              {:error, error_branches} ->
                 error(
-                  Error.TypeMismatch.case_branches_incompatible_types(
-                    ctx.module,
-                    meta,
-                    error_branches
-                  ),
-                  env
-                )
-
-              {:error, [q1: _b1, q2: _b2] = error_branches} ->
-                error(
-                  Error.TypeMismatch.case_branches_incompatible_session_states(
+                  Error.TypeMismatch.case_branches_incompatible(
                     ctx.module,
                     meta,
                     error_branches

@@ -104,7 +104,8 @@ defmodule Maty.Types do
   @doc """
   Returns a list of all accepted types, including :number, :atom, ...
   """
-  @spec payload_types :: nonempty_list(:atom | :binary | :boolean | :date | :number | :pid | :ref | nil)
+  @spec payload_types ::
+          nonempty_list(:atom | :binary | :boolean | :date | :number | :pid | :ref | nil)
   def payload_types() do
     @supported_payload_types
   end

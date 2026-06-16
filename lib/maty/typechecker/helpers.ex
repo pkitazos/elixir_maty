@@ -143,34 +143,35 @@ defmodule Maty.Typechecker.Helpers do
   @doc """
   Joins two types according to the lattice rules (T ⊔ T = T, ⊥ ⊔ T = T).
   Uses :no_return to represent the bottom type ⊥_T.
-  Returns the joined type or :error_incompatible_types if they cannot be joined.
+  Returns the joined type or :error if they cannot be joined.
   """
-  @spec join_types(type1 :: Type.t(), type2 :: Type.t()) :: Type.t() | :error_incompatible_types
+  @spec join_types(type1 :: Type.t(), type2 :: Type.t()) :: Type.t() | :error
   def join_types(:no_return, type2), do: type2
   def join_types(type1, :no_return), do: type1
   def join_types(type1, type2) when type1 == type2, do: type1
-  # todo: add rules for compatible types? (e.g., integer/number -> number)
+  # todo: potentially add rules for compatible types? (e.g., integer/number -> number)
   # For now, require exact match or bottom.
-  def join_types(_type1, _type2), do: :error_incompatible_types
+  def join_types(_type1, _type2), do: :error
 
   @doc """
   Joins two session types according to the lattice rules (Q ⊔ Q = Q, ⊥ ⊔ Q = Q).
   Uses %SBottom{} to represent the bottom type ⊥_S.
-  Returns the joined type or :error_incompatible_session_types if they cannot be joined.
+  Returns the joined type or :error if they cannot be joined.
   """
-  # @spec join_session_types(st1 :: ST.t() | atom, st2 :: ST.t() | atom) :: ST.t() | atom
+  @spec join_session_types(st1 :: ST.t() | atom, st2 :: ST.t() | atom) :: ST.t() | :error
   def join_session_types(%SBottom{}, st2), do: st2
   def join_session_types(st1, %SBottom{}), do: st1
   # Use structural comparison for session types
   def join_session_types(st1, st2) when st1 == st2, do: st1
   # todo: any other join rules? (e.g., joining identical choices) - unlikely needed for now.
-  def join_session_types(_st1, _st2), do: :error_incompatible_session_types
+  def join_session_types(_st1, _st2), do: :error
 
   def check_st_unchanged(st_pre, st_post, meta) do
     if st_pre == st_post do
       :ok
     else
-      {:error, Error.ProtocolViolation.case_scrutinee_altered_state(meta, from: st_pre, to: st_post)}
+      {:error,
+       Error.ProtocolViolation.case_scrutinee_altered_state(meta, from: st_pre, to: st_post)}
     end
   end
 
@@ -184,18 +185,18 @@ defmodule Maty.Typechecker.Helpers do
       joined_t = join_types(acc_t, ti)
       joined_q = join_session_types(acc_q, qi)
 
-      if joined_t != :error_incompatible_types and joined_q != :error_incompatible_session_types do
+      type_ok? = joined_t != :error
+      session_ok? = joined_q != :error
+
+      if type_ok? and session_ok? do
         {:cont, {:ok, {joined_t, joined_q}}}
       else
-        # determine which join failed
-        error_branches =
-          if joined_t == :error_incompatible_types do
-            [t1: acc_t, t2: ti]
-          else
-            [q1: acc_q, q2: qi]
-          end
+        # collect every join that failed at this step so the reporting site can
+        # surface an incompatible type pair AND an incompatible session-state pair
+        type_branches = if type_ok?, do: [], else: [t1: acc_t, t2: ti]
+        session_branches = if session_ok?, do: [], else: [q1: acc_q, q2: qi]
 
-        {:halt, {:error, error_branches}}
+        {:halt, {:error, type_branches ++ session_branches}}
       end
     end)
   end

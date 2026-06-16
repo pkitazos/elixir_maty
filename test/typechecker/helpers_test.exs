@@ -246,7 +246,7 @@ defmodule Maty.Typechecker.HelpersTest do
     end
 
     test "different types" do
-      assert :error_incompatible_types = Helpers.join_types(:number, :binary)
+      assert :error = Helpers.join_types(:number, :binary)
     end
 
     test "both bottom" do
@@ -270,8 +270,7 @@ defmodule Maty.Typechecker.HelpersTest do
     end
 
     test "different types" do
-      assert :error_incompatible_session_types =
-               Helpers.join_session_types(@st_end, @st_out)
+      assert :error = Helpers.join_session_types(@st_end, @st_out)
     end
 
     test "both SBottom" do
@@ -324,6 +323,11 @@ defmodule Maty.Typechecker.HelpersTest do
       assert {:error, [q1: @st_end, q2: @st_out]} =
                Helpers.join_branch_results([{:number, @st_end}, {:number, @st_out}])
     end
+
+    test "incompatible in both type and session reports both pairs" do
+      assert {:error, [t1: :number, t2: :binary, q1: @st_end, q2: @st_out]} =
+               Helpers.join_branch_results([{:number, @st_end}, {:binary, @st_out}])
+    end
   end
 
   # --- check_message_structure/3 ---
@@ -338,7 +342,11 @@ defmodule Maty.Typechecker.HelpersTest do
 
     test "non-tuple message returns error" do
       assert {:error, msg} = Helpers.check_message_structure(@ctx, @meta, 42)
-      assert is_binary(msg)
+
+      assert %Maty.Typechecker.Error{
+               category: :type_mismatch,
+               kind: :send_message_not_tuple
+             } = msg
     end
   end
 
