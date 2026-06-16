@@ -358,6 +358,23 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :type_mismatch, kind: :builtin_arg_type_mismatch} = e) do
+    %{function: function, expected: expected, got: got} = e.details
+    expected_str = expected |> List.wrap() |> Enum.map_join(" | ", &render_type/1)
+
+    """
+    \n\n** (ElixirMatyTypeError) Type Mismatch Error: Built-in Argument Type
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Function: #{function}
+      Expected: #{expected_str}
+      Got: #{render_type(got)}
+      --
+      This built-in does not accept an argument of that type.
+    """
+  end
+
   defp render(%Error{category: :type_mismatch, kind: :send_message_not_tuple} = e) do
     %{got: message_ast} = e.details
 

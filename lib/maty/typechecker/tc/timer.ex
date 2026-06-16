@@ -1,5 +1,5 @@
 defmodule Maty.Typechecker.TC.Timer do
-  alias Maty.Typechecker.TC
+  alias Maty.Typechecker.{TC, Error}
 
   import Maty.Utils, only: [deftc: 2]
   import Maty.Typechecker.TC.Thread
@@ -9,7 +9,7 @@ defmodule Maty.Typechecker.TC.Timer do
           ctx,
           env,
           st,
-          {{:., _meta1, [:timer, :sleep]}, _meta2, [arg]}
+          {{:., _meta1, [:timer, :sleep]}, meta, [arg]}
         ) do
     thread do
       arg_type <~ TC.tc_expr(ctx, env, st, arg)
@@ -17,7 +17,13 @@ defmodule Maty.Typechecker.TC.Timer do
       if arg_type == :number do
         ok(:atom, env, st)
       else
-        error(":timer.sleep expects a number argument, got: #{inspect(arg_type)}", env)
+        error(
+          Error.TypeMismatch.builtin_arg_type_mismatch(ctx.module, meta, ":timer.sleep",
+            expected: :number,
+            got: arg_type
+          ),
+          env
+        )
       end
     end
   end

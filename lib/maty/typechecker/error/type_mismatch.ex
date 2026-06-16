@@ -91,4 +91,15 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
       details: %{got: message_ast}
     }
   end
+
+  # A built-in (rn just: IO.puts + :timer.sleep) was called with an argument of the wrong type
+  def builtin_arg_type_mismatch(module, meta, function, expected: expected, got: got) do
+    %Error{
+      category: :type_mismatch,
+      kind: :builtin_arg_type_mismatch,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{function: function, expected: expected, got: got}
+    }
+  end
 end

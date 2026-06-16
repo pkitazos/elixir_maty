@@ -1,5 +1,5 @@
 defmodule Maty.Typechecker.TC.IO do
-  alias Maty.Typechecker.TC
+  alias Maty.Typechecker.{TC, Error}
 
   import Maty.Utils, only: [deftc: 2]
   import Maty.Typechecker.TC.Thread
@@ -9,7 +9,7 @@ defmodule Maty.Typechecker.TC.IO do
           ctx,
           env,
           st,
-          {{:., _meta1, [IO, :puts]}, _meta2, [arg]}
+          {{:., _meta1, [IO, :puts]}, meta, [arg]}
         ) do
     thread do
       arg_type <~ TC.tc_expr(ctx, env, st, arg)
@@ -17,7 +17,13 @@ defmodule Maty.Typechecker.TC.IO do
       if arg_type in [:binary, {:list, :binary}] do
         ok(:atom, env, st)
       else
-        error("IO.puts expects a string argument, got: #{inspect(arg_type)}", env)
+        error(
+          Error.TypeMismatch.builtin_arg_type_mismatch(ctx.module, meta, "IO.puts",
+            expected: [:binary, {:list, :binary}],
+            got: arg_type
+          ),
+          env
+        )
       end
     end
   end
