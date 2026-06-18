@@ -59,17 +59,13 @@ defmodule Maty.Utils do
     end
   end
 
-  @debug_stack_trace Application.compile_env(:maty, :debug_stack_trace, false)
-
-  if @debug_stack_trace do
+  if Application.compile_env(:maty, :debug_stack_trace, false) do
     defmacro stack_trace do
       quote do
+        require Logger
         {func_name, func_arity} = __ENV__.function
 
-        Logger.debug(
-          "[#{inspect(__MODULE__)}.#{func_name}/#{func_arity}:#{__ENV__.line}]",
-          ansi_color: :light_green
-        )
+        Logger.debug("[#{inspect(__MODULE__)}.#{func_name}/#{func_arity}:#{__ENV__.line}]")
       end
     end
   else

@@ -12,9 +12,9 @@ defmodule Maty.Typechecker do
 
   require Logger
 
-  @debug []
-
   @app Mix.Project.config()[:app]
+
+  @debug Application.compile_env(:maty, :debug_function_signatures, false)
 
   @doc """
   Called by Hook when a function definition is encountered (`@on_definition`).
@@ -60,17 +60,18 @@ defmodule Maty.Typechecker do
   def handle_before_compile(env) do
     # todo: potentially reverse the type_specs here
 
-    Logger.debug(format_function_signatures(env.module))
+    customise_logger()
+
+    if @debug do
+      Logger.debug(format_function_signatures(env.module))
+    end
 
     errors =
       Module.get_attribute(env.module, :spec_errors) ++
         Module.get_attribute(env.module, :handler_errors)
 
-    if (err_count = length(errors)) > 0 do
-      out = Enum.reduce(errors, "", fn err, acc -> acc <> inspect(err) <> "\n" end)
-
-      Logger.error(out)
-      throw({:phase_1, "#{err_count} errors you need to fix"})
+    if errors != [] do
+      raise_type_errors!(env, errors)
     end
   end
 
@@ -282,19 +283,10 @@ defmodule Maty.Typechecker do
           end
       end
 
-    # if we found any errors
-    if length(errors) != 0 do
-      for err <- errors do
-        if Enum.member?(@debug, :verbose) do
-          Logger.error("\n[#{env.module}] #{display_error(err)}")
-        else
-          {_, error_msg} = err
-          # we log each error in its module
-          Logger.error(normalise_error(error_msg), ansi_color: :light_red)
-        end
-      end
+    if errors != [] do
+      # if we found any errors, fail compilation
+      raise_type_errors!(env, errors)
     else
-      # otherwise we tell the user they are good to go
       Logger.info("\n[#{env.module}] No communication errors", ansi_color: :light_green)
     end
   end
@@ -334,7 +326,22 @@ defmodule Maty.Typechecker do
     end
   end
 
-  # this could be moved elsewhere
+  # because the Logger handler is installed when the VM actually boots up
+  # (i.e. before our :logger config is applied)
+  # I can't atually configure the compile-time logs via the config like normal
+  # apparently you can configure the handler's formatter directly
+  # by dropping down Erlang's :logger module
+  defp customise_logger do
+    :logger.update_handler_config(
+      :default,
+      :formatter,
+      # strip timestamps from compile-time logs
+      Logger.Formatter.new(format: "[$level] $message\n")
+    )
+  end
+
+  # LSP thinks this is never used cause it obv compiles without the env vars
+  @compile {:nowarn_unused_function, format_function_signatures: 1}
   defp format_function_signatures(module) do
     module_header =
       "-------------------- #{inspect(module)} -------------------"
@@ -350,6 +357,17 @@ defmodule Maty.Typechecker do
   def display_error({func_id, error_msg}) do
     "[#{Utils.to_func(func_id)}] #{normalise_error(error_msg)}"
   end
+
+  @spec raise_type_errors!(Macro.Env.t(), [{term(), Error.t() | String.t()}]) :: no_return()
+  defp raise_type_errors!(env, errors) do
+    description = Enum.map_join(errors, "\n", &display_error/1)
+    line = Enum.find_value(errors, fn {_func_id, error} -> error_line_or(error, env.line) end)
+
+    raise CompileError, file: env.file, line: line, description: description
+  end
+
+  defp error_line_or(%Error{meta: meta}, _), do: meta[:line]
+  defp error_line_or(_, other), do: other
 
   # During the migration to structured errors, results may carry either a
   # pre-formatted string (legacy) or an %Error{} struct.

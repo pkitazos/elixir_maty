@@ -774,17 +774,17 @@ defmodule Maty.Typechecker.TC do
     # So I'll come back and sort these out then, when I'm a little more clean on things
     thread do
       pid_type <~ tc_expr(ctx, env, st, ap_pid_ast)
-      # todo: better error
+      # pin - better error
       _ <~ lift_bool(pid_type == :pid, "AP must be a PID", env, st)
       # todo: also check session type is not progressing
 
       role_type <~ tc_expr(ctx, env, st, role_ast)
-      # todo: better error
+      # pin - better error
       _ <~ lift_bool(role_type == :atom, "role must be a atom", env, st)
       # todo: also check session type is not progressing
 
       init_handler_type <~ tc_expr(ctx, env, st, reg_info_ast)
-      # todo: better error
+      # pin - better error
       _ <~ lift_bool(match?({:fun, _}, init_handler_type), "handler must be a function", env, st)
       # todo: also check session type is not progressing
 
