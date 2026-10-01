@@ -149,11 +149,12 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     }
   end
 
-  def incorrect_choice_implementation(module, handler, missing_branches, st) do
+  def incorrect_choice_implementation(module, meta, handler, missing_branches, st) do
     %Error{
       category: :protocol_violation,
       kind: :incorrect_choice_implementation,
       module: module,
+      meta: Keyword.take(meta, [:line, :column]),
       handler: handler,
       details: %{missing_branches: missing_branches},
       st: st

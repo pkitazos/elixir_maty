@@ -41,20 +41,22 @@ defmodule Maty.Typechecker.Error.FunctionCall do
     }
   end
 
-  def wrong_number_of_clauses(module, func_id, expected: expected, got: got) do
+  def wrong_number_of_clauses(module, meta, func_id, expected: expected, got: got) do
     %Error{
       category: :function_call,
       kind: :wrong_number_of_clauses,
       module: module,
+      meta: Keyword.take(meta, [:line, :column]),
       details: %{func_id: func_id, expected: expected, got: got}
     }
   end
 
-  def wrong_number_of_specs(module, func_id, expected: expected, got: got) do
+  def wrong_number_of_specs(module, meta, func_id, expected: expected, got: got) do
     %Error{
       category: :function_call,
       kind: :wrong_number_of_specs,
       module: module,
+      meta: Keyword.take(meta, [:line, :column]),
       details: %{func_id: func_id, expected: expected, got: got}
     }
   end

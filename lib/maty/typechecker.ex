@@ -115,7 +115,7 @@ defmodule Maty.Typechecker do
     # perhaps a better option would be to create structs and bubble those all the way up to here
     # and only format them once we reach this point
     errors =
-      for {func_id, _kind, _meta, func_clauses} <- all_module_definitions, reduce: [] do
+      for {func_id, _kind, def_meta, func_clauses} <- all_module_definitions, reduce: [] do
         # we reduce over the list of all the definitions in our module to accumulate errors
         acc ->
           cond do
@@ -184,6 +184,7 @@ defmodule Maty.Typechecker do
                 error_msg =
                   Error.ProtocolViolation.incorrect_choice_implementation(
                     env.module,
+                    def_meta,
                     handler_name,
                     missing_st,
                     handler_M.st
@@ -218,7 +219,7 @@ defmodule Maty.Typechecker do
               else
                 {:clause, got} ->
                   error_msg =
-                    Error.FunctionCall.wrong_number_of_clauses(env.module, func_id,
+                    Error.FunctionCall.wrong_number_of_clauses(env.module, def_meta, func_id,
                       expected: 1,
                       got: length(got)
                     )
@@ -227,7 +228,7 @@ defmodule Maty.Typechecker do
 
                 {:signature, got} ->
                   error_msg =
-                    Error.FunctionCall.wrong_number_of_specs(env.module, func_id,
+                    Error.FunctionCall.wrong_number_of_specs(env.module, def_meta, func_id,
                       expected: 1,
                       got: length(got)
                     )
@@ -358,7 +359,8 @@ defmodule Maty.Typechecker do
     raise CompileError, file: env.file, line: line, description: description
   end
 
-  defp error_line_or(%Error{meta: meta}, _), do: meta[:line]
+  # errors that carry no line of their own fall back to the line of the module being compiled
+  defp error_line_or(%Error{meta: meta}, fallback), do: meta[:line] || fallback
   defp error_line_or(_, other), do: other
 
   # During the migration to structured errors, results may carry either a
