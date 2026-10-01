@@ -134,7 +134,8 @@ defmodule Maty.Typechecker do
               # we typecheck each clause exactly once, and derive both the per-clause errors
               # and the visited session branches from these results
               clause_results =
-                for {clause, type_signature} <- Enum.zip(func_clauses, type_signatures) do
+                for {{clause, type_signature}, index} <-
+                      Enum.zip(func_clauses, type_signatures) |> Enum.with_index(1) do
                   TC.WF.check_wf_message_handler_clause(
                     ctx,
                     handler_name,
@@ -142,6 +143,7 @@ defmodule Maty.Typechecker do
                     handler_M.st,
                     type_signature
                   )
+                  |> with_clause_frame(func_id, index, length(func_clauses))
                 end
 
               res =
@@ -246,7 +248,8 @@ defmodule Maty.Typechecker do
 
               # and begin typechecking all clauses
               res =
-                for {clause, type_signature} <- Enum.zip(func_clauses, type_signatures) do
+                for {{clause, type_signature}, index} <-
+                      Enum.zip(func_clauses, type_signatures) |> Enum.with_index(1) do
                   TC.WF.check_wf_init_handler_clause(
                     ctx,
                     handler_name,
@@ -254,6 +257,7 @@ defmodule Maty.Typechecker do
                     handler_I.st,
                     type_signature
                   )
+                  |> with_clause_frame(func_id, index, length(func_clauses))
                   |> case do
                     :ok -> :ok
                     {:error, error_msg} -> error_msg
@@ -269,6 +273,10 @@ defmodule Maty.Typechecker do
             true ->
               res =
                 TC.WF.check_wf_function(ctx, func_id, func_clauses)
+                |> Enum.with_index(1)
+                |> Enum.map(fn {result, index} ->
+                  with_clause_frame(result, func_id, index, length(func_clauses))
+                end)
                 |> Enum.reject(&match?({:ok, _}, &1))
                 |> Enum.map(fn {:error, error_msg} -> {func_id, error_msg} end)
 
@@ -346,6 +354,13 @@ defmodule Maty.Typechecker do
 
     "\n" <> module_header <> "\n" <> display <> "\n"
   end
+
+  # tags a clause's error with the clause it came from, so errors from different clauses
+  # of the same function can be identified. single-clause functions needs no such context
+  defp with_clause_frame(result, func_id, index, total_clauses) when total_clauses > 1,
+    do: TC.Bind.with_frame(result, {:clause, func_id, index})
+
+  defp with_clause_frame(result, _func_id, _index, _total_clauses), do: result
 
   def display_error({func_id, error_msg}) do
     "[#{Utils.to_func(func_id)}] #{normalise_error(error_msg)}"
