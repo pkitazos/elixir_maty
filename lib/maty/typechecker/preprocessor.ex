@@ -20,8 +20,6 @@ defmodule Maty.Typechecker.Preprocessor do
   user: spec failures in `:spec_errors`, handler-annotation failures in
   `:handler_errors`.
   """
-  require Logger
-
   alias Maty.Typechecker.TypeSpecParser
   alias Maty.Typechecker.Error
   alias Maty.Types.T, as: Type
@@ -111,7 +109,7 @@ defmodule Maty.Typechecker.Preprocessor do
   parsed `{arg_types, return_type}` pair is prepended under the function id
   in the `:psi` environment and the `:spec` attribute is deleted.
 
-  A validation error is logged and recorded under `:spec_errors`, so the
+  A validation error is recorded under `:spec_errors`, so the
   typechecker can surface it later instead of the compilation aborting.
   When no spec is present the call is a no-op.
   """
@@ -130,7 +128,6 @@ defmodule Maty.Typechecker.Preprocessor do
         Module.delete_attribute(module, :spec)
 
       {:error, error} ->
-        Logger.error(error)
         Module.put_attribute(module, :spec_errors, {func_id, error})
 
       # TODO: distinguish functions that legitimately need no spec
@@ -154,7 +151,7 @@ defmodule Maty.Typechecker.Preprocessor do
   #   * `:no_spec` - `spec_attr` isn't a recognised spec form (e.g. `nil`)
   @doc false
   @spec validate_type_annotation(term(), module(), {atom(), arity()}) ::
-          {:ok, {[Type.t()], Type.t()}} | {:error, String.t()} | :no_spec
+          {:ok, {[Type.t()], Type.t()}} | {:error, Error.t()} | :no_spec
   def validate_type_annotation(spec_attr, module, func_id = {name, arity}) do
     case spec_attr do
       [{:spec, {:"::", meta, [{spec_name, _, args_asts}, return_ast]}, _module} | _] ->

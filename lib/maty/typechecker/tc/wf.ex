@@ -20,14 +20,14 @@ defmodule Maty.Typechecker.TC.WF do
   Checks if a function definition is well-formed according to WF-Func.
   Verifies argument patterns, body type, return type, and session state purity.
 
-  Returns `{:ok, return_type}` or `{:error, message}` for each function clause checked.
+  Returns `{:ok, return_type}` or `{:error, error}` for each function clause checked.
   """
   @spec check_wf_function(
           ctx :: Ctx.t(),
           func_id :: {atom(), non_neg_integer()},
           clauses :: [clause()]
         ) ::
-          [{:ok, Type.t()} | {:error, binary()}]
+          [{:ok, Type.t()} | {:error, Error.t()}]
   def check_wf_function(ctx, {_name, arity} = func_id, clauses) do
     with {:ok, signatures} when is_list(signatures) <- Map.fetch(ctx.psi, func_id) do
       for {{spec_args, spec_return}, {meta, arg_pattern_asts, _guards, body_block}} <-
@@ -69,7 +69,7 @@ defmodule Maty.Typechecker.TC.WF do
   implements the session continuation, ending in done/suspend.
 
   Returns `{:ok, {label, role}}` if well-formed, identifying the session
-  branch handled. Otherwise returns `{:error, message}`.
+  branch handled. Otherwise returns `{:error, error}`.
   """
   @spec check_wf_message_handler_clause(
           ctx :: Ctx.t(),
@@ -77,7 +77,7 @@ defmodule Maty.Typechecker.TC.WF do
           handler_ast_clause :: clause(),
           st_pre :: ST.t(),
           type_signature :: tuple()
-        ) :: {:ok, ST.SBranch.t()} | {:error, binary()}
+        ) :: {:ok, ST.SBranch.t()} | {:error, Error.t()}
   def check_wf_message_handler_clause(
         ctx,
         handler_label,
@@ -143,7 +143,7 @@ defmodule Maty.Typechecker.TC.WF do
   if the body correctly implements the initial session state, ending in
   done/suspend.
 
-  Returns `{:ok, handler_label}` if well-formed. Otherwise returns `{:error, message}`.
+  Returns `{:ok, handler_label}` if well-formed. Otherwise returns `{:error, error}`.
   """
   @spec check_wf_init_handler_clause(
           ctx :: Ctx.t(),
@@ -152,7 +152,7 @@ defmodule Maty.Typechecker.TC.WF do
           st_pre :: ST.t(),
           type_signature :: tuple()
         ) ::
-          :ok | {:error, binary()}
+          :ok | {:error, Error.t()}
   def check_wf_init_handler_clause(ctx, handler_label, _, %ST.SIn{} = st_pre, _) do
     {:error,
      Error.ProtocolViolation.init_handler_starts_with_receive(ctx.module, handler_label, st_pre)}

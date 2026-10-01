@@ -110,10 +110,9 @@ defmodule Maty.Typechecker do
     module_init_handlers = Delta.key_set(delta_I)
     module_handlers = Delta.key_set(delta_M)
 
-    # we then build up a list of errors
-    # as things stand I have my errors just be big strings which I format in-place.
-    # perhaps a better option would be to create structs and bubble those all the way up to here
-    # and only format them once we reach this point
+    # we then build up a list of `{func_id, %Error{}}` pairs
+    # the errors are structs which bubble all the way up to here
+    # and are only formatted once we report them in `raise_type_errors!`
     errors =
       for {func_id, _kind, def_meta, func_clauses} <- all_module_definitions, reduce: [] do
         # we reduce over the list of all the definitions in our module to accumulate errors
@@ -363,10 +362,10 @@ defmodule Maty.Typechecker do
   defp with_clause_frame(result, _func_id, _index, _total_clauses), do: result
 
   def display_error({func_id, error_msg}) do
-    "[#{Utils.to_func(func_id)}] #{normalise_error(error_msg)}"
+    "[#{Utils.to_func(func_id)}] #{Formatter.format(error_msg)}"
   end
 
-  @spec raise_type_errors!(Macro.Env.t(), [{term(), Error.t() | String.t()}]) :: no_return()
+  @spec raise_type_errors!(Macro.Env.t(), [{term(), Error.t()}]) :: no_return()
   defp raise_type_errors!(env, errors) do
     description = Enum.map_join(errors, "\n", &display_error/1)
     line = Enum.find_value(errors, fn {_func_id, error} -> error_line_or(error, env.line) end)
@@ -376,11 +375,4 @@ defmodule Maty.Typechecker do
 
   # errors that carry no line of their own fall back to the line of the module being compiled
   defp error_line_or(%Error{meta: meta}, fallback), do: meta[:line] || fallback
-  defp error_line_or(_, other), do: other
-
-  # During the migration to structured errors, results may carry either a
-  # pre-formatted string (legacy) or an %Error{} struct.
-  # Normalise both to the final report text here, will eventually kill this
-  defp normalise_error(error_msg) when is_binary(error_msg), do: error_msg
-  defp normalise_error(%Error{} = error), do: Formatter.format(error)
 end
