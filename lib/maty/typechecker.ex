@@ -129,10 +129,12 @@ defmodule Maty.Typechecker do
               # and the associated type signatures
               type_signatures = psi[func_id] |> Enum.reverse()
 
-              res =
+              # because we may have multiple handler clauses, we need to iterate over
+              # all definitions and their associated type signatures and check if they are well-formed
+              # we typecheck each clause exactly once, and derive both the per-clause errors
+              # and the visited session branches from these results
+              clause_results =
                 for {clause, type_signature} <- Enum.zip(func_clauses, type_signatures) do
-                  # because we may have multiple handler clauses, we need to iterate over
-                  # all definitions and their associated type signatures and check if they are well-formed
                   TC.WF.check_wf_message_handler_clause(
                     ctx,
                     handler_name,
@@ -140,41 +142,31 @@ defmodule Maty.Typechecker do
                     handler_M.st,
                     type_signature
                   )
-                  |> case do
-                    {:ok, %ST.SBranch{}} -> :ok
-                    {:error, error_msg} -> error_msg
-                  end
                 end
+
+              res =
+                clause_results
                 # then, for whatever reason I'm rejecting any branches that typechecked
                 # ig if something typechecks there is nothing interesting to report
-                |> Enum.reject(&(&1 == :ok))
-                # and creating a list mapping the function id to whatever error it returned
-                |> Enum.map(&{func_id, &1})
+                |> Enum.flat_map(fn
+                  {:ok, %ST.SBranch{}} -> []
+                  # and creating a list mapping the function id to whatever error it returned
+                  {:error, error_msg} -> [{func_id, error_msg}]
+                end)
 
               # if we have more function clauses than branches, then we need to be a bit more vigilant about our session typechecking
               if(length(func_clauses) != length(handler_M.st.branches)) do
                 # we need to explicitly keep track of all the visited branches
                 # to ensure we sufficiently cover/support the annotated session type
                 visited_branches =
-                  for {clause, type_signature} <- Enum.zip(func_clauses, type_signatures) do
-                    # so as we iterate over the list of clauses and signatures we keep track of the branches we have visited
-                    TC.WF.check_wf_message_handler_clause(
-                      ctx,
-                      handler_name,
-                      clause,
-                      handler_M.st,
-                      type_signature
-                    )
-                    |> case do
-                      # this means that after typechecking a clause, we record the session branch we went down
-                      {:ok, %ST.SBranch{} = branch} -> branch
-                      {:error, _msg} -> :error
-                    end
-                  end
+                  clause_results
                   # in this case what we're interested in  is not the individual errors,
                   # but whether or not we are actually sufficiently covering the session type
-                  # so we can reject the errors
-                  |> Enum.reject(&(&1 == :error))
+                  # so we only keep the branches we went down after typechecking a clause
+                  |> Enum.flat_map(fn
+                    {:ok, %ST.SBranch{} = branch} -> [branch]
+                    {:error, _msg} -> []
+                  end)
                   # and we create a set containing the branches we covered
                   |> MapSet.new()
 
@@ -197,8 +189,8 @@ defmodule Maty.Typechecker do
                     handler_M.st
                   )
 
-                # this error is cons-ed onto the accumulator
-                [{func_id, error_msg} | acc]
+                # this error is cons-ed onto the accumulator, alongside the per-clause errors
+                [{func_id, error_msg} | res] ++ acc
               else
                 # or otherwise the other result is appended
                 res ++ acc
