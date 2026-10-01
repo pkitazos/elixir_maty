@@ -359,7 +359,7 @@ defmodule Maty.Typechecker.Error.Formatter do
   end
 
   defp render(%Error{category: :type_mismatch, kind: :invalid_maty_state_type} = e) do
-    %{internal: %Error.Internal{title: title, opts: opts, message: message}} = e.details
+    %{cause: %Error.Cause{title: title, opts: opts, message: message}} = e.details
 
     """
     \n\n** (ElixirMatyTypeError) Type Mismatch Error: #{title}
@@ -640,7 +640,7 @@ defmodule Maty.Typechecker.Error.Formatter do
   # --- :type_specification
 
   defp render(%Error{category: :type_specification, kind: :invalid_session_type_annotation} = e) do
-    %{internal: %Error.Internal{title: title, opts: opts, message: message}} = e.details
+    %{cause: %Error.Cause{title: title, opts: opts, message: message}} = e.details
 
     """
     \n\n** (ElixirMatyTypeError) Type Specification Error: Invalid Session Type Annotation
@@ -675,10 +675,10 @@ defmodule Maty.Typechecker.Error.Formatter do
   end
 
   defp render(%Error{category: :type_specification, kind: :spec_args_parse_error_at} = e) do
-    %{func_id: func_id, failed_index: failed_index, args_asts: args_asts, internal: internal} =
+    %{func_id: func_id, failed_index: failed_index, args_asts: args_asts, cause: cause} =
       e.details
 
-    %Error.Internal{title: title, opts: opts, message: message} = internal
+    %Error.Cause{title: title, opts: opts, message: message} = cause
     func_str = Utils.to_func(func_id)
 
     """
@@ -699,8 +699,8 @@ defmodule Maty.Typechecker.Error.Formatter do
   end
 
   defp render(%Error{category: :type_specification, kind: :spec_return_not_well_typed} = e) do
-    %{spec_name: spec_name, return_ast: return_ast, internal: internal} = e.details
-    %Error.Internal{title: title, opts: opts, message: message} = internal
+    %{spec_name: spec_name, return_ast: return_ast, cause: cause} = e.details
+    %Error.Cause{title: title, opts: opts, message: message} = cause
 
     """
     \n\n** (ElixirMatyTypeError) Type Specification Error: Invalid Spec Return Type

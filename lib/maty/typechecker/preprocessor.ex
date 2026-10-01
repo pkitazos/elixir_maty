@@ -173,7 +173,7 @@ defmodule Maty.Typechecker.Preprocessor do
                func_id: func_id
              )}
 
-          {:args, {:error, {failed_index, internal_error}}} ->
+          {:args, {:error, {failed_index, cause}}} ->
             {:error,
              Error.TypeSpecification.spec_args_parse_error_at(
                module,
@@ -181,7 +181,7 @@ defmodule Maty.Typechecker.Preprocessor do
                func_id,
                failed_index,
                args_asts,
-               internal_error
+               cause
              )}
 
           {:return, {:error, parse_error}} ->
@@ -203,10 +203,10 @@ defmodule Maty.Typechecker.Preprocessor do
   # Parses a list of argument type ASTs left-to-right.
   #
   # Returns `{:ok, types}` in source order, or halts on the first failure with
-  # `{:error, {index, internal_error}}`, where `index` is the position of the bad arg.
+  # `{:error, {index, cause}}`, where `index` is the position of the bad arg.
   @doc false
   @spec parse_spec_args([Macro.t()]) ::
-          {:ok, [Type.t()]} | {:error, {non_neg_integer(), Error.Internal.t()}}
+          {:ok, [Type.t()]} | {:error, {non_neg_integer(), Error.Cause.t()}}
   def parse_spec_args(asts) do
     asts
     |> Enum.with_index()

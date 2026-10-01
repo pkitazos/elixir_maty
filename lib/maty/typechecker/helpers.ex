@@ -243,7 +243,7 @@ defmodule Maty.Typechecker.Helpers do
     if Type.is?(state_type, :maty_actor_state) do
       {:ok, Type.maty_actor_state()}
     else
-      {:error, Error.TypeMismatch.invalid_maty_state_type(state_type)}
+      {:error, Error.TypeMismatch.invalid_maty_state_cause(state_type)}
     end
   end
 

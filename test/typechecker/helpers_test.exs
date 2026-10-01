@@ -376,7 +376,7 @@ defmodule Maty.Typechecker.HelpersTest do
     end
 
     test "non-state type returns error" do
-      assert {:error, %Maty.Typechecker.Error.Internal{title: "Invalid Maty State Type"}} =
+      assert {:error, %Maty.Typechecker.Error.Cause{title: "Invalid Maty State Type"}} =
                Helpers.check_maty_state_type(:number)
     end
   end

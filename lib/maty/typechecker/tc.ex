@@ -563,7 +563,7 @@ defmodule Maty.Typechecker.TC do
         Error.TypeMismatch.invalid_maty_state_type(
           ctx.module,
           meta,
-          Error.TypeMismatch.invalid_maty_state_type(state_type)
+          Error.TypeMismatch.invalid_maty_state_cause(state_type)
         ),
         env,
         st
@@ -589,7 +589,7 @@ defmodule Maty.Typechecker.TC do
         Error.TypeMismatch.invalid_maty_state_type(
           ctx.module,
           meta,
-          Error.TypeMismatch.invalid_maty_state_type(state_type)
+          Error.TypeMismatch.invalid_maty_state_cause(state_type)
         ),
         env,
         st
@@ -659,7 +659,7 @@ defmodule Maty.Typechecker.TC do
         Error.TypeMismatch.invalid_maty_state_type(
           ctx.module,
           meta,
-          Error.TypeMismatch.invalid_maty_state_type(state_type)
+          Error.TypeMismatch.invalid_maty_state_cause(state_type)
         ),
         env,
         st
@@ -729,7 +729,7 @@ defmodule Maty.Typechecker.TC do
         Error.TypeMismatch.invalid_maty_state_type(
           ctx.module,
           meta,
-          Error.TypeMismatch.invalid_maty_state_type(state_type)
+          Error.TypeMismatch.invalid_maty_state_cause(state_type)
         ),
         env,
         st
@@ -796,7 +796,7 @@ defmodule Maty.Typechecker.TC do
         Error.TypeMismatch.invalid_maty_state_type(
           ctx.module,
           meta,
-          Error.TypeMismatch.invalid_maty_state_type(state_type)
+          Error.TypeMismatch.invalid_maty_state_cause(state_type)
         ),
         env,
         st

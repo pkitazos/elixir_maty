@@ -68,12 +68,12 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
 
   describe "parse/1 errors" do
     test "unknown type constructor" do
-      assert {:error, %Maty.Typechecker.Error.Internal{title: "Unknown Type Constructor"}} =
+      assert {:error, %Maty.Typechecker.Error.Cause{title: "Unknown Type Constructor"}} =
                TypeSpecParser.parse(type_ast(:foo))
     end
 
     test "unsupported AST format" do
-      assert {:error, %Maty.Typechecker.Error.Internal{title: "Unsupported Type Constructor"}} =
+      assert {:error, %Maty.Typechecker.Error.Cause{title: "Unsupported Type Constructor"}} =
                TypeSpecParser.parse(123)
     end
   end
@@ -109,7 +109,7 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
     test "heterogeneous list returns error" do
       ast = {:list, @meta, [type_ast(:number), type_ast(:binary)]}
 
-      assert {:error, %Maty.Typechecker.Error.Internal{title: "Heterogeneous List Type"}} =
+      assert {:error, %Maty.Typechecker.Error.Cause{title: "Heterogeneous List Type"}} =
                TypeSpecParser.parse(ast)
     end
   end

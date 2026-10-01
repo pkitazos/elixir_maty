@@ -29,17 +29,17 @@ defmodule Maty.Typechecker.PreprocessorTest do
 
     test "single bad arg" do
       asts = [type_ast(:atom), unsupported_ast()]
-      assert {:error, {1, %Error.Internal{}}} = Preprocessor.parse_spec_args(asts)
+      assert {:error, {1, %Error.Cause{}}} = Preprocessor.parse_spec_args(asts)
     end
 
     test "first arg bad - index is 0" do
       asts = [unsupported_ast(), type_ast(:atom)]
-      assert {:error, {0, %Error.Internal{}}} = Preprocessor.parse_spec_args(asts)
+      assert {:error, {0, %Error.Cause{}}} = Preprocessor.parse_spec_args(asts)
     end
 
     test "multiple bad args - returns first" do
       asts = [unsupported_ast(), unsupported_ast()]
-      assert {:error, {0, %Error.Internal{}}} = Preprocessor.parse_spec_args(asts)
+      assert {:error, {0, %Error.Cause{}}} = Preprocessor.parse_spec_args(asts)
     end
   end
 

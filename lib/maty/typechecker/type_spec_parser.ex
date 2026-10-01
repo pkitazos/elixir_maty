@@ -11,7 +11,7 @@ defmodule Maty.Typechecker.TypeSpecParser do
   - {ast1, ast2}        (2-tuple)
   - {:{}, _, elements} (n-tuple)
   """
-  @spec parse(type_ast :: Macro.t()) :: {:ok, Type.t()} | {:error, Error.Internal.t()}
+  @spec parse(type_ast :: Macro.t()) :: {:ok, Type.t()} | {:error, Error.Cause.t()}
   def parse(type_ast) do
     type_env =
       Maty.Types.payload_types()

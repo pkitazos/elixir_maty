@@ -9,14 +9,14 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
   #
   # the @st annotation string may fail to parse in which case we
   # should wrap the parse error we get from st_parser with some meta info
-  def invalid_session_type_annotation(module, meta, handler_label, %Error.Internal{} = internal) do
+  def invalid_session_type_annotation(module, meta, handler_label, %Error.Cause{} = cause) do
     %Error{
       category: :type_specification,
       kind: :invalid_session_type_annotation,
       module: module,
       handler: handler_label,
       meta: Keyword.take(meta, [:line, :column]),
-      details: %{internal: internal}
+      details: %{cause: cause}
     }
   end
 
@@ -25,14 +25,14 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
         meta,
         spec_name,
         return_ast,
-        %Error.Internal{} = internal
+        %Error.Cause{} = cause
       ) do
     %Error{
       category: :type_specification,
       kind: :spec_return_not_well_typed,
       module: module,
       meta: Keyword.take(meta, [:line, :column]),
-      details: %{spec_name: spec_name, return_ast: return_ast, internal: internal}
+      details: %{spec_name: spec_name, return_ast: return_ast, cause: cause}
     }
   end
 
@@ -42,7 +42,7 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
         func_id,
         failed_index,
         args_asts,
-        %Error.Internal{} = internal
+        %Error.Cause{} = cause
       ) do
     %Error{
       category: :type_specification,
@@ -53,7 +53,7 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
         func_id: func_id,
         failed_index: failed_index,
         args_asts: args_asts,
-        internal: internal
+        cause: cause
       }
     }
   end
@@ -77,10 +77,10 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
     }
   end
 
-  # internal functions
+  # causes: payloads embedded in other errors under `details.cause`
 
   def unsupported_type_constructor(type_ast) do
-    %Error.Internal{
+    %Error.Cause{
       title: "Unsupported Type Constructor",
       opts: "Type AST: #{inspect(type_ast)}",
       message: "This type specification AST structure is not supported by the typechecker."
@@ -88,7 +88,7 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
   end
 
   def unknown_type_constructor(type_name) do
-    %Error.Internal{
+    %Error.Cause{
       title: "Unknown Type Constructor",
       opts: "Type: #{type_name}",
       message: "Unknown type constructor or type atom not found in the type environment."
@@ -101,7 +101,7 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
       |> Enum.map(&inspect/1)
       |> Enum.join(", ")
 
-    %Error.Internal{
+    %Error.Cause{
       title: "Heterogeneous List Type",
       opts: "Conflicting types found: #{formatted_types}",
       message: "List type specifications must contain elements of the same type."

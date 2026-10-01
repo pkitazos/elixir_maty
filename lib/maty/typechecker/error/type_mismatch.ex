@@ -64,18 +64,18 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
     }
   end
 
-  def invalid_maty_state_type(module, meta, %Error.Internal{} = internal) do
+  def invalid_maty_state_type(module, meta, %Error.Cause{} = cause) do
     %Error{
       category: :type_mismatch,
       kind: :invalid_maty_state_type,
       module: module,
       meta: Keyword.take(meta, [:line, :column]),
-      details: %{internal: internal}
+      details: %{cause: cause}
     }
   end
 
-  def invalid_maty_state_type(got_type) do
-    %Error.Internal{
+  def invalid_maty_state_cause(got_type) do
+    %Error.Cause{
       title: "Invalid Maty State Type",
       opts: "Expected type: :maty_actor_state\nGot type: #{render_type(got_type)}",
       message: "Maty operations require a valid actor state type."
