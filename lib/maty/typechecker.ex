@@ -70,6 +70,9 @@ defmodule Maty.Typechecker do
       Module.get_attribute(env.module, :spec_errors) ++
         Module.get_attribute(env.module, :handler_errors)
 
+    # we fail here, before the bodies are checked in `handle_after_compile`, on purpose:
+    # a spec or handler annotation that did not validate leaves psi and delta incomplete,
+    # so checking bodies against them would only pile follow-on errors on top of the real one
     if errors != [] do
       raise_type_errors!(env, errors)
     end

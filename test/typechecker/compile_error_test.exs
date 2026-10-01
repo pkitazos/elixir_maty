@@ -184,5 +184,31 @@ defmodule Maty.Typechecker.CompileErrorTest do
       # the first on_link clause, not the line of the module
       assert error.line == 9
     end
+
+    test "a spec error is reported on its own, body errors wait until it is fixed" do
+      # `g/0` has a body error that must not be reported yet
+      src =
+        seller_src("SpecErrorFirst", """
+        handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
+          MatyDSL.send(:buyer2, {:date, addr})
+          MatyDSL.done(state)
+        end
+
+        handler :decision_handler, :buyer2, {:quit, nil}, state do
+          MatyDSL.done(state)
+        end
+
+        @spec f(wat()) :: number()
+        def f(_x), do: 1
+
+        @spec g() :: number()
+        def g(), do: "not a number"
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Invalid Spec Argument"
+      refute error.description =~ "Return Type Mismatch"
+    end
   end
 end
