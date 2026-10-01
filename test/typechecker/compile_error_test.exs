@@ -68,7 +68,35 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
   describe "error context" do
     # the :seller actor with a two-branch session type
-    # `clauses` is spliced in as the handler (and function) definitions so that each test controls what is wrong
+
+    # `clauses` spliced in as the handler definitions so each test can control what is wrong
+    @valid_handlers """
+    handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
+      MatyDSL.send(:buyer2, {:date, addr})
+      MatyDSL.done(state)
+    end
+
+    handler :decision_handler, :buyer2, {:quit, nil}, state do
+      MatyDSL.done(state)
+    end
+    """
+
+    # the 1-based line of the first line of `src` containing `needle`
+    defp line_of(src, needle) do
+      line =
+        src
+        |> String.split("\n")
+        |> Enum.find_index(&String.contains?(&1, needle))
+
+      line + 1
+    end
+
+    # the line the first error in the report says it is on
+    defp own_line(%CompileError{description: description}) do
+      [_, line] = Regex.run(~r/Line: (\d+)/, description)
+      String.to_integer(line)
+    end
+
     defp seller_src(module_name, body) do
       """
       defmodule MatyCompileErrorFixture.#{module_name} do
@@ -164,14 +192,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       # The handlers are valid so that this is the only error reported
       src =
         seller_src("OnLinkTwice", """
-        handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
-          MatyDSL.send(:buyer2, {:date, addr})
-          MatyDSL.done(state)
-        end
-
-        handler :decision_handler, :buyer2, {:quit, nil}, state do
-          MatyDSL.done(state)
-        end
+        #{@valid_handlers}
 
         on_link ap_pid :: pid(), initial_state do
           MatyDSL.register(ap_pid, @role, [callback: :install, args: [ap_pid]], initial_state)
@@ -189,14 +210,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       # `g/0` has a body error that must not be reported yet
       src =
         seller_src("SpecErrorFirst", """
-        handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
-          MatyDSL.send(:buyer2, {:date, addr})
-          MatyDSL.done(state)
-        end
-
-        handler :decision_handler, :buyer2, {:quit, nil}, state do
-          MatyDSL.done(state)
-        end
+        #{@valid_handlers}
 
         @spec f(wat()) :: number()
         def f(_x), do: 1
@@ -209,6 +223,77 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
       assert error.description =~ "Invalid Spec Argument"
       refute error.description =~ "Return Type Mismatch"
+    end
+
+    test "every error in the module is reported, each under its own function" do
+      src =
+        seller_src("MultipleErrors", """
+        #{@valid_handlers}
+
+        @spec f() :: number()
+        def f(), do: "a"
+
+        @spec g() :: number()
+        def g(), do: "b"
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "[f/0]"
+      assert error.description =~ "[g/0]"
+      assert length(String.split(error.description, "Return Type Mismatch")) == 3
+    end
+
+    test "an error inside a call carries a call frame, and the CompileError line is its own line" do
+      src =
+        seller_src("CallFrame", """
+        #{@valid_handlers}
+
+        @spec f(number()) :: number()
+        def f(x), do: x
+
+        @spec g() :: number()
+        def g(), do: f(1 + "a")
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Binary Operator"
+      assert error.description =~ ~r/Trace:\n\s+via f\/1 \(line \d+\)/
+      assert error.line == own_line(error)
+      assert error.line == line_of(src, ~s|def g(), do: f(1 + "a")|)
+    end
+
+    test "an error in one clause of a multi-clause init handler names that clause" do
+      # the init handler :install from seller_src is clause #1, this is clause #2
+      src =
+        seller_src("InitHandlerClauseFrame", """
+        init_handler :install, _other :: binary(), state do
+          MatyDSL.done(state)
+        end
+
+        #{@valid_handlers}
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "in clause #2 of install/3"
+      refute error.description =~ "in clause #1"
+    end
+
+    test "a handler missing a branch is reported at the handler definition" do
+      src =
+        seller_src("MissingBranchLine", """
+        handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
+          MatyDSL.send(:buyer2, {:date, addr})
+          MatyDSL.done(state)
+        end
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Incomplete Message Handler Implementation"
+      assert error.line == line_of(src, "handler :decision_handler")
     end
   end
 end
