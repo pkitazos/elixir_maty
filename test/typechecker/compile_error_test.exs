@@ -295,5 +295,33 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Incomplete Message Handler Implementation"
       assert error.line == line_of(src, "handler :decision_handler")
     end
+
+    test "an on_link written without a spec reports the missing spec instead of crashing" do
+      # the on_link macro always generates a spec, a hand-written def does not
+      src =
+        """
+        defmodule MatyCompileErrorFixture.OnLinkNoSpec do
+          use Maty.Actor
+
+          @role :seller
+
+          @st {:install, ~q/end/}
+
+          def on_link(ap_pid, initial_state) do
+            MatyDSL.register(ap_pid, @role, [callback: :install, args: [ap_pid]], initial_state)
+          end
+
+          init_handler :install, _ap_pid :: pid(), state do
+            MatyDSL.done(state)
+          end
+        end
+        """
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Wrong Number of Specs"
+      assert error.description =~ "Got specs: 0"
+      assert error.line == line_of(src, "def on_link")
+    end
   end
 end
