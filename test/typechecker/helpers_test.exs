@@ -27,11 +27,11 @@ defmodule Maty.Typechecker.HelpersTest do
     end
 
     test "heterogeneous list returns error" do
-      assert {:error, :incompatible} = Helpers.unify_list_types([:number, :binary])
+      assert :error = Helpers.unify_list_types([:number, :binary])
     end
 
     test "non-list input returns error" do
-      assert {:error, :incompatible} = Helpers.unify_list_types(:number)
+      assert :error = Helpers.unify_list_types(:number)
     end
   end
 
@@ -376,8 +376,7 @@ defmodule Maty.Typechecker.HelpersTest do
     end
 
     test "non-state type returns error" do
-      assert {:error, %Maty.Typechecker.Error.Cause{title: "Invalid Maty State Type"}} =
-               Helpers.check_maty_state_type(:number)
+      assert :error = Helpers.check_maty_state_type(:number)
     end
   end
 

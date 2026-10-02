@@ -84,10 +84,9 @@ defmodule Maty.Typechecker.TC.Bind do
     end
   end
 
-  @spec lift_result({:ok, a} | {:error, term()} | :error, Error.t(), var_env(), Maty.ST.t()) ::
-          result(a)
+  # for helpers that only say whether they succeeded: on `:error` the given `error` is reported
+  @spec lift_result({:ok, a} | :error, Error.t(), var_env(), Maty.ST.t()) :: result(a)
         when a: var
-  def lift_result({:error, _reason}, error, env, _st), do: error(error, env)
   def lift_result(:error, error, env, _st), do: error(error, env)
   def lift_result({:ok, val}, _error, env, st), do: ok(val, env, st)
 

@@ -6,7 +6,7 @@ defmodule Maty.Typechecker.Helpers do
   alias Maty.Types.T, as: Type
 
   # Helper to unify list element types (simple version)
-  # Returns unified type or :error_incompatible
+  # Returns `{:ok, unified_type}` or `:error`
   def unify_list_types([]) do
     # Type of empty list element is any/nil
     {:ok, :any}
@@ -16,11 +16,11 @@ defmodule Maty.Typechecker.Helpers do
     if Enum.all?(rest, &(&1 == type)) do
       {:ok, type}
     else
-      {:error, :incompatible}
+      :error
     end
   end
 
-  def unify_list_types(type) when not is_list(type), do: {:error, :incompatible}
+  def unify_list_types(type) when not is_list(type), do: :error
 
   # Helper to check if a type is a valid base type for map keys (Formal C)
   def is_base_type?(:atom), do: true
@@ -243,7 +243,7 @@ defmodule Maty.Typechecker.Helpers do
     if Type.is?(state_type, :maty_actor_state) do
       {:ok, Type.maty_actor_state()}
     else
-      {:error, Error.TypeMismatch.invalid_maty_state_cause(state_type)}
+      :error
     end
   end
 

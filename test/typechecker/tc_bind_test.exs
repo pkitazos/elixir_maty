@@ -126,11 +126,6 @@ defmodule Maty.Typechecker.TCBindTest do
       assert {:ok, 42, @st_end, @env} = Bind.lift_result({:ok, 42}, "unused", @env, @st_end)
     end
 
-    test "error tuple replaces reason" do
-      assert {:error, "replaced", @env} =
-               Bind.lift_result({:error, "original"}, "replaced", @env, @st_end)
-    end
-
     test "bare :error replaces with given error" do
       assert {:error, "replaced", @env} = Bind.lift_result(:error, "replaced", @env, @st_end)
     end
