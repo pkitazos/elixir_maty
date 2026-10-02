@@ -13,6 +13,7 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
       built =
         Error.ProtocolViolation.incorrect_recipient_participant(
           TwoBuyer.Seller,
+          [line: 12],
           :title_handler,
           @st_in,
           received: :buyer2,

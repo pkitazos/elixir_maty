@@ -126,7 +126,11 @@ defmodule Maty.Typechecker do
             # in which case there is nothing to check its clauses against
             # todo: maybe just find a niccer way to forbid hand-written handlers..
             MapSet.member?(module_handlers, func_id) and not Map.has_key?(psi, func_id) ->
-              [{func_id, Error.TypeSpecification.no_spec_for_function(env.module, func_id)} | acc]
+              [
+                {func_id,
+                 Error.TypeSpecification.no_spec_for_function(env.module, def_meta, func_id)}
+                | acc
+              ]
 
             # if this particular function is a message handler
             # we check for its well-formedness
@@ -250,7 +254,11 @@ defmodule Maty.Typechecker do
 
             # todo: same as above, maybe a nicer way to forbid these
             MapSet.member?(module_init_handlers, func_id) and not Map.has_key?(psi, func_id) ->
-              [{func_id, Error.TypeSpecification.no_spec_for_function(env.module, func_id)} | acc]
+              [
+                {func_id,
+                 Error.TypeSpecification.no_spec_for_function(env.module, def_meta, func_id)}
+                | acc
+              ]
 
             # next we check to see if the function we're type-checking is an init_handler
             MapSet.member?(module_init_handlers, func_id) ->

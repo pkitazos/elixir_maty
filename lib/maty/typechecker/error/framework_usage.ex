@@ -19,19 +19,21 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
-  def missing_session_registration(module) do
+  def missing_session_registration(module, meta) do
     %Error{
       category: :framework_usage,
       kind: :missing_session_registration,
-      module: module
+      module: module,
+      meta: Keyword.take(meta, [:line, :column])
     }
   end
 
-  def on_link_altered_session_state(module, got_st) do
+  def on_link_altered_session_state(module, meta, got_st) do
     %Error{
       category: :framework_usage,
       kind: :on_link_altered_session_state,
       module: module,
+      meta: Keyword.take(meta, [:line, :column]),
       details: %{got: got_st}
     }
   end
@@ -41,11 +43,12 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
   # the on_link/2 return value has the wrong type.
   # I currently went with :framework_usage because it's also about the on_link callback contract, not sure.
   # Should have a look at other library code to see
-  def on_link_bad_return(module, got) do
+  def on_link_bad_return(module, meta, got) do
     %Error{
       category: :framework_usage,
       kind: :on_link_bad_return,
       module: module,
+      meta: Keyword.take(meta, [:line, :column]),
       details: %{got: got}
     }
   end

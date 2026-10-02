@@ -59,7 +59,12 @@ defmodule Maty.Typechecker.TC.WF do
       end
     else
       :error ->
-        error = Error.TypeSpecification.no_spec_for_function(ctx.module, func_id)
+        # reported at the first clause since the spec belongs to the function as a whole
+        {first_clause_meta, _, _, _} = hd(clauses)
+
+        error =
+          Error.TypeSpecification.no_spec_for_function(ctx.module, first_clause_meta, func_id)
+
         List.duplicate({:error, error}, length(clauses))
     end
   end
@@ -136,9 +141,9 @@ defmodule Maty.Typechecker.TC.WF do
     end
   end
 
-  def check_wf_message_handler_clause(ctx, handler_label, _, st_pre, _) do
+  def check_wf_message_handler_clause(ctx, handler_label, {meta, _, _, _}, st_pre, _) do
     {:error,
-     Error.ProtocolViolation.message_handler_not_receive(ctx.module, handler_label, st_pre)}
+     Error.ProtocolViolation.message_handler_not_receive(ctx.module, meta, handler_label, st_pre)}
   end
 
   @doc """
@@ -158,9 +163,14 @@ defmodule Maty.Typechecker.TC.WF do
           type_signature :: tuple()
         ) ::
           :ok | {:error, Error.t()}
-  def check_wf_init_handler_clause(ctx, handler_label, _, %ST.SIn{} = st_pre, _) do
+  def check_wf_init_handler_clause(ctx, handler_label, {meta, _, _, _}, %ST.SIn{} = st_pre, _) do
     {:error,
-     Error.ProtocolViolation.init_handler_starts_with_receive(ctx.module, handler_label, st_pre)}
+     Error.ProtocolViolation.init_handler_starts_with_receive(
+       ctx.module,
+       meta,
+       handler_label,
+       st_pre
+     )}
   end
 
   def check_wf_init_handler_clause(
@@ -226,6 +236,7 @@ defmodule Maty.Typechecker.TC.WF do
       {:error,
        Error.ProtocolViolation.incorrect_recipient_participant(
          ctx.module,
+         ctx.meta,
          handler_label,
          st,
          received: received_role,
@@ -244,6 +255,7 @@ defmodule Maty.Typechecker.TC.WF do
         {:error,
          Error.ProtocolViolation.incorrect_incoming_message_label(
            ctx.module,
+           ctx.meta,
            handler_label,
            st,
            got: label,
@@ -257,6 +269,7 @@ defmodule Maty.Typechecker.TC.WF do
           {:error,
            Error.ProtocolViolation.incorrect_incoming_payload_type(
              ctx.module,
+             ctx.meta,
              handler_label,
              st,
              got: payload_type,
@@ -266,6 +279,7 @@ defmodule Maty.Typechecker.TC.WF do
           {:error,
            Error.ProtocolViolation.incorrect_incoming_message_label(
              ctx.module,
+             ctx.meta,
              handler_label,
              st,
              got: label,
@@ -290,20 +304,20 @@ defmodule Maty.Typechecker.TC.WF do
   defp check_on_link_session_state(_ctx, %ST.SEnd{}), do: :ok
 
   defp check_on_link_session_state(ctx, other_st) do
-    {:error, Error.FrameworkUsage.on_link_altered_session_state(ctx.module, other_st)}
+    {:error, Error.FrameworkUsage.on_link_altered_session_state(ctx.module, ctx.meta, other_st)}
   end
 
   defp check_contains_register(ctx, body) do
     if Helpers.contains_register_call?(body),
       do: :ok,
-      else: {:error, Error.FrameworkUsage.missing_session_registration(ctx.module)}
+      else: {:error, Error.FrameworkUsage.missing_session_registration(ctx.module, ctx.meta)}
   end
 
   defp check_on_link_return_type(ctx, return_type) do
     if return_type == {:tuple, [:ok, Type.maty_actor_state()]} do
       :ok
     else
-      {:error, Error.FrameworkUsage.on_link_bad_return(ctx.module, return_type)}
+      {:error, Error.FrameworkUsage.on_link_bad_return(ctx.module, ctx.meta, return_type)}
     end
   end
 

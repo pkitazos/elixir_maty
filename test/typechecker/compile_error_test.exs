@@ -517,5 +517,89 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "MatyDSL.register (access point)"
       assert error.line == line_of(src, "MatyDSL.register(:not_a_pid")
     end
+
+    test "an on_link that never registers is reported at the on_link clause" do
+      src = """
+      defmodule MatyCompileErrorFixture.OnLinkNoRegister do
+        use Maty.Actor
+
+        @role :seller
+
+        @st {:install, ~q/end/}
+
+        on_link _ap_pid :: pid(), initial_state do
+          {:ok, initial_state}
+        end
+
+        init_handler :install, _ap_pid :: pid(), state do
+          MatyDSL.done(state)
+        end
+      end
+      """
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Missing Session Registration"
+      assert error.line == line_of(src, "on_link _ap_pid")
+    end
+
+    test "a handler whose role does not match the session type is reported at that clause" do
+      # both branches are implemented, so this is the only error
+      src =
+        seller_src("WrongRole", """
+        handler :decision_handler, :buyer1, {:address, addr :: binary()}, state do
+          MatyDSL.send(:buyer2, {:date, addr})
+          MatyDSL.done(state)
+        end
+
+        handler :decision_handler, :buyer2, {:quit, nil}, state do
+          MatyDSL.done(state)
+        end
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Incorrect Incoming Participant"
+      assert error.line == line_of(src, "handler :decision_handler, :buyer1")
+    end
+
+    test "an init handler whose session type starts with a receive is reported at that clause" do
+      src = """
+      defmodule MatyCompileErrorFixture.InitStartsWithReceive do
+        use Maty.Actor
+
+        @role :seller
+
+        @st {:install, ~q/&buyer2:{quit(nil).end}/}
+
+        on_link ap_pid :: pid(), initial_state do
+          MatyDSL.register(ap_pid, @role, [callback: :install, args: [ap_pid]], initial_state)
+        end
+
+        init_handler :install, _ap_pid :: pid(), state do
+          MatyDSL.done(state)
+        end
+      end
+      """
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Init Handler Starts With a Receive"
+      assert error.line == line_of(src, "init_handler :install")
+    end
+
+    test "a function without a spec is reported at its first clause" do
+      src =
+        seller_src("NoSpec", """
+        #{@valid_handlers}
+
+        def h(x), do: x
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Missing Function Spec"
+      assert error.line == line_of(src, "def h(x)")
+    end
   end
 end

@@ -18,22 +18,24 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
   # An init handler must initiate the actors role in a session
   # if they are the first actor to send a message then the handler should send
   # otherwise the handler suspends into their first receive
-  def init_handler_starts_with_receive(module, handler, st) do
+  def init_handler_starts_with_receive(module, meta, handler, st) do
     %Error{
       category: :protocol_violation,
       kind: :init_handler_starts_with_receive,
       module: module,
+      meta: Keyword.take(meta, [:line, :column]),
       handler: handler,
       st: st
     }
   end
 
   # a message handler session type must begin with a receive (SIn)
-  def message_handler_not_receive(module, handler, st) do
+  def message_handler_not_receive(module, meta, handler, st) do
     %Error{
       category: :protocol_violation,
       kind: :message_handler_not_receive,
       module: module,
+      meta: Keyword.take(meta, [:line, :column]),
       handler: handler,
       st: st
     }
@@ -50,7 +52,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     }
   end
 
-  def incorrect_recipient_participant(module, handler, st,
+  def incorrect_recipient_participant(module, meta, handler, st,
         received: received,
         declared: declared,
         expected: expected
@@ -59,13 +61,14 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
       category: :protocol_violation,
       kind: :incorrect_recipient_participant,
       module: module,
+      meta: Keyword.take(meta, [:line, :column]),
       handler: handler,
       details: %{received: received, declared: declared, expected: expected},
       st: st
     }
   end
 
-  def incorrect_incoming_message_label(module, handler, st,
+  def incorrect_incoming_message_label(module, meta, handler, st,
         got: label_received,
         expected: labels_expected
       ) do
@@ -73,13 +76,14 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
       category: :protocol_violation,
       kind: :incorrect_incoming_message_label,
       module: module,
+      meta: Keyword.take(meta, [:line, :column]),
       handler: handler,
       details: %{got: label_received, expected: labels_expected},
       st: st
     }
   end
 
-  def incorrect_incoming_payload_type(module, handler, st,
+  def incorrect_incoming_payload_type(module, meta, handler, st,
         got: payload_received,
         expected: payload_expected
       ) do
@@ -87,6 +91,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
       category: :protocol_violation,
       kind: :incorrect_incoming_payload_type,
       module: module,
+      meta: Keyword.take(meta, [:line, :column]),
       handler: handler,
       details: %{got: payload_received, expected: payload_expected},
       st: st

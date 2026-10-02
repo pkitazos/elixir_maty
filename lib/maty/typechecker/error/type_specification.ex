@@ -68,11 +68,12 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
     }
   end
 
-  def no_spec_for_function(module, func_id) do
+  def no_spec_for_function(module, meta, func_id) do
     %Error{
       category: :type_specification,
       kind: :no_spec_for_function,
       module: module,
+      meta: Keyword.take(meta, [:line, :column]),
       details: %{func_id: func_id}
     }
   end
