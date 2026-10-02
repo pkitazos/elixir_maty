@@ -31,6 +31,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     \n\n** (ElixirMatyTypeError) Protocol Violation: Init Handler Starts With a Receive
       Module: #{e.module}
       Handler: #{e.handler}
+      Line: #{e.meta[:line]}
       --
       An init handler must initiate the session (send or suspend), but the protocol
       for this role begins by receiving. That first step needs a message handler.
@@ -44,6 +45,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     \n\n** (ElixirMatyTypeError) Protocol Violation: Message Handler Does Not Receive
       Module: #{e.module}
       Handler: #{e.handler}
+      Line: #{e.meta[:line]}
       --
       A message handler runs when a message is received, so its session type must
       begin with a receive. This handler's session type does not.
@@ -76,6 +78,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Incoming Participant
       Module: #{e.module}
       Handler: #{e.handler}
+      Line: #{e.meta[:line]}
       --
       Received role (handler arg): #{render_atom(received)}
       Declared role (@spec): #{render_atom(declared)}
@@ -94,6 +97,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Incoming Message Label
       Module: #{e.module}
       Handler: #{e.handler}
+      Line: #{e.meta[:line]}
       --
       Got: #{render_atom(label_received)}
       Expected: #{acceptable_labels}
@@ -110,6 +114,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Incoming Payload Type
       Module: #{e.module}
       Handler: #{e.handler}
+      Line: #{e.meta[:line]}
       --
       Got: #{render_atom(payload_received)}
       Expected: #{render_atom(payload_expected)}
@@ -741,6 +746,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     \n\n** (ElixirMatyTypeError) Type Specification Error: Missing Function Spec
       Module: #{e.module}
+      Line: #{e.meta[:line]}
       --
       Function: #{func_str}
       --
@@ -770,6 +776,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     \n\n** (ElixirMatyTypeError) Framework Usage Violation: Missing Session Registration
       Module: #{e.module}
+      Line: #{e.meta[:line]}
       --
       Actor does not register in a session in the on_link/2 callback
     """
@@ -781,6 +788,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     \n\n** (ElixirMatyTypeError) Framework Usage Violation: Session State Altered in on_link
       Module: #{e.module}
+      Line: #{e.meta[:line]}
       --
       The on_link/2 callback must not advance the session type.
       Final state: #{inspect(got)}
@@ -793,6 +801,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     \n\n** (ElixirMatyTypeError) Framework Usage Violation: Invalid on_link Return
       Module: #{e.module}
+      Line: #{e.meta[:line]}
       --
       The on_link/2 callback must return {:ok, actor_state}.
       Got: #{inspect(got)}

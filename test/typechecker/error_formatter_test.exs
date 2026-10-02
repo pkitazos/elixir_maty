@@ -35,6 +35,7 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
         \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Incoming Participant
           Module: #{TwoBuyer.Seller}
           Handler: title_handler
+          Line: 12
           --
           Received role (handler arg): :buyer2
           Declared role (@spec): :buyer1
