@@ -445,5 +445,25 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Missing Function Spec"
       assert error.description =~ "Function: install/3"
     end
+
+    test "several specs on one clause are reported instead of one being silently dropped" do
+      src =
+        seller_src("OverloadedSpecs", """
+        #{@valid_handlers}
+
+        @spec f(number()) :: number()
+        @spec f(binary()) :: binary()
+        def f(x), do: x
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Wrong Number of Specs"
+      assert error.description =~ "Expected specs: 1"
+      assert error.description =~ "Got specs: 2"
+      assert error.description =~ "[f/1]"
+      # the line of one of the two specs
+      assert error.line in [line_of(src, "@spec f(number())"), line_of(src, "@spec f(binary())")]
+    end
   end
 end

@@ -146,7 +146,7 @@ defmodule Maty.Typechecker.Preprocessor do
   # argument and the return type. Returns:
   #
   #   * `{:ok, {arg_types, return_type}}` - name/arity match and everything parses
-  #   * `{:error, e}` - a name/arity mismatch, an argument that fails to parse
+  #   * `{:error, e}` - more than one spec, a name/arity mismatch, an argument that fails to parse
   #     (carrying its position), or an unparseable return type
   #   * `:no_spec` - `spec_attr` isn't a recognised spec form (e.g. `nil`)
   @doc false
@@ -154,6 +154,15 @@ defmodule Maty.Typechecker.Preprocessor do
           {:ok, {[Type.t()], Type.t()}} | {:error, Error.t()} | :no_spec
   def validate_type_annotation(spec_attr, module, func_id = {name, arity}) do
     case spec_attr do
+      # each clause is typechecked against exactly one spec, so overloaded specs are rejected
+      # rather than silently keeping one of them
+      [{:spec, {:"::", meta, _}, _module}, _ | _] ->
+        {:error,
+         Error.FunctionCall.wrong_number_of_specs(module, meta, func_id,
+           expected: 1,
+           got: length(spec_attr)
+         )}
+
       [{:spec, {:"::", meta, [{spec_name, _, args_asts}, return_ast]}, _module} | _] ->
         # we check that:
         # - the arity and name match

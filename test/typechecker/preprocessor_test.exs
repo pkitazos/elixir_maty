@@ -53,6 +53,21 @@ defmodule Maty.Typechecker.PreprocessorTest do
                Preprocessor.validate_type_annotation(attr, @module, {:my_func, 2})
     end
 
+    test "more than one spec for a clause is rejected" do
+      attr =
+        spec_attr(:my_func, [type_ast(:atom)], type_ast(:number)) ++
+          spec_attr(:my_func, [type_ast(:binary)], type_ast(:binary))
+
+      assert {:error, error} =
+               Preprocessor.validate_type_annotation(attr, @module, {:my_func, 1})
+
+      assert %Error{
+               category: :function_call,
+               kind: :wrong_number_of_specs,
+               details: %{func_id: {:my_func, 1}, expected: 1, got: 2}
+             } = error
+    end
+
     test "spec name/arity mismatch" do
       attr = spec_attr(:other_func, [type_ast(:atom)], type_ast(:binary))
 
