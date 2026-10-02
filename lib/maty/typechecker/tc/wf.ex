@@ -32,6 +32,9 @@ defmodule Maty.Typechecker.TC.WF do
     with {:ok, signatures} when is_list(signatures) <- Map.fetch(ctx.psi, func_id) do
       for {{spec_args, spec_return}, {meta, arg_pattern_asts, _guards, body_block}} <-
             Enum.zip(signatures, clauses) do
+        # errors that have no more precise location of their own are reported at this clause
+        ctx = %{ctx | meta: meta}
+
         with :ok <- check_clause_arity(ctx, meta, func_id, arity, spec_args),
              {:ok, env} <-
                check_argument_patterns(
@@ -92,6 +95,8 @@ defmodule Maty.Typechecker.TC.WF do
         {[declared_role, {:tuple, [_, payload_type]} = message_type, _state, _session_ctx],
          _return_type}
       ) do
+    ctx = %{ctx | meta: meta}
+
     with nil,
          # check handler and session type roles align
          :ok <-
@@ -165,6 +170,8 @@ defmodule Maty.Typechecker.TC.WF do
         st_pre,
         {[args_types, _state, _session_ctx], _return_type}
       ) do
+    ctx = %{ctx | meta: meta}
+
     with nil,
          # bind variables from the argument pattern
          {:ok, _bindings, env} <- tc_pattern(ctx, arg_pattern_ast, args_types, %{}),
@@ -184,9 +191,10 @@ defmodule Maty.Typechecker.TC.WF do
 
   def check_wf_on_link_callback(
         ctx,
-        {_meta, [arg_pattern_ast, {state_var, _, _}], _guards, body_block},
+        {meta, [arg_pattern_ast, {state_var, _, _}], _guards, body_block},
         {[args_types, _state], _return_type}
       ) do
+    ctx = %{ctx | meta: meta}
     body = extract_body(body_block)
 
     with nil,

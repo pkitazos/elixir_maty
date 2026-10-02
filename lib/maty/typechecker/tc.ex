@@ -384,7 +384,8 @@ defmodule Maty.Typechecker.TC do
           fan_out(Enum.with_index(clauses_list, 1), env, st_pre, fn
             {{:->, branch_meta, [[p_ast], e_ast]}, index}, env, st ->
               thread do
-                _ <~ lift_pattern(ctx, p_ast, scrutinee_type, env, st)
+                # a literal pattern has no meta of its own, so its errors are reported at the branch
+                _ <~ lift_pattern(%{ctx | meta: branch_meta}, p_ast, scrutinee_type, env, st)
                 tc_expr(ctx, env, st, e_ast)
               end
               |> with_frame({:case_branch, index, Keyword.take(branch_meta, [:line, :column])})

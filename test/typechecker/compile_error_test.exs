@@ -261,7 +261,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Binary Operator"
       assert error.description =~ ~r/Trace:\n\s+via f\/1 \(line \d+\)/
       assert error.line == own_line(error)
-      assert error.line == line_of(src, ~s|def g(), do: f(1 + "a")|)
+      assert error.line == line_of(src, "def g(), do: f(1 + \"a\")")
     end
 
     test "an error in one clause of a multi-clause init handler names that clause" do
@@ -370,6 +370,43 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
       assert error.description =~ "in case branch #1 (line #{line_of(src, "1 ->")})"
       assert error.description =~ "in case branch #1 (line #{line_of(src, "2 -> 1 + ")})"
+    end
+
+    test "a literal pattern mismatch in a function clause is reported at that clause, not line 0" do
+      # a literal carries no meta of its own, so the error takes the line of its clause
+      src =
+        seller_src("LiteralPatternClause", """
+        #{@valid_handlers}
+
+        @spec f(binary()) :: number()
+        def f(1), do: 1
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Pattern Type Mismatch"
+      assert own_line(error) == line_of(src, "def f(1)")
+      assert error.line == line_of(src, "def f(1)")
+    end
+
+    test "a literal pattern mismatch in a case branch is reported at that branch" do
+      src =
+        seller_src("LiteralPatternBranch", """
+        #{@valid_handlers}
+
+        @spec g(number()) :: number()
+        def g(x) do
+          case x do
+            1 -> 1
+            "a" -> 2
+          end
+        end
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Pattern Type Mismatch"
+      assert own_line(error) == line_of(src, "\"a\" -> 2")
     end
   end
 end
