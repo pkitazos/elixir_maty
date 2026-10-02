@@ -408,5 +408,42 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Pattern Type Mismatch"
       assert own_line(error) == line_of(src, "\"a\" -> 2")
     end
+
+    test "a hand-written message handler without a spec reports the missing spec" do
+      src =
+        seller_src("RawHandlerNoSpec", """
+        @handler :decision_handler
+        def decision_handler(_session_ctx, _role, {:quit, nil}, state), do: MatyDSL.done(state)
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Missing Function Spec"
+      assert error.description =~ "Function: decision_handler/4"
+    end
+
+    test "a hand-written init handler without a spec reports the missing spec" do
+      src = """
+      defmodule MatyCompileErrorFixture.RawInitNoSpec do
+        use Maty.Actor
+
+        @role :seller
+
+        @st {:install, ~q/end/}
+
+        on_link ap_pid :: pid(), initial_state do
+          MatyDSL.register(ap_pid, @role, [callback: :install, args: [ap_pid]], initial_state)
+        end
+
+        @init_handler :install
+        def install(_session_ctx, _arg, state), do: MatyDSL.done(state)
+      end
+      """
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Missing Function Spec"
+      assert error.description =~ "Function: install/3"
+    end
   end
 end

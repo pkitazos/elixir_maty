@@ -121,6 +121,12 @@ defmodule Maty.Typechecker do
         # we reduce over the list of all the definitions in our module to accumulate errors
         acc ->
           cond do
+            # a hand-written handler (an `@handler` on a plain def) may have no spec at all
+            # in which case there is nothing to check its clauses against
+            # todo: maybe just find a niccer way to forbid hand-written handlers..
+            MapSet.member?(module_handlers, func_id) and not Map.has_key?(psi, func_id) ->
+              [{func_id, Error.TypeSpecification.no_spec_for_function(env.module, func_id)} | acc]
+
             # if this particular function is a message handler
             # we check for its well-formedness
             MapSet.member?(module_handlers, func_id) ->
@@ -240,6 +246,10 @@ defmodule Maty.Typechecker do
 
                   [{func_id, error_msg} | acc]
               end
+
+            # todo: same as above, maybe a nicer way to forbid these
+            MapSet.member?(module_init_handlers, func_id) and not Map.has_key?(psi, func_id) ->
+              [{func_id, Error.TypeSpecification.no_spec_for_function(env.module, func_id)} | acc]
 
             # next we check to see if the function we're type-checking is an init_handler
             MapSet.member?(module_init_handlers, func_id) ->
