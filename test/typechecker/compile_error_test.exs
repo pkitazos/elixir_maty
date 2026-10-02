@@ -323,5 +323,53 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Got specs: 0"
       assert error.line == line_of(src, "def on_link")
     end
+
+    test "an error in a case branch names the branch and its line" do
+      src =
+        seller_src("CaseBranchFrame", """
+        #{@valid_handlers}
+
+        @spec g(number()) :: number()
+        def g(x) do
+          case x do
+            1 -> 1
+            _ -> 1 + "a"
+          end
+        end
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Binary Operator"
+      # the second branch, at the line of that branch rather than the line of the `case`
+      assert error.description =~ "in case branch #2 (line #{line_of(src, "_ -> 1 + \"a\"")})"
+      refute error.description =~ "in case branch #1"
+    end
+
+    test "an error in a nested case names both branches" do
+      src =
+        seller_src("NestedCaseBranchFrame", """
+        #{@valid_handlers}
+
+        @spec g(number()) :: number()
+        def g(x) do
+          case x do
+            1 ->
+              case x do
+                2 -> 1 + "a"
+                _ -> 3
+              end
+
+            _ ->
+              2
+          end
+        end
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "in case branch #1 (line #{line_of(src, "1 ->")})"
+      assert error.description =~ "in case branch #1 (line #{line_of(src, "2 -> 1 + ")})"
+    end
   end
 end
