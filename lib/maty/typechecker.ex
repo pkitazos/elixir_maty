@@ -103,7 +103,8 @@ defmodule Maty.Typechecker do
     # build the typing context struct for tc_expr and friends
     ctx = %Ctx{
       module: env.module,
-      meta: [line: 0],
+      # until a clause sets its own, errors that have no location of their own point at the module
+      meta: [line: env.line],
       delta_M: delta_m,
       delta_I: delta_i,
       psi: psi
