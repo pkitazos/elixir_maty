@@ -490,5 +490,32 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
       assert error.description =~ ~r/Trace:\n\s+in case branch #1 .*\n\s+via f\/1/
     end
+
+    test "a wrongly typed argument to register is reported, not crashed on" do
+      src =
+        """
+        defmodule MatyCompileErrorFixture.RegisterBadAp do
+          use Maty.Actor
+
+          @role :seller
+
+          @st {:install, ~q/end/}
+
+          on_link ap_pid :: pid(), initial_state do
+            MatyDSL.register(:not_a_pid, @role, [callback: :install, args: [ap_pid]], initial_state)
+          end
+
+          init_handler :install, _ap_pid :: pid(), state do
+            MatyDSL.done(state)
+          end
+        end
+        """
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Built-in Argument Type"
+      assert error.description =~ "MatyDSL.register (access point)"
+      assert error.line == line_of(src, "MatyDSL.register(:not_a_pid")
+    end
   end
 end

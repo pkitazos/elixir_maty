@@ -31,7 +31,7 @@ defmodule Maty.Typechecker.TC.Bind do
   def ok(value, env, st), do: {:ok, value, st, env}
 
   @doc "Build a failure carrying the current env."
-  @spec error(term(), var_env()) :: {:error, term(), var_env()}
+  @spec error(Error.t(), var_env()) :: {:error, Error.t(), var_env()}
   def error(reason, env), do: {:error, reason, env}
 
   @doc """
@@ -84,19 +84,20 @@ defmodule Maty.Typechecker.TC.Bind do
     end
   end
 
-  @spec lift_result({:ok, a} | {:error, term()}, term(), var_env(), Maty.ST.t()) :: result(a)
+  @spec lift_result({:ok, a} | {:error, term()} | :error, Error.t(), var_env(), Maty.ST.t()) ::
+          result(a)
         when a: var
   def lift_result({:error, _reason}, error, env, _st), do: error(error, env)
   def lift_result(:error, error, env, _st), do: error(error, env)
   def lift_result({:ok, val}, _error, env, st), do: ok(val, env, st)
 
   @doc "Like lift_result/4 but preserves the original error reason."
-  @spec lift_result({:ok, a} | {:error, term()}, var_env(), Maty.ST.t()) :: result(a)
+  @spec lift_result({:ok, a} | {:error, Error.t()}, var_env(), Maty.ST.t()) :: result(a)
         when a: var
   def lift_result({:ok, val}, env, st), do: ok(val, env, st)
   def lift_result({:error, reason}, env, _st), do: error(reason, env)
 
-  @spec lift_bool(boolean(), term(), var_env(), Maty.ST.t()) :: result(nil) when a: var
+  @spec lift_bool(boolean(), Error.t(), var_env(), Maty.ST.t()) :: result(nil)
   def lift_bool(true, _error, env, st), do: ok(nil, env, st)
   def lift_bool(false, error, env, _st), do: error(error, env)
 

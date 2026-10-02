@@ -9,11 +9,12 @@ defmodule Maty.Typechecker.Judgment do
   The fixed per-module part (Ψ; Δ) is `Maty.Typechecker.Ctx`.
   """
   alias Maty.Types.T, as: Type
+  alias Maty.Typechecker.Error
 
   @type var_env :: %{atom() => Type.t()}
 
   @typedoc "A checking step producing a value of type `a`, threading env and session type."
-  @type result(a) :: {:ok, a, Maty.ST.t(), var_env()} | {:error, term(), var_env()}
+  @type result(a) :: {:ok, a, Maty.ST.t(), var_env()} | {:error, Error.t(), var_env()}
 
   @typedoc "What a tc_expr clause produces: the value is always an object-language type."
   @type result :: result(Type.t())
