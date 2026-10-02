@@ -601,5 +601,45 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Missing Function Spec"
       assert error.line == line_of(src, "def h(x)")
     end
+
+    test "a failing clause still covers its branch, so no missing-branch error is added" do
+      # three clauses for two branches, so coverage is checked. The address clause fails, but it
+      # still implements the address branch. (the second quit clause can never match, which is
+      # fine here, it only makes the clause count differ from the branch count)
+      src =
+        seller_src("FailingClauseCovers", """
+        handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
+          MatyDSL.send(:buyer1, {:date, addr})
+          MatyDSL.done(state)
+        end
+
+        handler :decision_handler, :buyer2, {:quit, nil}, state do
+          MatyDSL.done(state)
+        end
+
+        handler :decision_handler, :buyer2, {:quit, nil}, state do
+          MatyDSL.done(state)
+        end
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Incorrect Target Participant"
+      refute error.description =~ "Incomplete Message Handler Implementation"
+    end
+
+    test "more clauses than branches compiles when every branch is covered" do
+      src =
+        seller_src("MoreClausesThanBranches", """
+        #{@valid_handlers}
+
+        handler :decision_handler, :buyer2, {:quit, nil}, state do
+          MatyDSL.done(state)
+        end
+        """)
+
+      assert {[{MatyCompileErrorFixture.MoreClausesThanBranches, _}], _diagnostics} =
+               Code.with_diagnostics(fn -> Code.compile_string(src) end)
+    end
   end
 end

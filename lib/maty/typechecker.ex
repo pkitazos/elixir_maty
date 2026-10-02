@@ -173,40 +173,53 @@ defmodule Maty.Typechecker do
               if(length(func_clauses) != length(handler_M.st.branches)) do
                 # we need to explicitly keep track of all the visited branches
                 # to ensure we sufficiently cover/support the annotated session type
-                visited_branches =
-                  clause_results
+                visited_labels =
+                  func_clauses
+                  |> Enum.zip(clause_results)
                   # in this case what we're interested in  is not the individual errors,
                   # but whether or not we are actually sufficiently covering the session type
                   # so we only keep the branches we went down after typechecking a clause
+                  #
+                  # a clause that failed typechecking still names the branch it implements
+                  # through its message label, so it should count too
                   |> Enum.flat_map(fn
-                    {:ok, %ST.SBranch{} = branch} -> [branch]
-                    {:error, _msg} -> []
+                    {_clause, {:ok, %ST.SBranch{label: label}}} ->
+                      [label]
+
+                    {{_meta, [_role, {label, _payload}, _state, _session_ctx], _guards, _body},
+                     {:error, _msg}} ->
+                      [label]
+
+                    {_clause, {:error, _msg}} ->
+                      []
                   end)
                   # and we create a set containing the branches we covered
                   |> MapSet.new()
 
                 # we check to see if we've covered all branches or not
                 missing_branches =
-                  handler_M.st.branches
-                  |> MapSet.new()
-                  |> MapSet.difference(visited_branches)
-                  |> MapSet.to_list()
+                  Enum.reject(handler_M.st.branches, &MapSet.member?(visited_labels, &1.label))
 
-                # we format the missing branches into their string representation
-                missing_st = Maty.ST.repr(%{handler_M.st | branches: missing_branches})
+                if missing_branches == [] do
+                  # more clauses than branches is fine as long as every branch is covered
+                  res ++ acc
+                else
+                  # we format the missing branches into their string representation
+                  missing_st = Maty.ST.repr(%{handler_M.st | branches: missing_branches})
 
-                # and report an error stating that we have violated the protocol definition
-                error_msg =
-                  Error.ProtocolViolation.incorrect_choice_implementation(
-                    env.module,
-                    def_meta,
-                    handler_name,
-                    missing_st,
-                    handler_M.st
-                  )
+                  # and report an error stating that we have violated the protocol definition
+                  error_msg =
+                    Error.ProtocolViolation.incorrect_choice_implementation(
+                      env.module,
+                      def_meta,
+                      handler_name,
+                      missing_st,
+                      handler_M.st
+                    )
 
-                # this error is cons-ed onto the accumulator, alongside the per-clause errors
-                [{func_id, error_msg} | res] ++ acc
+                  # this error is cons-ed onto the accumulator, alongside the per-clause errors
+                  [{func_id, error_msg} | res] ++ acc
+                end
               else
                 # or otherwise the other result is appended
                 res ++ acc
