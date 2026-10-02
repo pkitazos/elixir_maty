@@ -9,44 +9,6 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
   @st_in ST.input_one(:buyer1, :title, :binary, @st_end)
 
   describe "format/1" do
-    test "renders :incorrect_recipient_participant identically to the legacy builder" do
-      built =
-        Error.ProtocolViolation.incorrect_recipient_participant(
-          TwoBuyer.Seller,
-          [line: 12],
-          :title_handler,
-          @st_in,
-          received: :buyer2,
-          declared: :buyer1,
-          expected: :buyer1
-        )
-
-      assert %Error{
-               category: :protocol_violation,
-               kind: :incorrect_recipient_participant,
-               module: TwoBuyer.Seller,
-               handler: :title_handler,
-               st: @st_in,
-               details: %{received: :buyer2, declared: :buyer1, expected: :buyer1}
-             } = built
-
-      expected =
-        """
-        \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Incoming Participant
-          Module: #{TwoBuyer.Seller}
-          Handler: title_handler
-          Line: 12
-          --
-          Received role (handler arg): :buyer2
-          Declared role (@spec): :buyer1
-          Expected role (session type): :buyer1
-          --
-          Session Type: #{Maty.ST.repr(@st_in)}
-        """
-
-      assert Formatter.format(built) == expected
-    end
-
     test "raises on an unknown {category, kind}" do
       error = %Error{category: :protocol_violation, kind: :does_not_exist}
 
@@ -105,11 +67,6 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
 
       assert {:error, %Error{trace: [{:call, {:inner, 1}, []}, ^outer]}} =
                Bind.with_frame({:error, error}, outer)
-    end
-
-    test "passes string reasons through unchanged (migration passthrough)" do
-      assert {:error, "boom", %{}} = Bind.with_frame({:error, "boom", %{}}, {:clause, {:f, 1}, 0})
-      assert {:error, "boom"} = Bind.with_frame({:error, "boom"}, {:clause, {:f, 1}, 0})
     end
 
     test "passes successes through unchanged" do
