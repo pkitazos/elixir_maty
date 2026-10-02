@@ -20,14 +20,16 @@ defmodule Maty.Typechecker.TC.WF do
   Checks if a function definition is well-formed according to WF-Func.
   Verifies argument patterns, body type, return type, and session state purity.
 
-  Returns `{:ok, return_type}` or `{:error, error}` for each function clause checked.
+  Returns `{:ok, return_type}` or `{:error, error}` for each function clause checked,
+  or a single `{:error, error}` (not in a list) when the problem is with the function as a
+  whole (no spec, or a spec count that does not fit its clauses), so it is reported once.
   """
   @spec check_wf_function(
           ctx :: Ctx.t(),
           func_id :: {atom(), non_neg_integer()},
           clauses :: [clause()]
         ) ::
-          [{:ok, Type.t()} | {:error, Error.t()}]
+          [{:ok, Type.t()} | {:error, Error.t()}] | {:error, Error.t()}
   def check_wf_function(ctx, {_name, arity} = func_id, clauses) do
     with {:spec, {:ok, signatures}} when is_list(signatures) <-
            {:spec, Map.fetch(ctx.psi, func_id)},
@@ -68,7 +70,7 @@ defmodule Maty.Typechecker.TC.WF do
         error =
           Error.TypeSpecification.no_spec_for_function(ctx.module, first_clause_meta, func_id)
 
-        List.duplicate({:error, error}, length(clauses))
+        {:error, error}
 
       {:count, {:error, spec_count}} ->
         {first_clause_meta, _, _, _} = hd(clauses)
@@ -79,7 +81,7 @@ defmodule Maty.Typechecker.TC.WF do
             got: spec_count
           )
 
-        [{:error, error}]
+        {:error, error}
     end
   end
 

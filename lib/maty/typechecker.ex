@@ -306,16 +306,23 @@ defmodule Maty.Typechecker do
 
             # otherwise, this is just a regular function which we still need to check is well-formed
             true ->
-              res =
-                TC.WF.check_wf_function(ctx, func_id, func_clauses)
-                |> Enum.with_index(1)
-                |> Enum.map(fn {result, index} ->
-                  with_clause_frame(result, func_id, index, length(func_clauses))
-                end)
-                |> Enum.reject(&match?({:ok, _}, &1))
-                |> Enum.map(fn {:error, error_msg} -> {func_id, error_msg} end)
+              case TC.WF.check_wf_function(ctx, func_id, func_clauses) do
+                # a problem with the function as a whole, reported once and without a clause frame
+                {:error, error} ->
+                  [{func_id, error} | acc]
 
-              res ++ acc
+                clause_results ->
+                  res =
+                    clause_results
+                    |> Enum.with_index(1)
+                    |> Enum.map(fn {result, index} ->
+                      with_clause_frame(result, func_id, index, length(func_clauses))
+                    end)
+                    |> Enum.reject(&match?({:ok, _}, &1))
+                    |> Enum.map(fn {:error, error_msg} -> {func_id, error_msg} end)
+
+                  res ++ acc
+              end
           end
       end
 

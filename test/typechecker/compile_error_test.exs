@@ -693,6 +693,8 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Wrong Number of Specs"
       assert error.description =~ "Expected specs: 1 or 3"
       assert error.description =~ "Got specs: 2"
+      # a problem with the function as a whole, so it is not attributed to a clause
+      refute error.description =~ "in clause"
       assert error.line == line_of(src, "def f(1)")
     end
 
@@ -721,6 +723,21 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Argument: 2 (role)"
       assert error.description =~ "Expected: :atom"
       assert error.description =~ "Got: :binary"
+    end
+
+    test "a multi-clause function without a spec reports the missing spec once" do
+      src =
+        seller_src("NoSpecTwoClauses", """
+        #{@valid_handlers}
+
+        def h(1), do: 1
+        def h(_x), do: 2
+        """)
+
+      error = compile_error!(src)
+
+      assert length(String.split(error.description, "Missing Function Spec")) == 2
+      refute error.description =~ "in clause"
     end
   end
 end
