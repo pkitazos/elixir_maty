@@ -25,7 +25,7 @@ defmodule Maty.Typechecker.TC do
 
   Returns:
     - `{:ok, elixir_type, next_session_state, var_env}` on success
-    - `{:error, error_message, var_env}` on failure
+    - `{:error, error, var_env}` on failure
   """
   @spec tc_expr(ctx :: Ctx.t(), var_env :: var_env(), st_pre :: Maty.ST.t(), ast :: ast()) ::
           result()

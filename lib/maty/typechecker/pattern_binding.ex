@@ -16,7 +16,7 @@ defmodule Maty.Typechecker.PatternBinding do
   Checks if a pattern AST is compatible with an expected type and calculates
   the variable bindings introduced by the pattern. Corresponds to `⊢ p : A ⟹ Γ'`.
 
-  Returns `{:ok, new_bindings, updated_env}` or `{:error, message, original_env}`.
+  Returns `{:ok, new_bindings, updated_env}` or `{:error, error, original_env}`.
   `new_bindings` contains only the variables bound in this pattern.
   `updated_env` is the original_env merged with new_bindings.
   """
@@ -26,7 +26,7 @@ defmodule Maty.Typechecker.PatternBinding do
           expected_type :: Type.t(),
           var_env :: var_env()
         ) ::
-          {:ok, map(), var_env()} | {:error, binary(), var_env()}
+          {:ok, map(), var_env()} | {:error, Error.t(), var_env()}
 
   # Pat-Var: Pattern is a variable 'x'
   deftc tc_pattern(_ctx, {var_name, _meta, context}, expected_type, var_env)
