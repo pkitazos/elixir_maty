@@ -389,6 +389,22 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :type_mismatch, kind: :register_arg_type_mismatch} = e) do
+    %{argument: argument, expected: expected, got: got} = e.details
+
+    """
+    \n\n** (ElixirMatyTypeError) Type Mismatch Error: Register Argument Type
+      Module: #{e.module}
+      Line: #{e.meta[:line]}
+      --
+      Argument: #{render_register_argument(argument)}
+      Expected: #{render_expected(expected)}
+      Got: #{render_type(got)}
+      --
+      MatyDSL.register/4 was called with an argument of the wrong type.
+    """
+  end
+
   defp render(%Error{category: :type_mismatch, kind: :send_message_not_tuple} = e) do
     %{got: message_ast} = e.details
 
@@ -861,6 +877,14 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render_type(type) when is_atom(type), do: ":#{type}"
   defp render_type(type), do: "#{inspect(type)}"
+
+  # an expected type, or a description where there is no single type to show
+  defp render_expected(description) when is_binary(description), do: description
+  defp render_expected(type), do: render_type(type)
+
+  defp render_register_argument(:access_point), do: "1 (access point)"
+  defp render_register_argument(:role), do: "2 (role)"
+  defp render_register_argument(:init_handler), do: "3 (init handler)"
 
   defp render_operator(op) when is_atom(op), do: "#{op}"
   defp render_operator(op), do: "#{inspect(op)}"

@@ -513,8 +513,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
       error = compile_error!(src)
 
-      assert error.description =~ "Built-in Argument Type"
-      assert error.description =~ "MatyDSL.register (access point)"
+      assert error.description =~ "Register Argument Type"
+      assert error.description =~ "Argument: 1 (access point)"
+      assert error.description =~ "Expected: :pid"
       assert error.line == line_of(src, "MatyDSL.register(:not_a_pid")
     end
 
@@ -693,6 +694,33 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Expected specs: 1 or 3"
       assert error.description =~ "Got specs: 2"
       assert error.line == line_of(src, "def f(1)")
+    end
+
+    test "a role that is not an atom is reported as register's second argument" do
+      src =
+        """
+        defmodule MatyCompileErrorFixture.RegisterBadRole do
+          use Maty.Actor
+
+          @role :seller
+
+          @st {:install, ~q/end/}
+
+          on_link ap_pid :: pid(), initial_state do
+            MatyDSL.register(ap_pid, "seller", [callback: :install, args: [ap_pid]], initial_state)
+          end
+
+          init_handler :install, _ap_pid :: pid(), state do
+            MatyDSL.done(state)
+          end
+        end
+        """
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Argument: 2 (role)"
+      assert error.description =~ "Expected: :atom"
+      assert error.description =~ "Got: :binary"
     end
   end
 end

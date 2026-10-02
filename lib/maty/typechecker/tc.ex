@@ -787,11 +787,11 @@ defmodule Maty.Typechecker.TC do
       _
       <~ lift_bool(
         pid_type == :pid,
-        Error.TypeMismatch.builtin_arg_type_mismatch(
+        Error.TypeMismatch.register_arg_type_mismatch(
           ctx.module,
           meta,
-          "MatyDSL.register (access point)",
-          expected: [:pid],
+          :access_point,
+          expected: :pid,
           got: pid_type
         ),
         env,
@@ -806,11 +806,11 @@ defmodule Maty.Typechecker.TC do
       _
       <~ lift_bool(
         role_type == :atom,
-        Error.TypeMismatch.builtin_arg_type_mismatch(
+        Error.TypeMismatch.register_arg_type_mismatch(
           ctx.module,
           meta,
-          "MatyDSL.register (role)",
-          expected: [:atom],
+          :role,
+          expected: :atom,
           got: role_type
         ),
         env,
@@ -827,11 +827,11 @@ defmodule Maty.Typechecker.TC do
       _
       <~ lift_bool(
         match?({:fun, _}, init_handler_type),
-        Error.TypeMismatch.builtin_arg_type_mismatch(
+        Error.TypeMismatch.register_arg_type_mismatch(
           ctx.module,
           meta,
-          "MatyDSL.register (init handler)",
-          expected: [:fun],
+          :init_handler,
+          expected: "a function",
           got: init_handler_type
         ),
         env,
