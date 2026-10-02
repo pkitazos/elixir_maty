@@ -20,6 +20,10 @@ defmodule Maty.DSL.Handlers do
         # process the pattern to extract the cleaned pattern and type specification
         {clean_pattern, type_spec} = process_pattern(pattern)
 
+        # a handler may be defined by several clauses, but its expected role only needs
+        # registering once, a second identical clause would never match (and would warn)
+        expects_key = :"__handler_expects_#{handler_name}__"
+
         quote do
           @handler unquote(handler_name)
           @spec unquote(handler_name)(
@@ -47,7 +51,10 @@ defmodule Maty.DSL.Handlers do
             end
           end
 
-          def __handler_expects__(unquote(handler_name)), do: unquote(role)
+          if not Module.has_attribute?(__MODULE__, unquote(expects_key)) do
+            Module.put_attribute(__MODULE__, unquote(expects_key), true)
+            def __handler_expects__(unquote(handler_name)), do: unquote(role)
+          end
         end
 
       _ ->
