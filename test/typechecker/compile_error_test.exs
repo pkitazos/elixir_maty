@@ -641,5 +641,58 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert {[{MatyCompileErrorFixture.MoreClausesThanBranches, _}], _diagnostics} =
                Code.with_diagnostics(fn -> Code.compile_string(src) end)
     end
+
+    test "one spec covers every clause, so a later clause is checked against it" do
+      src =
+        seller_src("OneSpecAllClauses", """
+        #{@valid_handlers}
+
+        @spec f(number()) :: number()
+        def f(1), do: 1
+        def f(_x), do: "not a number"
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Return Type Mismatch"
+      assert error.description =~ "in clause #2 of f/1"
+    end
+
+    test "one spec per clause pairs each clause with its own spec, in source order" do
+      src =
+        seller_src("SpecPerClauseInOrder", """
+        #{@valid_handlers}
+
+        @spec f(number()) :: number()
+        def f(1), do: 1
+
+        @spec f(binary()) :: binary()
+        def f(_x), do: "a binary"
+        """)
+
+      assert {[{MatyCompileErrorFixture.SpecPerClauseInOrder, _}], _diagnostics} =
+               Code.with_diagnostics(fn -> Code.compile_string(src) end)
+    end
+
+    test "a spec count that is neither one nor one per clause is reported" do
+      src =
+        seller_src("TooFewSpecs", """
+        #{@valid_handlers}
+
+        @spec f(number()) :: number()
+        def f(1), do: 1
+
+        @spec f(number()) :: number()
+        def f(2), do: 2
+        def f(_x), do: 3
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Wrong Number of Specs"
+      assert error.description =~ "Expected specs: 1 or 3"
+      assert error.description =~ "Got specs: 2"
+      assert error.line == line_of(src, "def f(1)")
+    end
   end
 end

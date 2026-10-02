@@ -29,9 +29,12 @@ defmodule Maty.Typechecker.TC.WF do
         ) ::
           [{:ok, Type.t()} | {:error, Error.t()}]
   def check_wf_function(ctx, {_name, arity} = func_id, clauses) do
-    with {:ok, signatures} when is_list(signatures) <- Map.fetch(ctx.psi, func_id) do
+    with {:spec, {:ok, signatures}} when is_list(signatures) <-
+           {:spec, Map.fetch(ctx.psi, func_id)},
+         {:count, {:ok, clause_signatures}} <-
+           {:count, signatures_per_clause(signatures, clauses)} do
       for {{spec_args, spec_return}, {meta, arg_pattern_asts, _guards, body_block}} <-
-            Enum.zip(signatures, clauses) do
+            Enum.zip(clause_signatures, clauses) do
         # errors that have no more precise location of their own are reported at this clause
         ctx = %{ctx | meta: meta}
 
@@ -58,7 +61,7 @@ defmodule Maty.Typechecker.TC.WF do
         end
       end
     else
-      :error ->
+      {:spec, :error} ->
         # reported at the first clause since the spec belongs to the function as a whole
         {first_clause_meta, _, _, _} = hd(clauses)
 
@@ -66,6 +69,31 @@ defmodule Maty.Typechecker.TC.WF do
           Error.TypeSpecification.no_spec_for_function(ctx.module, first_clause_meta, func_id)
 
         List.duplicate({:error, error}, length(clauses))
+
+      {:count, {:error, spec_count}} ->
+        {first_clause_meta, _, _, _} = hd(clauses)
+
+        error =
+          Error.FunctionCall.wrong_number_of_specs(ctx.module, first_clause_meta, func_id,
+            expected: "1 or #{length(clauses)}",
+            got: spec_count
+          )
+
+        [{:error, error}]
+    end
+  end
+
+  # Pairs every clause with the spec it is checked against
+  # A function either has one spec covering every clause or one spec per clause
+  # Any other count would leave clauses without a spec so it is an error
+  defp signatures_per_clause(signatures, clauses) do
+    # psi holds the specs newest first, so we put them back in source order
+    in_order = Enum.reverse(signatures)
+
+    cond do
+      length(in_order) == length(clauses) -> {:ok, in_order}
+      length(in_order) == 1 -> {:ok, List.duplicate(hd(in_order), length(clauses))}
+      true -> {:error, length(in_order)}
     end
   end
 
