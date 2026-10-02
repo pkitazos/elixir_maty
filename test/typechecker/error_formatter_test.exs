@@ -77,7 +77,7 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
   end
 
   describe "Bind.with_frame/2" do
-    test "prepends a frame onto a structured error (3-tuple shape)" do
+    test "adds a frame to a structured error (3-tuple shape)" do
       error = %Error{category: :protocol_violation, kind: :incorrect_recipient_participant}
       frame = {:call, {:foo, 2}, [line: 7]}
 
@@ -85,14 +85,14 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
                Bind.with_frame({:error, error, %{}}, frame)
     end
 
-    test "prepends a frame onto a structured error (2-tuple shape)" do
+    test "adds a frame to a structured error (2-tuple shape)" do
       error = %Error{category: :protocol_violation, kind: :incorrect_recipient_participant}
       frame = {:clause, {:foo, 4}, 2}
 
       assert {:error, %Error{trace: [^frame]}} = Bind.with_frame({:error, error}, frame)
     end
 
-    test "prepends frames innermost-first" do
+    test "appends frames so the trace reads innermost-first" do
       error = %Error{
         category: :protocol_violation,
         kind: :incorrect_recipient_participant,
@@ -101,7 +101,7 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
 
       outer = {:clause, {:outer, 4}, 1}
 
-      assert {:error, %Error{trace: [^outer, {:call, {:inner, 1}, []}]}} =
+      assert {:error, %Error{trace: [{:call, {:inner, 1}, []}, ^outer]}} =
                Bind.with_frame({:error, error}, outer)
     end
 

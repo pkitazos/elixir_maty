@@ -101,17 +101,18 @@ defmodule Maty.Typechecker.TC.Bind do
   def lift_bool(false, error, env, _st), do: error(error, env)
 
   @doc """
-  Prepend a context frame (see `Maty.Typechecker.Error.frame/0`) onto any
+  Append a context frame (see `Maty.Typechecker.Error.frame/0`) to any
   structured error bubbling through this result, so the reporting site can
-  show the propagation path.
+  show the propagation path. Frames are added as the error bubbles up, so the
+  trace reads innermost first.
   """
   @spec with_frame(t(a) | {:error, term()} | :ok, Error.frame()) :: t(a) | {:error, term()} | :ok
         when a: var
   def with_frame({:error, %Error{} = e, env}, frame),
-    do: {:error, %{e | trace: [frame | e.trace]}, env}
+    do: {:error, %{e | trace: e.trace ++ [frame]}, env}
 
   def with_frame({:error, %Error{} = e}, frame),
-    do: {:error, %{e | trace: [frame | e.trace]}}
+    do: {:error, %{e | trace: e.trace ++ [frame]}}
 
   def with_frame(other, _frame), do: other
 end

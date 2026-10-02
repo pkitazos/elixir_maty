@@ -465,5 +465,30 @@ defmodule Maty.Typechecker.CompileErrorTest do
       # the line of one of the two specs
       assert error.line in [line_of(src, "@spec f(number())"), line_of(src, "@spec f(binary())")]
     end
+
+    test "the trace lists frames innermost first" do
+      # the failing branch is inside a case, which is itself an argument of the call to f/1
+      src =
+        seller_src("TraceOrder", """
+        #{@valid_handlers}
+
+        @spec f(number()) :: number()
+        def f(x), do: x
+
+        @spec g(number()) :: number()
+        def g(x) do
+          f(
+            case x do
+              1 -> 1 + "a"
+              _ -> 2
+            end
+          )
+        end
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ ~r/Trace:\n\s+in case branch #1 .*\n\s+via f\/1/
+    end
   end
 end

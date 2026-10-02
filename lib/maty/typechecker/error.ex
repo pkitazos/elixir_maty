@@ -3,7 +3,7 @@ defmodule Maty.Typechecker.Error do
   defstruct [:category, :kind, :module, :handler, meta: [], details: %{}, st: nil, trace: []]
 
   @typedoc """
-  A context frame pushed onto an error's `trace` as it bubbles up through the
+  A context frame added to an error's `trace` as it bubbles up through the
   typechecker, innermost first. Rendered by `Maty.Typechecker.Error.Formatter`.
   """
   @type frame ::
@@ -35,7 +35,7 @@ defmodule Maty.Typechecker.Error do
           details: map(),
           # carried so the Formatter can call Maty.ST.repr/1 & get_action/1
           st: Maty.ST.t() | nil,
-          # context frames, innermost first (prepended on bubble-up)
+          # context frames, innermost first (appended on bubble-up)
           trace: [frame()]
         }
 
