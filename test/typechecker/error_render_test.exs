@@ -152,7 +152,7 @@ defmodule Maty.Typechecker.ErrorRenderTest do
 
       # :pattern_matching
       {{Error.PatternMatching, :conflicting_pattern_bindings},
-       Error.PatternMatching.conflicting_pattern_bindings(@m, @meta, "x, y")},
+       Error.PatternMatching.conflicting_pattern_bindings(@m, @meta, [:x, :y])},
       {{Error.PatternMatching, :pattern_type_mismatch},
        Error.PatternMatching.pattern_type_mismatch(@m, @meta,
          pattern: 1,

@@ -1,7 +1,8 @@
 defmodule Maty.Typechecker.Error.PatternMatching do
   alias Maty.Typechecker.Error
 
-  def conflicting_pattern_bindings(module, meta, conflicting_vars) do
+  def conflicting_pattern_bindings(module, meta, conflicting_vars)
+      when is_list(conflicting_vars) do
     %Error{
       category: :pattern_matching,
       kind: :conflicting_pattern_bindings,

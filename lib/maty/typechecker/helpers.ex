@@ -113,7 +113,7 @@ defmodule Maty.Typechecker.Helpers do
       updated_env = Map.merge(current_env, merged_new_bindings)
       {:ok, merged_new_bindings, updated_env}
     else
-      conflicting_vars = Enum.join(intersection, ", ")
+      conflicting_vars = intersection |> MapSet.to_list() |> Enum.sort()
       error = Error.PatternMatching.conflicting_pattern_bindings(module, meta, conflicting_vars)
       {:error, error, current_env}
     end

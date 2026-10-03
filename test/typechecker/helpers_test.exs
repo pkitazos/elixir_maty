@@ -166,7 +166,8 @@ defmodule Maty.Typechecker.HelpersTest do
 
       assert %Maty.Typechecker.Error{
                category: :pattern_matching,
-               kind: :conflicting_pattern_bindings
+               kind: :conflicting_pattern_bindings,
+               details: %{conflicting_vars: [:x]}
              } = msg
     end
 

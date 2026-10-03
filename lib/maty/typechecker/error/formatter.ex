@@ -407,7 +407,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     Pattern Matching Error: Conflicting Pattern Bindings
       Line: #{e.meta[:line]}
       --
-      Conflicting variables: #{conflicting_vars}
+      Conflicting variables: #{Enum.join(conflicting_vars, ", ")}
       --
       The same variable is bound multiple times in this pattern, which is not allowed.
     """
