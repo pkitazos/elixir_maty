@@ -94,12 +94,11 @@ defmodule Maty.Typechecker.PatternBinding do
         {:ok, %{}, var_env}
 
       _ ->
-        # todo: fix the `got` value
         error =
           Error.PatternMatching.pattern_type_mismatch(ctx.module, ctx.meta,
             pattern: [],
             expected: expected_type,
-            got: "{:list, :any}"
+            got: {:list, :any}
           )
 
         {:error, error, var_env}
@@ -107,7 +106,7 @@ defmodule Maty.Typechecker.PatternBinding do
   end
 
   # Pat-EmptyTuple: Pattern is '{}'
-  deftc tc_pattern(ctx, {:{}, _, []}, expected_type, var_env) do
+  deftc tc_pattern(ctx, {:{}, _, []} = pattern_ast, expected_type, var_env) do
     case expected_type do
       {:tuple, []} ->
         {:ok, %{}, var_env}
@@ -118,9 +117,9 @@ defmodule Maty.Typechecker.PatternBinding do
       _ ->
         error =
           Error.PatternMatching.pattern_type_mismatch(ctx.module, ctx.meta,
-            pattern: {},
+            pattern: pattern_ast,
             expected: expected_type,
-            got: "{:tuple, []}"
+            got: {:tuple, []}
           )
 
         {:error, error, var_env}
@@ -128,7 +127,7 @@ defmodule Maty.Typechecker.PatternBinding do
   end
 
   # Pat-EmptyMap: Pattern is '%{}'
-  deftc tc_pattern(ctx, {:%{}, _, []}, expected_type, var_env) do
+  deftc tc_pattern(ctx, {:%{}, _, []} = pattern_ast, expected_type, var_env) do
     case expected_type do
       {:map, _} ->
         {:ok, %{}, var_env}
@@ -139,9 +138,9 @@ defmodule Maty.Typechecker.PatternBinding do
       _ ->
         error =
           Error.PatternMatching.pattern_type_mismatch(ctx.module, ctx.meta,
-            pattern: %{},
+            pattern: pattern_ast,
             expected: expected_type,
-            got: "{:map, %{}}"
+            got: {:map, %{}}
           )
 
         {:error, error, var_env}
@@ -151,7 +150,7 @@ defmodule Maty.Typechecker.PatternBinding do
   # --- Recursive Pattern Clauses ---
 
   # Pat-Cons
-  deftc tc_pattern(ctx, {:|, meta, [p1_ast, p2_ast]}, expected_type, var_env) do
+  deftc tc_pattern(ctx, {:|, meta, [p1_ast, p2_ast]} = cons_ast, expected_type, var_env) do
     case expected_type do
       {:list, element_type} ->
         with {:p1, {:ok, bindings1, env1}} <-
@@ -173,9 +172,9 @@ defmodule Maty.Typechecker.PatternBinding do
       other_type ->
         error =
           Error.PatternMatching.pattern_type_mismatch(ctx.module, meta,
-            pattern: "[h|t]",
-            expected: "List",
-            got: other_type
+            pattern: [cons_ast],
+            expected: other_type,
+            got: {:list, :any}
           )
 
         {:error, error, var_env}
@@ -198,8 +197,8 @@ defmodule Maty.Typechecker.PatternBinding do
 
         error =
           Error.PatternMatching.tuple_arity_mismatch(ctx.module, meta,
-            pattern_arity: length(other_types),
-            expected: 2
+            pattern_arity: 2,
+            expected: length(other_types)
           )
 
         {:error, error, var_env}
@@ -207,7 +206,12 @@ defmodule Maty.Typechecker.PatternBinding do
       {:type, other_type} ->
         meta = Helpers.extract_meta_from_pattern(pattern_ast)
 
-        error = Error.PatternMatching.pattern_not_tuple(ctx.module, meta, got: other_type)
+        error =
+          Error.PatternMatching.pattern_type_mismatch(ctx.module, meta,
+            pattern: pattern_ast,
+            expected: other_type,
+            got: {:tuple, [:any, :any]}
+          )
 
         {:error, error, var_env}
 
@@ -222,7 +226,7 @@ defmodule Maty.Typechecker.PatternBinding do
     end
   end
 
-  deftc tc_pattern(ctx, {:{}, meta, elements_asts}, expected_type, var_env) do
+  deftc tc_pattern(ctx, {:{}, meta, elements_asts} = pattern_ast, expected_type, var_env) do
     case expected_type do
       {:tuple, expected_types} when length(elements_asts) == length(expected_types) ->
         # process elements sequentially, checking disjointedness at each step
@@ -262,12 +266,10 @@ defmodule Maty.Typechecker.PatternBinding do
         end
 
       {:tuple, expected_types} ->
-        # todo: rethink this
         error =
-          Error.PatternMatching.pattern_arity_mismatch(ctx.module, meta,
-            pattern: "Tuple",
-            expected: length(expected_types),
-            got: length(elements_asts)
+          Error.PatternMatching.tuple_arity_mismatch(ctx.module, meta,
+            pattern_arity: length(elements_asts),
+            expected: length(expected_types)
           )
 
         {:error, error, var_env}
@@ -275,9 +277,9 @@ defmodule Maty.Typechecker.PatternBinding do
       other_type ->
         error =
           Error.PatternMatching.pattern_type_mismatch(ctx.module, meta,
-            pattern: "{...}",
-            expected: "Tuple",
-            got: other_type
+            pattern: pattern_ast,
+            expected: other_type,
+            got: {:tuple, Enum.map(elements_asts, fn _ -> :any end)}
           )
 
         {:error, error, var_env}
@@ -286,7 +288,7 @@ defmodule Maty.Typechecker.PatternBinding do
 
   # Pat-Map
   # Assuming keys k_i are literal atoms.
-  deftc tc_pattern(ctx, {:%{}, meta, pairs}, expected_type, var_env) do
+  deftc tc_pattern(ctx, {:%{}, meta, pairs} = pattern_ast, expected_type, var_env) do
     case expected_type do
       {:map, expected_type_map} ->
         initial_acc = {:ok, %{}, var_env}
@@ -348,9 +350,9 @@ defmodule Maty.Typechecker.PatternBinding do
       other_type ->
         error =
           Error.PatternMatching.pattern_type_mismatch(ctx.module, meta,
-            pattern: "%{...}",
-            expected: "Map",
-            got: other_type
+            pattern: pattern_ast,
+            expected: other_type,
+            got: {:map, for({key, _value} <- pairs, is_atom(key), into: %{}, do: {key, :any})}
           )
 
         {:error, error, var_env}

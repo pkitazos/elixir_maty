@@ -21,16 +21,6 @@ defmodule Maty.Typechecker.Error.PatternMatching do
     }
   end
 
-  def pattern_arity_mismatch(module, meta, pattern: pattern_type, expected: expected, got: got) do
-    %Error{
-      category: :pattern_matching,
-      kind: :pattern_arity_mismatch,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{pattern_type: pattern_type, expected: expected, got: got}
-    }
-  end
-
   def tuple_arity_mismatch(module, meta, pattern_arity: pattern_arity, expected: expected) do
     %Error{
       category: :pattern_matching,
@@ -38,16 +28,6 @@ defmodule Maty.Typechecker.Error.PatternMatching do
       module: module,
       meta: Keyword.take(meta, [:line, :column]),
       details: %{pattern_arity: pattern_arity, expected: expected}
-    }
-  end
-
-  def pattern_not_tuple(module, meta, got: got_type) do
-    %Error{
-      category: :pattern_matching,
-      kind: :pattern_not_tuple,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{got: got_type}
     }
   end
 

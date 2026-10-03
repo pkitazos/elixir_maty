@@ -428,21 +428,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :pattern_matching, kind: :pattern_arity_mismatch} = e) do
-    %{pattern_type: pattern_type, expected: expected, got: got} = e.details
-
-    """
-    Pattern Matching Error: Pattern Arity Mismatch
-      Line: #{e.meta[:line]}
-      --
-      Pattern type: #{pattern_type}
-      Expected arity: #{expected}
-      Got arity: #{got}
-      --
-      The pattern has a different number of elements than expected.
-    """
-  end
-
   defp render(%Error{category: :pattern_matching, kind: :tuple_arity_mismatch} = e) do
     %{pattern_arity: pattern_arity, expected: expected} = e.details
 
@@ -454,21 +439,6 @@ defmodule Maty.Typechecker.Error.Formatter do
       Expected: #{expected}-tuple
       --
       The tuple pattern has #{pattern_arity} elements but expected #{expected} elements.
-    """
-  end
-
-  defp render(%Error{category: :pattern_matching, kind: :pattern_not_tuple} = e) do
-    %{got: got} = e.details
-
-    """
-    Pattern Matching Error: Pattern Type Mismatch
-      Line: #{e.meta[:line]}
-      --
-      Pattern: 2-tuple
-      Expected: tuple
-      Got: #{render_type(got)}
-      --
-      Expected a tuple but got a different type.
     """
   end
 
@@ -841,12 +811,7 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render_atom(elt) when is_atom(elt), do: ":#{elt}"
   defp render_atom(elt), do: "#{inspect(elt)}"
 
-  defp render_pattern(pattern) when is_atom(pattern), do: ":#{pattern}"
-  defp render_pattern(pattern) when is_binary(pattern), do: "\"#{pattern}\""
-  defp render_pattern(pattern) when is_number(pattern), do: "#{pattern}"
-  defp render_pattern(pattern) when is_boolean(pattern), do: "#{pattern}"
-  defp render_pattern(nil), do: "nil"
-  defp render_pattern(pattern), do: "#{inspect(pattern)}"
+  defp render_pattern(pattern), do: Macro.to_string(pattern)
 
   defp render_type(type) when is_atom(type), do: ":#{type}"
   defp render_type(type), do: "#{inspect(type)}"

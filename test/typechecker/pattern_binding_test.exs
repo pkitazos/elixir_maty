@@ -167,7 +167,8 @@ defmodule Maty.Typechecker.PatternBindingTest do
     test "fails against non-tuple type" do
       pattern = {var(:a), var(:b)}
       assert {:error, msg, %{}} = PatternBinding.tc_pattern(@ctx, pattern, :number, %{})
-      assert %Error{category: :pattern_matching, kind: :pattern_not_tuple} = msg
+      assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
+      assert %{expected: :number, got: {:tuple, [:any, :any]}} = msg.details
     end
 
     test "fails with wrong arity" do
@@ -182,6 +183,8 @@ defmodule Maty.Typechecker.PatternBindingTest do
                )
 
       assert %Error{category: :pattern_matching, kind: :tuple_arity_mismatch} = msg
+      # the pattern is the 2-tuple, the type is the 3-tuple
+      assert %{pattern_arity: 2, expected: 3} = msg.details
     end
 
     test "nested tuple" do
@@ -232,7 +235,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
                  %{}
                )
 
-      assert %Error{category: :pattern_matching, kind: :pattern_arity_mismatch} = msg
+      assert %Error{category: :pattern_matching, kind: :tuple_arity_mismatch} = msg
     end
 
     test "non-tuple expected type" do
