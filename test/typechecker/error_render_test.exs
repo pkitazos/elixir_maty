@@ -43,7 +43,12 @@ defmodule Maty.Typechecker.ErrorRenderTest do
       {{Error.ProtocolViolation, :message_handler_not_receive},
        Error.ProtocolViolation.message_handler_not_receive(@m, @meta, :title_handler, @st_out)},
       {{Error.ProtocolViolation, :incorrect_action},
-       Error.ProtocolViolation.incorrect_action(@m, @meta, [got: :send], @st_in)},
+       Error.ProtocolViolation.incorrect_action(
+         @m,
+         @meta,
+         [got: {:send, [:seller, {:title, "a title"}]}],
+         @st_in
+       )},
       {{Error.ProtocolViolation, :incorrect_recipient_participant},
        Error.ProtocolViolation.incorrect_recipient_participant(@m, @meta, :title_handler, @st_in,
          received: :buyer2,

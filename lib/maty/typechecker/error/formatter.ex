@@ -59,7 +59,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     Protocol Violation: Incorrect Action
       Line: #{e.meta[:line]}
       --
-      Tried: #{got}
+      Tried: #{render_action(got)}
       Current permitted actions: #{actions}
       --
       Session Type: #{Maty.ST.repr(e.st)}
@@ -765,6 +765,10 @@ defmodule Maty.Typechecker.Error.Formatter do
       #{e.details[:message]}
     """
   end
+
+  # todo: add `@spec`
+  defp render_action({action, args}),
+    do: "MatyDSL.#{action}(#{Enum.map_join(args, ", ", &Macro.to_string/1)})"
 
   # an Error.Cause as {title, details line(s), explanation}, for the parent error's render clause
   defp render_cause(%Error.Cause{kind: :unsupported_type_constructor, details: %{type_ast: ast}}) do

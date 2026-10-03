@@ -532,14 +532,13 @@ defmodule Maty.Typechecker.TC do
           ctx,
           env,
           st,
-          {{:., meta, [Maty.DSL, :internal_send]}, _, [_session_ctx, recipient_ast, _message_ast]}
+          {{:., meta, [Maty.DSL, :internal_send]}, _, [_session_ctx, recipient_ast, message_ast]}
         ) do
     error(
       Error.ProtocolViolation.incorrect_action(
         ctx.module,
         meta,
-        # todo: try to render shape of message
-        [got: "MatyDSL.send(:#{recipient_ast}, message)"],
+        [got: {:send, [recipient_ast, message_ast]}],
         st
       ),
       env
@@ -617,7 +616,7 @@ defmodule Maty.Typechecker.TC do
           env,
           st,
           {{:., _, [:erlang, :throw]}, _,
-           [{:{}, meta, [:suspend, handler_ast, {state_var, _, _} = state_ast]}]}
+           [{:{}, meta, [:suspend, handler_ast, {_state_var, _, _} = state_ast]}]}
         ) do
     thread do
       handler_type
@@ -676,7 +675,7 @@ defmodule Maty.Typechecker.TC do
             Error.ProtocolViolation.incorrect_action(
               ctx.module,
               meta,
-              [got: "MatyDSL.suspend(:#{handler_ast}, #{state_var})"],
+              [got: {:suspend, [handler_ast, state_ast]}],
               other_st
             ),
             env
@@ -712,7 +711,7 @@ defmodule Maty.Typechecker.TC do
           ctx,
           env,
           st,
-          {{:., _, [:erlang, :throw]}, meta, [done: {state_var, _, _} = state_ast]}
+          {{:., _, [:erlang, :throw]}, meta, [done: {_state_var, _, _} = state_ast]}
         ) do
     thread do
       state_type
@@ -746,7 +745,7 @@ defmodule Maty.Typechecker.TC do
             Error.ProtocolViolation.incorrect_action(
               ctx.module,
               meta,
-              [got: "MatyDSL.done(#{state_var})"],
+              [got: {:done, [state_ast]}],
               other_st
             ),
             env
