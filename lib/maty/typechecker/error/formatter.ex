@@ -170,15 +170,15 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  # todo: add line
   defp render(%Error{category: :protocol_violation, kind: :incorrect_choice_implementation} = e) do
     %{missing_branches: missing_branches} = e.details
 
     """
     Protocol Violation: Incomplete Message Handler Implementation
       Handler: #{e.handler}
+      Line: #{e.meta[:line]}
       --
-      Missing implementation for branches: #{missing_branches}
+      Missing implementation for branches: #{Maty.ST.repr(%{e.st | branches: missing_branches})}
       --
       Session Type: #{Maty.ST.repr(e.st)}
     """
@@ -565,6 +565,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     Function Call Error: Wrong Number of Clauses
       Function: #{func_str}
+      Line: #{e.meta[:line]}
       --
       Expected clauses: #{expected}
       Got clauses: #{got}
@@ -580,6 +581,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     Function Call Error: Wrong Number of Specs
       Function: #{func_str}
+      Line: #{e.meta[:line]}
       --
       Expected specs: #{expected}
       Got specs: #{got}

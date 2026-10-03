@@ -98,7 +98,7 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          @m,
          @meta,
          :title_handler,
-         Maty.ST.repr(@st_in),
+         @st_in.branches,
          @st_in
        )},
       {{Error.ProtocolViolation, :suspend_invalid_handler_type},

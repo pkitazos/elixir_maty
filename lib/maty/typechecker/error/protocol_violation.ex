@@ -157,7 +157,9 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     }
   end
 
-  def incorrect_choice_implementation(module, meta, handler, missing_branches, st) do
+  # todo: add @spec
+  def incorrect_choice_implementation(module, meta, handler, missing_branches, st)
+      when is_list(missing_branches) do
     %Error{
       category: :protocol_violation,
       kind: :incorrect_choice_implementation,

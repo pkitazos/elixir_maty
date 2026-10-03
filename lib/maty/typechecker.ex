@@ -204,16 +204,13 @@ defmodule Maty.Typechecker do
                   # more clauses than branches is fine as long as every branch is covered
                   res ++ acc
                 else
-                  # we format the missing branches into their string representation
-                  missing_st = Maty.ST.repr(%{handler_M.st | branches: missing_branches})
-
-                  # and report an error stating that we have violated the protocol definition
+                  # report an error stating that we have violated the protocol definition
                   error_msg =
                     Error.ProtocolViolation.incorrect_choice_implementation(
                       env.module,
                       def_meta,
                       handler_name,
-                      missing_st,
+                      missing_branches,
                       handler_M.st
                     )
 
