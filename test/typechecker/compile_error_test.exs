@@ -201,8 +201,10 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
       error = compile_error!(src)
 
+      assert error.description =~ "[maty] 1 type error in"
       assert error.description =~ "Wrong Number of Clauses"
       # the first on_link clause, not the line of the module
+      assert own_line(error) == 9
       assert error.line == 9
     end
 
@@ -693,8 +695,6 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Wrong Number of Specs"
       assert error.description =~ "Expected specs: 1 or 3"
       assert error.description =~ "Got specs: 2"
-      # a problem with the function as a whole, so it is not attributed to a clause
-      refute error.description =~ "in clause"
       assert error.line == line_of(src, "def f(1)")
     end
 
@@ -738,6 +738,26 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
       assert length(String.split(error.description, "Missing Function Spec")) == 2
       refute error.description =~ "in clause"
+    end
+
+    test "spec errors and handler annotation errors are reported together" do
+      src =
+        seller_src("SpecAndAnnotationErrors", """
+        #{@valid_handlers}
+
+        handler :no_such_session_type, :buyer2, {:quit, nil}, state do
+          MatyDSL.done(state)
+        end
+
+        @spec f(wat()) :: number()
+        def f(_x), do: 1
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "[maty] 2 type errors in"
+      assert error.description =~ "Missing Handler"
+      assert error.description =~ "Invalid Spec Argument"
     end
   end
 end
