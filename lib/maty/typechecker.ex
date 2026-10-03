@@ -410,7 +410,12 @@ defmodule Maty.Typechecker do
 
   @spec raise_type_errors!(Macro.Env.t(), [{term(), Error.t()}]) :: no_return()
   defp raise_type_errors!(env, errors) do
-    description = Enum.map_join(errors, "\n", &display_error/1)
+    count = length(errors)
+
+    header =
+      "[#{@app}] #{count} type #{if count == 1, do: "error", else: "errors"} in #{inspect(env.module)}"
+
+    description = header <> "\n\n" <> Enum.map_join(errors, "\n", &display_error/1)
     line = Enum.find_value(errors, fn {_func_id, error} -> error_line_or(error, env.line) end)
 
     raise CompileError, file: env.file, line: line, description: description

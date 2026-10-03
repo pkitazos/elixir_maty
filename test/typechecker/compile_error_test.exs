@@ -2,7 +2,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
   use ExUnit.Case
 
   defp compile_error!(src) do
-    assert_raise CompileError, ~r/ElixirMatyTypeError/, fn ->
+    assert_raise CompileError, ~r/\[maty\]/, fn ->
       Code.with_diagnostics(fn -> Code.compile_string(src) end)
     end
   end

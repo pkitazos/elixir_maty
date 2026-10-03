@@ -17,8 +17,7 @@ defmodule Maty.Typechecker.Error.Formatter do
   # todo: potentially rename
   defp render(%Error{category: :protocol_violation, kind: :missing_handler} = e) do
     """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Missing Handler
-      Module: #{e.module}
+    Protocol Violation: Missing Handler
       Handler: #{e.handler}
       Line: #{e.meta[:line]}
       --
@@ -28,8 +27,7 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render(%Error{category: :protocol_violation, kind: :init_handler_starts_with_receive} = e) do
     """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Init Handler Starts With a Receive
-      Module: #{e.module}
+    Protocol Violation: Init Handler Starts With a Receive
       Handler: #{e.handler}
       Line: #{e.meta[:line]}
       --
@@ -42,8 +40,7 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render(%Error{category: :protocol_violation, kind: :message_handler_not_receive} = e) do
     """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Message Handler Does Not Receive
-      Module: #{e.module}
+    Protocol Violation: Message Handler Does Not Receive
       Handler: #{e.handler}
       Line: #{e.meta[:line]}
       --
@@ -59,8 +56,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     actions = Maty.ST.get_action(e.st)
 
     """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Action
-      Module: #{e.module}
+    Protocol Violation: Incorrect Action
       Line: #{e.meta[:line]}
       --
       Tried: #{got}
@@ -70,13 +66,11 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  # todo: add line
   defp render(%Error{category: :protocol_violation, kind: :incorrect_recipient_participant} = e) do
     %{received: received, declared: declared, expected: expected} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Incoming Participant
-      Module: #{e.module}
+    Protocol Violation: Incorrect Incoming Participant
       Handler: #{e.handler}
       Line: #{e.meta[:line]}
       --
@@ -88,14 +82,12 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  # todo: add line
   defp render(%Error{category: :protocol_violation, kind: :incorrect_incoming_message_label} = e) do
     %{got: label_received, expected: labels_expected} = e.details
     acceptable_labels = labels_expected |> Enum.map(&render_atom/1) |> Enum.join(" | ")
 
     """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Incoming Message Label
-      Module: #{e.module}
+    Protocol Violation: Incorrect Incoming Message Label
       Handler: #{e.handler}
       Line: #{e.meta[:line]}
       --
@@ -106,13 +98,11 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  # todo: add line
   defp render(%Error{category: :protocol_violation, kind: :incorrect_incoming_payload_type} = e) do
     %{got: payload_received, expected: payload_expected} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Incoming Payload Type
-      Module: #{e.module}
+    Protocol Violation: Incorrect Incoming Payload Type
       Handler: #{e.handler}
       Line: #{e.meta[:line]}
       --
@@ -127,8 +117,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{got: role_received, expected: role_expected} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Target Participant
-      Module: #{e.module}
+    Protocol Violation: Incorrect Target Participant
       Line: #{e.meta[:line]}
       --
       Got: #{render_atom(role_received)}
@@ -142,8 +131,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{got: handler_received, expected: handler_expected} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Handler Suspension
-      Module: #{e.module}
+    Protocol Violation: Incorrect Handler Suspension
       Line: #{e.meta[:line]}
       --
       Got: #{render_atom(handler_received)}
@@ -158,8 +146,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     acceptable_labels = labels_expected |> Enum.map(&render_atom/1) |> Enum.join(" | ")
 
     """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Message Label
-      Module: #{e.module}
+    Protocol Violation: Incorrect Message Label
       Line: #{e.meta[:line]}
       --
       Got: #{render_atom(label_received)}
@@ -173,8 +160,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{got: payload_received, expected: payload_expected} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incorrect Payload Type
-      Module: #{e.module}
+    Protocol Violation: Incorrect Payload Type
       Line: #{e.meta[:line]}
       --
       Got: #{render_atom(payload_received)}
@@ -189,8 +175,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{missing_branches: missing_branches} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Incomplete Message Handler Implementation
-      Module: #{e.module}
+    Protocol Violation: Incomplete Message Handler Implementation
       Handler: #{e.handler}
       --
       Missing implementation for branches: #{missing_branches}
@@ -203,8 +188,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{got: got} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Suspended with Invalid Handler
-      Module: #{e.module}
+    Protocol Violation: Suspended with Invalid Handler
       Line: #{e.meta[:line]}
       --
       Tried: #{got}
@@ -218,7 +202,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{from: from, to: to} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Case Scrutinee Altered Session State
+    Protocol Violation: Case Scrutinee Altered Session State
       Line: #{e.meta[:line]}
       --
       The scrutinee of a case expression must not perform any session actions.
@@ -231,7 +215,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{got_return: got_return} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Protocol Violation: Handler Did Not Terminate the Session
+    Protocol Violation: Handler Did Not Terminate the Session
       Handler: #{e.handler}
       Line: #{e.meta[:line]}
       --
@@ -247,8 +231,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{operator: operator, operand_type: operand_type} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Type Mismatch Error: Logical Operator Type Error
-      Module: #{e.module}
+    Type Mismatch Error: Logical Operator Type Error
       Line: #{e.meta[:line]}
       --
       Operator: #{render_operator(operator)}
@@ -263,8 +246,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{expected: expected, got: got} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Type Mismatch Error: Return Type Mismatch
-      Module: #{e.module}
+    Type Mismatch Error: Return Type Mismatch
       Line: #{e.meta[:line]}
       --
       Expected return type: #{render_type(expected)}
@@ -278,8 +260,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{operator: operator, lhs: lhs_type, rhs: rhs_type} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Type Mismatch Error: Binary Operator Type Error
-      Module: #{e.module}
+    Type Mismatch Error: Binary Operator Type Error
       Line: #{e.meta[:line]}
       --
       Operator: #{render_operator(operator)}
@@ -294,8 +275,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{operator: operator, lhs: lhs_type, rhs: rhs_type} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Type Mismatch Error: Logical Operator Type Error
-      Module: #{e.module}
+    Type Mismatch Error: Logical Operator Type Error
       Line: #{e.meta[:line]}
       --
       Operator: #{render_operator(operator)}
@@ -312,8 +292,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     formatted_types = element_types |> Enum.map(&render_type/1) |> Enum.join(", ")
 
     """
-    \n\n** (ElixirMatyTypeError) Type Mismatch Error: Incompatible List Elements
-      Module: #{e.module}
+    Type Mismatch Error: Incompatible List Elements
       Line: #{e.meta[:line]}
       --
       Element types found: #{formatted_types}
@@ -353,8 +332,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     lines = Enum.join(type_lines ++ session_lines, "\n")
 
     """
-    \n\n** (ElixirMatyTypeError) Type Mismatch Error: Incompatible Case Branches
-      Module: #{e.module}
+    Type Mismatch Error: Incompatible Case Branches
       Line: #{e.meta[:line]}
       --
     #{lines}
@@ -367,8 +345,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{cause: %Error.Cause{title: title, opts: opts, message: message}} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Type Mismatch Error: #{title}
-      Module: #{e.module}
+    Type Mismatch Error: #{title}
       Line: #{e.meta[:line]}
       --
       #{opts}
@@ -382,8 +359,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     expected_str = expected |> List.wrap() |> Enum.map_join(" | ", &render_type/1)
 
     """
-    \n\n** (ElixirMatyTypeError) Type Mismatch Error: Built-in Argument Type
-      Module: #{e.module}
+    Type Mismatch Error: Built-in Argument Type
       Line: #{e.meta[:line]}
       --
       Function: #{function}
@@ -398,8 +374,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{argument: argument, expected: expected, got: got} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Type Mismatch Error: Register Argument Type
-      Module: #{e.module}
+    Type Mismatch Error: Register Argument Type
       Line: #{e.meta[:line]}
       --
       Argument: #{render_register_argument(argument)}
@@ -414,8 +389,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{got: message_ast} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Type Mismatch Error: Send Message Not Tuple
-      Module: #{e.module}
+    Type Mismatch Error: Send Message Not Tuple
       Line: #{e.meta[:line]}
       --
       Expected: Tagged tuple message {label, payload}
@@ -429,8 +403,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{conflicting_vars: conflicting_vars} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Conflicting Pattern Bindings
-      Module: #{e.module}
+    Pattern Matching Error: Conflicting Pattern Bindings
       Line: #{e.meta[:line]}
       --
       Conflicting variables: #{conflicting_vars}
@@ -443,8 +416,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{pattern: pattern, expected: expected, got: got} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Pattern Type Mismatch
-      Module: #{e.module}
+    Pattern Matching Error: Pattern Type Mismatch
       Line: #{e.meta[:line]}
       --
       Pattern: #{render_pattern(pattern)}
@@ -459,8 +431,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{pattern_type: pattern_type, expected: expected, got: got} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Pattern Arity Mismatch
-      Module: #{e.module}
+    Pattern Matching Error: Pattern Arity Mismatch
       Line: #{e.meta[:line]}
       --
       Pattern type: #{pattern_type}
@@ -475,8 +446,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{pattern_arity: pattern_arity, expected: expected} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Tuple Arity Mismatch
-      Module: #{e.module}
+    Pattern Matching Error: Tuple Arity Mismatch
       Line: #{e.meta[:line]}
       --
       Pattern: #{pattern_arity}-tuple
@@ -490,8 +460,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{got: got} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Pattern Type Mismatch
-      Module: #{e.module}
+    Pattern Matching Error: Pattern Type Mismatch
       Line: #{e.meta[:line]}
       --
       Pattern: 2-tuple
@@ -506,8 +475,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{key_ast: key_ast} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Complex Map Key
-      Module: #{e.module}
+    Pattern Matching Error: Complex Map Key
       Line: #{e.meta[:line]}
       --
       Key expression: #{inspect(key_ast)}
@@ -520,8 +488,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{got: got, expected: expected} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Invalid Map Key Type
-      Module: #{e.module}
+    Pattern Matching Error: Invalid Map Key Type
       Line: #{e.meta[:line]}
       --
       Expected key type: #{render_type(expected)}
@@ -535,8 +502,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{missing_key: missing_key} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Map Key Not Found
-      Module: #{e.module}
+    Pattern Matching Error: Map Key Not Found
       Line: #{e.meta[:line]}
       --
       Missing key: #{render_pattern(missing_key)}
@@ -549,8 +515,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{key_ast: key_ast} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Pattern Matching Error: Map Key Not Atom
-      Module: #{e.module}
+    Pattern Matching Error: Map Key Not Atom
       Line: #{e.meta[:line]}
       --
       Key expression: #{inspect(key_ast)}
@@ -566,8 +531,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     func_str = Utils.to_func(func_id)
 
     """
-    \n\n** (ElixirMatyTypeError) Function Call Error: Function Does Not Exist
-      Module: #{e.module}
+    Function Call Error: Function Does Not Exist
       Line: #{e.meta[:line]}
       --
       Function: #{func_str}
@@ -581,8 +545,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     func_str = Utils.to_func(func_id)
 
     """
-    \n\n** (ElixirMatyTypeError) Function Call Error: Arity Mismatch
-      Module: #{e.module}
+    Function Call Error: Arity Mismatch
       Line: #{e.meta[:line]}
       --
       Function: #{func_str}
@@ -599,8 +562,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     formatted_args = arg_types |> Enum.map(&render_type/1) |> Enum.join(", ")
 
     """
-    \n\n** (ElixirMatyTypeError) Function Call Error: No Matching Function Clause
-      Module: #{e.module}
+    Function Call Error: No Matching Function Clause
       Line: #{e.meta[:line]}
       --
       Function: #{func_str}
@@ -615,8 +577,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     func_str = Utils.to_func(func_id)
 
     """
-    \n\n** (ElixirMatyTypeError) Function Call Error: Function Altered Session State
-      Module: #{e.module}
+    Function Call Error: Function Altered Session State
       Line: #{e.meta[:line]}
       --
       Function: #{func_str}
@@ -631,8 +592,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     func_str = Utils.to_func(func_id)
 
     """
-    \n\n** (ElixirMatyTypeError) Function Call Error: Wrong Number of Clauses
-      Module: #{e.module}
+    Function Call Error: Wrong Number of Clauses
       Function: #{func_str}
       --
       Expected clauses: #{expected}
@@ -647,8 +607,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     func_str = Utils.to_func(func_id)
 
     """
-    \n\n** (ElixirMatyTypeError) Function Call Error: Wrong Number of Specs
-      Module: #{e.module}
+    Function Call Error: Wrong Number of Specs
       Function: #{func_str}
       --
       Expected specs: #{expected}
@@ -664,8 +623,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{cause: %Error.Cause{title: title, opts: opts, message: message}} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Type Specification Error: Invalid Session Type Annotation
-      Module: #{e.module}
+    Type Specification Error: Invalid Session Type Annotation
       Line: #{e.meta[:line]}
       --
       Handler: #{e.handler}
@@ -684,8 +642,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     func_str = Utils.to_func(func_id)
 
     """
-    \n\n** (ElixirMatyTypeError) Type Specification Error: Function Spec Mismatch
-      Module: #{e.module}
+    Type Specification Error: Function Spec Mismatch
       Line: #{e.meta[:line]}
       --
       @spec signature: #{spec_str}
@@ -703,8 +660,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     func_str = Utils.to_func(func_id)
 
     """
-    \n\n** (ElixirMatyTypeError) Type Specification Error: Invalid Spec Argument
-      Module: #{e.module}
+    Type Specification Error: Invalid Spec Argument
       Line: #{e.meta[:line]}
       --
       Function: #{func_str}
@@ -724,8 +680,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %Error.Cause{title: title, opts: opts, message: message} = cause
 
     """
-    \n\n** (ElixirMatyTypeError) Type Specification Error: Invalid Spec Return Type
-      Module: #{e.module}
+    Type Specification Error: Invalid Spec Return Type
       Line: #{e.meta[:line]}
       --
       Function: #{spec_name}
@@ -744,8 +699,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     func_str = Utils.to_func(func_id)
 
     """
-    \n\n** (ElixirMatyTypeError) Type Specification Error: Missing Function Spec
-      Module: #{e.module}
+    Type Specification Error: Missing Function Spec
       Line: #{e.meta[:line]}
       --
       Function: #{func_str}
@@ -760,8 +714,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{var: var} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Name Resolution Error: Unbound Variable
-      Module: #{e.module}
+    Name Resolution Error: Unbound Variable
       Line: #{e.meta[:line]}
       --
       Variable: #{var}
@@ -774,8 +727,7 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render(%Error{category: :framework_usage, kind: :missing_session_registration} = e) do
     """
-    \n\n** (ElixirMatyTypeError) Framework Usage Violation: Missing Session Registration
-      Module: #{e.module}
+    Framework Usage Violation: Missing Session Registration
       Line: #{e.meta[:line]}
       --
       Actor does not register in a session in the on_link/2 callback
@@ -786,8 +738,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{got: got} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Framework Usage Violation: Session State Altered in on_link
-      Module: #{e.module}
+    Framework Usage Violation: Session State Altered in on_link
       Line: #{e.meta[:line]}
       --
       The on_link/2 callback must not advance the session type.
@@ -799,8 +750,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{got: got} = e.details
 
     """
-    \n\n** (ElixirMatyTypeError) Framework Usage Violation: Invalid on_link Return
-      Module: #{e.module}
+    Framework Usage Violation: Invalid on_link Return
       Line: #{e.meta[:line]}
       --
       The on_link/2 callback must return {:ok, actor_state}.
@@ -810,8 +760,7 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render(%Error{category: :framework_usage, kind: :invalid_init_handler} = e) do
     """
-    \n\n** (ElixirMatyTypeError) Framework Usage Violation: Invalid Initialisation Handler
-      Module: #{e.module}
+    Framework Usage Violation: Invalid Initialisation Handler
       Line: #{e.meta[:line]}
       --
       Actor tries to register with an invalid initialisation handler.
@@ -820,8 +769,7 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render(%Error{category: :framework_usage, kind: :no_native_send} = e) do
     """
-    \n\n** (ElixirMatyTypeError) Framework Usage Violation: Attempted Native Communication
-      Module: #{e.module}
+    Framework Usage Violation: Attempted Native Communication
       Line: #{e.meta[:line]}
       --
       Actor attempted communication using send/2
@@ -830,8 +778,7 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render(%Error{category: :framework_usage, kind: :no_native_receive} = e) do
     """
-    \n\n** (ElixirMatyTypeError) Framework Usage Violation: Attempted Native Communication
-      Module: #{e.module}
+    Framework Usage Violation: Attempted Native Communication
       Line: #{e.meta[:line]}
       --
       Actor attempted communication using a receive block
@@ -842,7 +789,7 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render(%Error{category: :internal} = e) do
     """
-    \n\n** (ElixirMatyTypeError) Internal Error
+    Internal Error
       #{e.details[:message]}
     """
   end
