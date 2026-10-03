@@ -342,7 +342,8 @@ defmodule Maty.Typechecker.Error.Formatter do
   end
 
   defp render(%Error{category: :type_mismatch, kind: :invalid_maty_state_type} = e) do
-    %{cause: %Error.Cause{title: title, opts: opts, message: message}} = e.details
+    %{cause: cause} = e.details
+    {title, opts, message} = render_cause(cause)
 
     """
     Type Mismatch Error: #{title}
@@ -620,7 +621,8 @@ defmodule Maty.Typechecker.Error.Formatter do
   # --- :type_specification
 
   defp render(%Error{category: :type_specification, kind: :invalid_session_type_annotation} = e) do
-    %{cause: %Error.Cause{title: title, opts: opts, message: message}} = e.details
+    %{cause: cause} = e.details
+    {title, opts, message} = render_cause(cause)
 
     """
     Type Specification Error: Invalid Session Type Annotation
@@ -656,7 +658,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     %{func_id: func_id, failed_index: failed_index, args_asts: args_asts, cause: cause} =
       e.details
 
-    %Error.Cause{title: title, opts: opts, message: message} = cause
+    {title, opts, message} = render_cause(cause)
     func_str = Utils.to_func(func_id)
 
     """
@@ -677,7 +679,7 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render(%Error{category: :type_specification, kind: :spec_return_not_well_typed} = e) do
     %{spec_name: spec_name, return_ast: return_ast, cause: cause} = e.details
-    %Error.Cause{title: title, opts: opts, message: message} = cause
+    {title, opts, message} = render_cause(cause)
 
     """
     Type Specification Error: Invalid Spec Return Type
@@ -792,6 +794,28 @@ defmodule Maty.Typechecker.Error.Formatter do
     Internal Error
       #{e.details[:message]}
     """
+  end
+
+  # an Error.Cause as {title, details line(s), explanation}, for the parent error's render clause
+  defp render_cause(%Error.Cause{kind: :unsupported_type_constructor, details: %{type_ast: ast}}) do
+    {"Unsupported Type Constructor", "Type AST: #{inspect(ast)}",
+     "This type specification AST structure is not supported by the typechecker."}
+  end
+
+  defp render_cause(%Error.Cause{kind: :unknown_type_constructor, details: %{type: type}}) do
+    {"Unknown Type Constructor", "Type: #{type}",
+     "Unknown type constructor or type atom not found in the type environment."}
+  end
+
+  defp render_cause(%Error.Cause{kind: :heterogeneous_list, details: %{types: types}}) do
+    {"Heterogeneous List Type",
+     "Conflicting types found: #{Enum.map_join(types, ", ", &inspect/1)}",
+     "List type specifications must contain elements of the same type."}
+  end
+
+  defp render_cause(%Error.Cause{kind: :invalid_maty_state, details: %{got: got}}) do
+    {"Invalid Maty State Type", "Expected type: :maty_actor_state\nGot type: #{render_type(got)}",
+     "Maty operations require a valid actor state type."}
   end
 
   defp render_trace([]), do: ""

@@ -1,9 +1,6 @@
 defmodule Maty.Typechecker.Error.TypeMismatch do
   alias Maty.Typechecker.Error
 
-  defp render_type(type) when is_atom(type), do: ":#{type}"
-  defp render_type(type), do: "#{inspect(type)}"
-
   def logical_operator_requires_boolean(module, meta, operator, operand_type) do
     %Error{
       category: :type_mismatch,
@@ -75,11 +72,7 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
   end
 
   def invalid_maty_state_cause(got_type) do
-    %Error.Cause{
-      title: "Invalid Maty State Type",
-      opts: "Expected type: :maty_actor_state\nGot type: #{render_type(got_type)}",
-      message: "Maty operations require a valid actor state type."
-    }
+    %Error.Cause{kind: :invalid_maty_state, details: %{got: got_type}}
   end
 
   def send_message_not_tuple(module, meta, got: message_ast) do

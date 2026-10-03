@@ -81,31 +81,14 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
   # causes: payloads embedded in other errors under `details.cause`
 
   def unsupported_type_constructor(type_ast) do
-    %Error.Cause{
-      title: "Unsupported Type Constructor",
-      opts: "Type AST: #{inspect(type_ast)}",
-      message: "This type specification AST structure is not supported by the typechecker."
-    }
+    %Error.Cause{kind: :unsupported_type_constructor, details: %{type_ast: type_ast}}
   end
 
   def unknown_type_constructor(type_name) do
-    %Error.Cause{
-      title: "Unknown Type Constructor",
-      opts: "Type: #{type_name}",
-      message: "Unknown type constructor or type atom not found in the type environment."
-    }
+    %Error.Cause{kind: :unknown_type_constructor, details: %{type: type_name}}
   end
 
   def heterogeneous_list_error(conflicting_types) do
-    formatted_types =
-      conflicting_types
-      |> Enum.map(&inspect/1)
-      |> Enum.join(", ")
-
-    %Error.Cause{
-      title: "Heterogeneous List Type",
-      opts: "Conflicting types found: #{formatted_types}",
-      message: "List type specifications must contain elements of the same type."
-    }
+    %Error.Cause{kind: :heterogeneous_list, details: %{types: conflicting_types}}
   end
 end
