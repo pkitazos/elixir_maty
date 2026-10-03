@@ -847,13 +847,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: category, kind: kind}) do
-    # todo: eventually kill this
-    raise ArgumentError,
-          "no Formatter clause for error kind #{inspect({category, kind})} — " <>
-            "add a render/1 clause when migrating this constructor"
-  end
-
   defp render_trace([]), do: ""
 
   defp render_trace(frames) do

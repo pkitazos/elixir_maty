@@ -9,14 +9,6 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
   @st_in ST.input_one(:buyer1, :title, :binary, @st_end)
 
   describe "format/1" do
-    test "raises on an unknown {category, kind}" do
-      error = %Error{category: :protocol_violation, kind: :does_not_exist}
-
-      assert_raise ArgumentError, ~r/no Formatter clause/, fn ->
-        Formatter.format(error)
-      end
-    end
-
     test "appends trace frames after the error body" do
       error = %Error{
         category: :protocol_violation,
