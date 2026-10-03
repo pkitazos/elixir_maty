@@ -182,7 +182,7 @@ defmodule Maty.Typechecker.ErrorRenderTest do
       {{Error.FunctionCall, :wrong_number_of_clauses},
        Error.FunctionCall.wrong_number_of_clauses(@m, @meta, {:on_link, 2}, expected: 1, got: 2)},
       {{Error.FunctionCall, :wrong_number_of_specs},
-       Error.FunctionCall.wrong_number_of_specs(@m, @meta, {:f, 1}, expected: "1 or 3", got: 2)},
+       Error.FunctionCall.wrong_number_of_specs(@m, @meta, {:f, 1}, expected: [1, 3], got: 2)},
 
       # :type_specification
       {{Error.TypeSpecification, :invalid_session_type_annotation},

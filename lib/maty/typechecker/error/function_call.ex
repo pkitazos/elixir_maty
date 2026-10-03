@@ -51,7 +51,8 @@ defmodule Maty.Typechecker.Error.FunctionCall do
     }
   end
 
-  def wrong_number_of_specs(module, meta, func_id, expected: expected, got: got) do
+  def wrong_number_of_specs(module, meta, func_id, expected: expected, got: got)
+      when is_integer(expected) or is_list(expected) do
     %Error{
       category: :function_call,
       kind: :wrong_number_of_specs,

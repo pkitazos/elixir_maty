@@ -583,7 +583,7 @@ defmodule Maty.Typechecker.Error.Formatter do
       Function: #{func_str}
       Line: #{e.meta[:line]}
       --
-      Expected specs: #{expected}
+      Expected specs: #{expected |> List.wrap() |> Enum.uniq() |> Enum.join(" or ")}
       Got specs: #{got}
       --
       Incompatible number of @spec annotations defined for function.

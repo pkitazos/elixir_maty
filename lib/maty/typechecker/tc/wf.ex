@@ -77,7 +77,7 @@ defmodule Maty.Typechecker.TC.WF do
 
         error =
           Error.FunctionCall.wrong_number_of_specs(ctx.module, first_clause_meta, func_id,
-            expected: "1 or #{length(clauses)}",
+            expected: [1, length(clauses)],
             got: spec_count
           )
 
