@@ -181,7 +181,7 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Protocol Violation: Handler Did Not Terminate the Session
-      A message handler must end by suspending or completing the session.
+      A handler must end by suspending or completing the session.
       Returned: #{render_atom(got_return)}
       Remaining session type: #{Maty.ST.repr(e.st)}
     """
@@ -499,21 +499,6 @@ defmodule Maty.Typechecker.Error.Formatter do
   end
 
   # --- :type_specification
-
-  defp render(%Error{category: :type_specification, kind: :invalid_session_type_annotation} = e) do
-    %{cause: cause} = e.details
-    {title, opts, message} = render_cause(cause)
-
-    """
-    Type Specification Error: Invalid Session Type Annotation
-      Parse error: #{title}
-      #{opts}
-      --
-      The @st annotation contains an invalid session type string that cannot be parsed.
-
-      Details: #{message}
-    """
-  end
 
   defp render(%Error{category: :type_specification, kind: :function_spec_info_mismatch} = e) do
     %{spec_id: spec_id, func_id: func_id} = e.details

@@ -3,23 +3,6 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
 
   # external functions
 
-  # MATY_ERROR_KIND_REVIEW
-  # this isn't currently wired anywhere, but it's a real error
-  # that should be invoked where session-type strings are parsed (in the pre-processor)
-  #
-  # the @st annotation string may fail to parse in which case we
-  # should wrap the parse error we get from st_parser with some meta info
-  def invalid_session_type_annotation(module, meta, handler_label, %Error.Cause{} = cause) do
-    %Error{
-      category: :type_specification,
-      kind: :invalid_session_type_annotation,
-      module: module,
-      handler: handler_label,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{cause: cause}
-    }
-  end
-
   def spec_return_not_well_typed(
         module,
         meta,

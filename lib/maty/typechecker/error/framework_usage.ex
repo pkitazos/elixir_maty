@@ -38,11 +38,6 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
-  # MATY_ERROR_KIND_REVIEW
-  # this is also arguably a :type_mismatch since it gets returned when
-  # the on_link/2 return value has the wrong type.
-  # I currently went with :framework_usage because it's also about the on_link callback contract, not sure.
-  # Should have a look at other library code to see
   def on_link_bad_return(module, meta, got) do
     %Error{
       category: :framework_usage,
@@ -53,7 +48,6 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
-  # MATY_ERROR_KIND_REVIEW
   # the whole register / init_handler path needs rework
   # init_handlers are passed as references which would be okay,
   # BUT anonymous functions aren't really supported yet (see todos in tc.ex)

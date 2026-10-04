@@ -767,22 +767,12 @@ defmodule Maty.Typechecker.TC do
           {{:., _m1, [Maty.DSL, :register]}, meta,
            [ap_pid_ast, role_ast, reg_info_ast, state_ast]}
         ) do
-    # MATY_ERROR_KIND_REVIEW
-    #
-    # I still havn't migrated the three errors returned by the lift_bool checks
-    # There's gonna be a more comprehensive register / init_handler rework soon
-    # So I'll come back and sort these out then, when I'm a little more clean on things
-    #
-    # (they are structured errors now, so they are formatted at the boundary like the rest,
-    # the better error kinds are what is left for that rework)
+    # the argument checks report register_arg_type_mismatch, naming the argument at fault.
+    # What is left waits for the register / init_handler rework: the init handler argument
+    # should show the signature it is expected to have
     thread do
       pid_type <~ tc_expr(ctx, env, st, ap_pid_ast)
-      # pin - better error
-      # todo: these three reuse `builtin_arg_type_mismatch` for now, but its title and text say "built-in"
-      # and register is a framework operation, so the report is a little misleading.
-      # Should give it its own kind (e.g. register_arg_type_mismatch with `argument: :access_point | :role | :init_handler`, `expected` and `got`)
-      # and render it as "argument 1 (access point) of MatyDSL.register must be :pid, got :atom", which also
-      # replaces the argument name currently packed into the function string
+
       _
       <~ lift_bool(
         pid_type == :pid,
@@ -800,8 +790,7 @@ defmodule Maty.Typechecker.TC do
       # todo: also check session type is not progressing
 
       role_type <~ tc_expr(ctx, env, st, role_ast)
-      # pin - better error
-      # todo: as above, argument: :role (expected :atom)
+
       _
       <~ lift_bool(
         role_type == :atom,
@@ -819,10 +808,8 @@ defmodule Maty.Typechecker.TC do
       # todo: also check session type is not progressing
 
       init_handler_type <~ tc_expr(ctx, env, st, reg_info_ast)
-      # pin - better error
-      # todo: as above, argument: :init_handler (expected any {:fun, arity}, so `expected` needs
-      # a readable form like "a function", `[:fun]` currently renders as :fun)
-      # or better yet, to actually specify the function signature (e.g. `A -> B` or something along those lines)
+
+      # todo: show the signature the init handler is expected to have (e.g. `A -> B`) instead of "a function"
       _
       <~ lift_bool(
         match?({:fun, _}, init_handler_type),

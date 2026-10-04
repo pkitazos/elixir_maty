@@ -199,16 +199,13 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     }
   end
 
-  # Fired when a message-handler body finishes without terminating the session
-  # (it should reduce to ⊥ via suspend/done). `got_return` is the body's value
-  # type; `st` carries the residual session type that was left unconsumed.
+  # Fired when a message-handler body finishes without terminating the session (it should reduce to ⊥ via suspend/done)
+  # - `got_return` is the body's value type
+  # - `st` carries the residual session type that was left unconsumed
   #
-  # MATY_ERROR_KIND_REVIEW
-  # this currently conflates two failures: (1) final_st ≠ ⊥, the session wasn't
-  # consumed, and (2) return_type ≠ :no_return, the body returned a value instead
-  # of yielding via suspend/done
-  #
-  # todo: (2) is arguably a :framework_usage shape rule
+  # A message or init handler body must end with suspend or done
+  # The check looks at two things, the session reached ⊥ and the body returned :no_return,
+  # but both come from suspend/done, so they fail together and are one error
   def handler_body_wrong_termination(meta, handler_label, return_type, final_st) do
     %Error{
       category: :protocol_violation,

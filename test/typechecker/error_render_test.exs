@@ -185,8 +185,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FunctionCall.wrong_number_of_specs(@m, @meta, {:f, 1}, expected: [1, 3], got: 2)},
 
       # :type_specification
-      {{Error.TypeSpecification, :invalid_session_type_annotation},
-       Error.TypeSpecification.invalid_session_type_annotation(@m, @meta, :title_handler, @cause)},
       {{Error.TypeSpecification, :spec_return_not_well_typed},
        Error.TypeSpecification.spec_return_not_well_typed(
          @m,
