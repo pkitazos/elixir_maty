@@ -15,11 +15,9 @@ defmodule Maty.Typechecker.Error.Formatter do
   # --- :protocol_violation
 
   # todo: potentially rename
-  defp render(%Error{category: :protocol_violation, kind: :missing_handler} = e) do
+  defp render(%Error{category: :protocol_violation, kind: :missing_handler}) do
     """
     Protocol Violation: Missing Handler
-      Handler: #{e.handler}
-      --
       No session type is declared for this handler's label.
     """
   end
@@ -27,8 +25,6 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render(%Error{category: :protocol_violation, kind: :init_handler_starts_with_receive} = e) do
     """
     Protocol Violation: Init Handler Starts With a Receive
-      Handler: #{e.handler}
-      --
       An init handler must initiate the session (send or suspend), but the protocol
       for this role begins by receiving. That first step needs a message handler.
       --
@@ -39,8 +35,6 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render(%Error{category: :protocol_violation, kind: :message_handler_not_receive} = e) do
     """
     Protocol Violation: Message Handler Does Not Receive
-      Handler: #{e.handler}
-      --
       A message handler runs when a message is received, so its session type must
       begin with a receive. This handler's session type does not.
       --
@@ -66,8 +60,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Protocol Violation: Incorrect Incoming Participant
-      Handler: #{e.handler}
-      --
       Received role (handler arg): #{render_atom(received)}
       Declared role (@spec): #{render_atom(declared)}
       Expected role (session type): #{render_atom(expected)}
@@ -82,8 +74,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Protocol Violation: Incorrect Incoming Message Label
-      Handler: #{e.handler}
-      --
       Got: #{render_atom(label_received)}
       Expected: #{acceptable_labels}
       --
@@ -96,8 +86,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Protocol Violation: Incorrect Incoming Payload Type
-      Handler: #{e.handler}
-      --
       Got: #{render_atom(payload_received)}
       Expected: #{render_atom(payload_expected)}
       --
@@ -159,8 +147,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Protocol Violation: Incomplete Message Handler Implementation
-      Handler: #{e.handler}
-      --
       Missing implementation for branches: #{Maty.ST.repr(%{e.st | branches: missing_branches})}
       --
       Session Type: #{Maty.ST.repr(e.st)}
@@ -195,8 +181,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Protocol Violation: Handler Did Not Terminate the Session
-      Handler: #{e.handler}
-      --
       A message handler must end by suspending or completing the session.
       Returned: #{render_atom(got_return)}
       Remaining session type: #{Maty.ST.repr(e.st)}
@@ -447,19 +431,17 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Function Call Error: Function Does Not Exist
-      Function: #{func_str}
+      Called function: #{func_str}
       --
       The function #{func_str} is not defined in this module.
     """
   end
 
   defp render(%Error{category: :function_call, kind: :arity_mismatch} = e) do
-    %{func_id: func_id, expected: expected, got: got} = e.details
-    func_str = Utils.to_func(func_id)
+    %{expected: expected, got: got} = e.details
 
     """
     Function Call Error: Arity Mismatch
-      Function: #{func_str}
       Expected arity: #{expected}
       Got arity: #{got}
       --
@@ -474,7 +456,7 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Function Call Error: No Matching Function Clause
-      Function: #{func_str}
+      Called function: #{func_str}
       Called with argument types: (#{formatted_args})
       --
       No function clause matches the provided argument types.
@@ -482,12 +464,10 @@ defmodule Maty.Typechecker.Error.Formatter do
   end
 
   defp render(%Error{category: :function_call, kind: :function_altered_session_state} = e) do
-    %{func_id: func_id, final_state: final_state} = e.details
-    func_str = Utils.to_func(func_id)
+    %{final_state: final_state} = e.details
 
     """
     Function Call Error: Function Altered Session State
-      Function: #{func_str}
       Final state: #{inspect(final_state)}
       --
       Function altered the session state when it should remain unchanged.
@@ -495,13 +475,10 @@ defmodule Maty.Typechecker.Error.Formatter do
   end
 
   defp render(%Error{category: :function_call, kind: :wrong_number_of_clauses} = e) do
-    %{func_id: func_id, expected: expected, got: got} = e.details
-    func_str = Utils.to_func(func_id)
+    %{expected: expected, got: got} = e.details
 
     """
     Function Call Error: Wrong Number of Clauses
-      Function: #{func_str}
-      --
       Expected clauses: #{expected}
       Got clauses: #{got}
       --
@@ -510,13 +487,10 @@ defmodule Maty.Typechecker.Error.Formatter do
   end
 
   defp render(%Error{category: :function_call, kind: :wrong_number_of_specs} = e) do
-    %{func_id: func_id, expected: expected, got: got} = e.details
-    func_str = Utils.to_func(func_id)
+    %{expected: expected, got: got} = e.details
 
     """
     Function Call Error: Wrong Number of Specs
-      Function: #{func_str}
-      --
       Expected specs: #{expected |> List.wrap() |> Enum.uniq() |> Enum.join(" or ")}
       Got specs: #{got}
       --
@@ -532,7 +506,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Type Specification Error: Invalid Session Type Annotation
-      Handler: #{e.handler}
       Parse error: #{title}
       #{opts}
       --
@@ -557,15 +530,13 @@ defmodule Maty.Typechecker.Error.Formatter do
   end
 
   defp render(%Error{category: :type_specification, kind: :spec_args_parse_error_at} = e) do
-    %{func_id: func_id, failed_index: failed_index, args_asts: args_asts, cause: cause} =
+    %{failed_index: failed_index, args_asts: args_asts, cause: cause} =
       e.details
 
     {title, opts, message} = render_cause(cause)
-    func_str = Utils.to_func(func_id)
 
     """
     Type Specification Error: Invalid Spec Argument
-      Function: #{func_str}
       Argument types: #{render_type_list(args_asts)}
       Error at argument: ##{failed_index + 1}
       Parse error: #{title}
@@ -578,12 +549,11 @@ defmodule Maty.Typechecker.Error.Formatter do
   end
 
   defp render(%Error{category: :type_specification, kind: :spec_return_not_well_typed} = e) do
-    %{spec_name: spec_name, return_ast: return_ast, cause: cause} = e.details
+    %{return_ast: return_ast, cause: cause} = e.details
     {title, opts, message} = render_cause(cause)
 
     """
     Type Specification Error: Invalid Spec Return Type
-      Function: #{spec_name}
       Return type: #{inspect(return_ast)}
       Parse error: #{title}
       #{opts}
@@ -594,14 +564,9 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :type_specification, kind: :no_spec_for_function} = e) do
-    %{func_id: func_id} = e.details
-    func_str = Utils.to_func(func_id)
-
+  defp render(%Error{category: :type_specification, kind: :no_spec_for_function}) do
     """
     Type Specification Error: Missing Function Spec
-      Function: #{func_str}
-      --
       No @spec annotation found for this function. All functions require type specifications.
     """
   end

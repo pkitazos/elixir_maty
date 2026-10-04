@@ -421,7 +421,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
       error = compile_error!(src)
 
       assert error.description =~ "Missing Function Spec"
-      assert error.description =~ "Function: decision_handler/4"
+
+      assert error.description =~
+               "[decision_handler/4] Type Specification Error: Missing Function Spec"
     end
 
     test "a hand-written init handler without a spec reports the missing spec" do
@@ -445,7 +447,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       error = compile_error!(src)
 
       assert error.description =~ "Missing Function Spec"
-      assert error.description =~ "Function: install/3"
+      assert error.description =~ "[install/3] Type Specification Error: Missing Function Spec"
     end
 
     test "several specs on one clause are reported instead of one being silently dropped" do
