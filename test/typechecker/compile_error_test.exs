@@ -93,7 +93,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
     # the line the first error in the report says it is on
     defp own_line(%CompileError{description: description}) do
-      [_, line] = Regex.run(~r/Line: (\d+)/, description)
+      [_, line] = Regex.run(~r/^[^\s:]+:(\d+): \[[^\]]+\/\d+\]/m, description)
       String.to_integer(line)
     end
 
@@ -758,6 +758,35 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "[maty] 2 type errors in"
       assert error.description =~ "Missing Handler"
       assert error.description =~ "Invalid Spec Argument"
+    end
+
+    test "errors are reported in source order, each at its own location" do
+      # defined b, a, c: the report used to follow function names (a, b, c)
+      src =
+        seller_src("SourceOrder", """
+        #{@valid_handlers}
+
+        @spec b() :: number()
+        def b(), do: "not a number"
+
+        @spec a() :: number()
+        def a(), do: "not a number"
+
+        @spec c() :: number()
+        def c(), do: "not a number"
+        """)
+
+      error = compile_error!(src)
+
+      [b_line, a_line, c_line] = Enum.map(["def b()", "def a()", "def c()"], &line_of(src, &1))
+
+      reported = Regex.scan(~r/^nofile:(\d+): \[(\w+\/\d)\]/m, error.description)
+
+      assert Enum.map(reported, fn [_, line, func] -> {String.to_integer(line), func} end) ==
+               [{b_line, "b/0"}, {a_line, "a/0"}, {c_line, "c/0"}]
+
+      # the CompileError points at the first error in the file
+      assert error.line == b_line
     end
   end
 end

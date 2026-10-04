@@ -19,7 +19,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     Protocol Violation: Missing Handler
       Handler: #{e.handler}
-      Line: #{e.meta[:line]}
       --
       No session type is declared for this handler's label.
     """
@@ -29,7 +28,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     Protocol Violation: Init Handler Starts With a Receive
       Handler: #{e.handler}
-      Line: #{e.meta[:line]}
       --
       An init handler must initiate the session (send or suspend), but the protocol
       for this role begins by receiving. That first step needs a message handler.
@@ -42,7 +40,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     Protocol Violation: Message Handler Does Not Receive
       Handler: #{e.handler}
-      Line: #{e.meta[:line]}
       --
       A message handler runs when a message is received, so its session type must
       begin with a receive. This handler's session type does not.
@@ -57,8 +54,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Protocol Violation: Incorrect Action
-      Line: #{e.meta[:line]}
-      --
       Tried: #{render_action(got)}
       Current permitted actions: #{actions}
       --
@@ -72,7 +67,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     Protocol Violation: Incorrect Incoming Participant
       Handler: #{e.handler}
-      Line: #{e.meta[:line]}
       --
       Received role (handler arg): #{render_atom(received)}
       Declared role (@spec): #{render_atom(declared)}
@@ -89,7 +83,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     Protocol Violation: Incorrect Incoming Message Label
       Handler: #{e.handler}
-      Line: #{e.meta[:line]}
       --
       Got: #{render_atom(label_received)}
       Expected: #{acceptable_labels}
@@ -104,7 +97,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     Protocol Violation: Incorrect Incoming Payload Type
       Handler: #{e.handler}
-      Line: #{e.meta[:line]}
       --
       Got: #{render_atom(payload_received)}
       Expected: #{render_atom(payload_expected)}
@@ -118,8 +110,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Protocol Violation: Incorrect Target Participant
-      Line: #{e.meta[:line]}
-      --
       Got: #{render_atom(role_received)}
       Expected: #{render_atom(role_expected)}
       --
@@ -132,8 +122,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Protocol Violation: Incorrect Handler Suspension
-      Line: #{e.meta[:line]}
-      --
       Got: #{render_atom(handler_received)}
       Expected: #{render_atom(handler_expected)}
       --
@@ -147,8 +135,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Protocol Violation: Incorrect Message Label
-      Line: #{e.meta[:line]}
-      --
       Got: #{render_atom(label_received)}
       Expected: #{acceptable_labels}
       --
@@ -161,8 +147,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Protocol Violation: Incorrect Payload Type
-      Line: #{e.meta[:line]}
-      --
       Got: #{render_atom(payload_received)}
       Expected: #{render_atom(payload_expected)}
       --
@@ -176,7 +160,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     Protocol Violation: Incomplete Message Handler Implementation
       Handler: #{e.handler}
-      Line: #{e.meta[:line]}
       --
       Missing implementation for branches: #{Maty.ST.repr(%{e.st | branches: missing_branches})}
       --
@@ -189,8 +172,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Protocol Violation: Suspended with Invalid Handler
-      Line: #{e.meta[:line]}
-      --
       Tried: #{got}
       --
       Session Type: #{Maty.ST.repr(e.st)}
@@ -203,8 +184,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Protocol Violation: Case Scrutinee Altered Session State
-      Line: #{e.meta[:line]}
-      --
       The scrutinee of a case expression must not perform any session actions.
       Before: #{Maty.ST.repr(from)}
       After: #{Maty.ST.repr(to)}
@@ -217,7 +196,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     Protocol Violation: Handler Did Not Terminate the Session
       Handler: #{e.handler}
-      Line: #{e.meta[:line]}
       --
       A message handler must end by suspending or completing the session.
       Returned: #{render_atom(got_return)}
@@ -232,8 +210,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Type Mismatch Error: Logical Operator Type Error
-      Line: #{e.meta[:line]}
-      --
       Operator: #{render_operator(operator)}
       Expected operand type: :boolean
       Got operand type: #{render_type(operand_type)}
@@ -247,8 +223,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Type Mismatch Error: Return Type Mismatch
-      Line: #{e.meta[:line]}
-      --
       Expected return type: #{render_type(expected)}
       Got return type: #{render_type(got)}
       --
@@ -261,8 +235,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Type Mismatch Error: Binary Operator Type Error
-      Line: #{e.meta[:line]}
-      --
       Operator: #{render_operator(operator)}
       Left operand type: #{render_type(lhs_type)}
       Right operand type: #{render_type(rhs_type)}
@@ -276,8 +248,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Type Mismatch Error: Logical Operator Type Error
-      Line: #{e.meta[:line]}
-      --
       Operator: #{render_operator(operator)}
       Left operand type: #{render_type(lhs_type)}
       Right operand type: #{render_type(rhs_type)}
@@ -293,8 +263,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Type Mismatch Error: Incompatible List Elements
-      Line: #{e.meta[:line]}
-      --
       Element types found: #{formatted_types}
       --
       All elements in a list must have the same type.
@@ -333,8 +301,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Type Mismatch Error: Incompatible Case Branches
-      Line: #{e.meta[:line]}
-      --
     #{lines}
       --
       All case branches must return the same type and result in compatible session states.
@@ -347,8 +313,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Type Mismatch Error: #{title}
-      Line: #{e.meta[:line]}
-      --
       #{opts}
       --
       #{message}
@@ -361,8 +325,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Type Mismatch Error: Built-in Argument Type
-      Line: #{e.meta[:line]}
-      --
       Function: #{function}
       Expected: #{expected_str}
       Got: #{render_type(got)}
@@ -376,8 +338,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Type Mismatch Error: Register Argument Type
-      Line: #{e.meta[:line]}
-      --
       Argument: #{render_register_argument(argument)}
       Expected: #{render_expected(expected)}
       Got: #{render_type(got)}
@@ -391,8 +351,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Type Mismatch Error: Send Message Not Tuple
-      Line: #{e.meta[:line]}
-      --
       Expected: Tagged tuple message {label, payload}
       Got: #{inspect(message_ast)}
       --
@@ -405,8 +363,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Pattern Matching Error: Conflicting Pattern Bindings
-      Line: #{e.meta[:line]}
-      --
       Conflicting variables: #{Enum.join(conflicting_vars, ", ")}
       --
       The same variable is bound multiple times in this pattern, which is not allowed.
@@ -418,8 +374,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Pattern Matching Error: Pattern Type Mismatch
-      Line: #{e.meta[:line]}
-      --
       Pattern: #{render_pattern(pattern)}
       Expected type: #{render_type(expected)}
       Got type: #{render_type(got)}
@@ -433,8 +387,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Pattern Matching Error: Tuple Arity Mismatch
-      Line: #{e.meta[:line]}
-      --
       Pattern: #{pattern_arity}-tuple
       Expected: #{expected}-tuple
       --
@@ -447,8 +399,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Pattern Matching Error: Complex Map Key
-      Line: #{e.meta[:line]}
-      --
       Key expression: #{inspect(key_ast)}
       --
       Map patterns require literal atom keys. Complex expressions are not allowed as map keys.
@@ -460,8 +410,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Pattern Matching Error: Invalid Map Key Type
-      Line: #{e.meta[:line]}
-      --
       Expected key type: #{render_type(expected)}
       Got key type: #{render_type(got)}
       --
@@ -474,8 +422,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Pattern Matching Error: Map Key Not Found
-      Line: #{e.meta[:line]}
-      --
       Missing key: #{render_pattern(missing_key)}
       --
       The pattern references a map key that is not present in the expected map type.
@@ -487,8 +433,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Pattern Matching Error: Map Key Not Atom
-      Line: #{e.meta[:line]}
-      --
       Key expression: #{inspect(key_ast)}
       --
       Map pattern keys must be literal atoms.
@@ -503,8 +447,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Function Call Error: Function Does Not Exist
-      Line: #{e.meta[:line]}
-      --
       Function: #{func_str}
       --
       The function #{func_str} is not defined in this module.
@@ -517,8 +459,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Function Call Error: Arity Mismatch
-      Line: #{e.meta[:line]}
-      --
       Function: #{func_str}
       Expected arity: #{expected}
       Got arity: #{got}
@@ -534,8 +474,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Function Call Error: No Matching Function Clause
-      Line: #{e.meta[:line]}
-      --
       Function: #{func_str}
       Called with argument types: (#{formatted_args})
       --
@@ -549,8 +487,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Function Call Error: Function Altered Session State
-      Line: #{e.meta[:line]}
-      --
       Function: #{func_str}
       Final state: #{inspect(final_state)}
       --
@@ -565,7 +501,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     Function Call Error: Wrong Number of Clauses
       Function: #{func_str}
-      Line: #{e.meta[:line]}
       --
       Expected clauses: #{expected}
       Got clauses: #{got}
@@ -581,7 +516,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     Function Call Error: Wrong Number of Specs
       Function: #{func_str}
-      Line: #{e.meta[:line]}
       --
       Expected specs: #{expected |> List.wrap() |> Enum.uniq() |> Enum.join(" or ")}
       Got specs: #{got}
@@ -598,8 +532,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Type Specification Error: Invalid Session Type Annotation
-      Line: #{e.meta[:line]}
-      --
       Handler: #{e.handler}
       Parse error: #{title}
       #{opts}
@@ -617,8 +549,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Type Specification Error: Function Spec Mismatch
-      Line: #{e.meta[:line]}
-      --
       @spec signature: #{spec_str}
       Function signature: #{func_str}
       --
@@ -635,8 +565,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Type Specification Error: Invalid Spec Argument
-      Line: #{e.meta[:line]}
-      --
       Function: #{func_str}
       Argument types: #{render_type_list(args_asts)}
       Error at argument: ##{failed_index + 1}
@@ -655,8 +583,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Type Specification Error: Invalid Spec Return Type
-      Line: #{e.meta[:line]}
-      --
       Function: #{spec_name}
       Return type: #{inspect(return_ast)}
       Parse error: #{title}
@@ -674,8 +600,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Type Specification Error: Missing Function Spec
-      Line: #{e.meta[:line]}
-      --
       Function: #{func_str}
       --
       No @spec annotation found for this function. All functions require type specifications.
@@ -689,8 +613,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Name Resolution Error: Unbound Variable
-      Line: #{e.meta[:line]}
-      --
       Variable: #{var}
       --
       This variable is not bound in the current scope.
@@ -699,11 +621,9 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   # --- :framework_usage
 
-  defp render(%Error{category: :framework_usage, kind: :missing_session_registration} = e) do
+  defp render(%Error{category: :framework_usage, kind: :missing_session_registration}) do
     """
     Framework Usage Violation: Missing Session Registration
-      Line: #{e.meta[:line]}
-      --
       Actor does not register in a session in the on_link/2 callback
     """
   end
@@ -713,8 +633,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Framework Usage Violation: Session State Altered in on_link
-      Line: #{e.meta[:line]}
-      --
       The on_link/2 callback must not advance the session type.
       Final state: #{inspect(got)}
     """
@@ -725,36 +643,28 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Framework Usage Violation: Invalid on_link Return
-      Line: #{e.meta[:line]}
-      --
       The on_link/2 callback must return {:ok, actor_state}.
       Got: #{inspect(got)}
     """
   end
 
-  defp render(%Error{category: :framework_usage, kind: :invalid_init_handler} = e) do
+  defp render(%Error{category: :framework_usage, kind: :invalid_init_handler}) do
     """
     Framework Usage Violation: Invalid Initialisation Handler
-      Line: #{e.meta[:line]}
-      --
       Actor tries to register with an invalid initialisation handler.
     """
   end
 
-  defp render(%Error{category: :framework_usage, kind: :no_native_send} = e) do
+  defp render(%Error{category: :framework_usage, kind: :no_native_send}) do
     """
     Framework Usage Violation: Attempted Native Communication
-      Line: #{e.meta[:line]}
-      --
       Actor attempted communication using send/2
     """
   end
 
-  defp render(%Error{category: :framework_usage, kind: :no_native_receive} = e) do
+  defp render(%Error{category: :framework_usage, kind: :no_native_receive}) do
     """
     Framework Usage Violation: Attempted Native Communication
-      Line: #{e.meta[:line]}
-      --
       Actor attempted communication using a receive block
     """
   end

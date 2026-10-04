@@ -401,8 +401,8 @@ defmodule Maty.Typechecker do
 
   defp with_clause_frame(result, _func_id, _index, _total_clauses), do: result
 
-  def display_error({func_id, error_msg}) do
-    "[#{Utils.to_func(func_id)}] #{Formatter.format(error_msg)}"
+  def display_error(location, {func_id, error_msg}) do
+    "#{location}: [#{Utils.to_func(func_id)}] #{Formatter.format(error_msg)}"
   end
 
   @spec raise_type_errors!(Macro.Env.t(), [{term(), Error.t()}]) :: no_return()
@@ -412,8 +412,23 @@ defmodule Maty.Typechecker do
     header =
       "[#{@app}] #{count} type #{if count == 1, do: "error", else: "errors"} in #{inspect(env.module)}"
 
-    description = header <> "\n\n" <> Enum.map_join(errors, "\n", &display_error/1)
-    line = Enum.find_value(errors, fn {_func_id, error} -> error_line_or(error, env.line) end)
+    # errors are reported in the order they appear in the source, each with its own file:line,
+    # and the CompileError points at the first one
+    file = Path.relative_to_cwd(env.file)
+
+    located =
+      errors
+      |> Enum.map(fn {_func_id, error} = entry -> {error_line_or(error, env.line), entry} end)
+      |> Enum.sort_by(fn {line, {_func_id, error}} -> {line, error.meta[:column] || 0} end)
+
+    description =
+      header <>
+        "\n\n" <>
+        Enum.map_join(located, "\n", fn {line, entry} ->
+          display_error("#{file}:#{line}", entry)
+        end)
+
+    [{line, _entry} | _] = located
 
     raise CompileError, file: env.file, line: line, description: description
   end
