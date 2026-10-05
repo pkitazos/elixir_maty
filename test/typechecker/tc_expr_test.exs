@@ -24,6 +24,19 @@ defmodule Maty.Typechecker.TCExprTest do
      ]}
   end
 
+  # `segments` as they appear after expansion: {:interp, ast} for `#{ast}`, anything else is `ast :: binary`
+  defp string(segments) do
+    {:<<>>, @meta,
+     Enum.map(segments, fn
+       {:interp, ast} ->
+         to_string_call = {{:., @meta, [String.Chars, :to_string]}, @meta, [ast]}
+         {:"::", @meta, [to_string_call, {:binary, @meta, nil}]}
+
+       ast ->
+         {:"::", @meta, [ast, {:binary, @meta, nil}]}
+     end)}
+  end
+
   defp block(exprs), do: {:__block__, @meta, exprs}
 
   defp match(pattern, expr), do: {:=, @meta, [pattern, expr]}
@@ -382,7 +395,63 @@ defmodule Maty.Typechecker.TCExprTest do
       assert {:error, msg, _env} =
                TC.tc_expr(@ctx, env, @st_end, string_concat(var(:x), "world"))
 
-      assert %Error{category: :type_mismatch, kind: :binary_operator_type_mismatch} = msg
+      assert %Error{
+               category: :type_mismatch,
+               kind: :string_segment_type_mismatch,
+               details: %{segment: :concatenation, got: :number}
+             } = msg
+    end
+
+    test "more than two operands" do
+      env = %{middle: :binary}
+
+      assert {:ok, :binary, @st_end, _env} =
+               TC.tc_expr(@ctx, env, @st_end, string(["a", var(:middle), "c"]))
+    end
+  end
+
+  # --- String interpolation
+
+  describe "tc_expr/4 string interpolation" do
+    test "interpolating each supported type" do
+      env = %{a: :atom, b: :binary, c: :boolean, d: :date, n: :number, z: nil}
+      segments = for name <- [:a, :b, :c, :d, :n, :z], do: {:interp, var(name)}
+
+      assert {:ok, :binary, @st_end, _env} = TC.tc_expr(@ctx, env, @st_end, string(segments))
+    end
+
+    test "interpolation mixed with literal text" do
+      env = %{n: :number}
+
+      assert {:ok, :binary, @st_end, _env} =
+               TC.tc_expr(@ctx, env, @st_end, string(["n=", {:interp, var(:n)}, "!"]))
+    end
+
+    test "interpolating a type String.Chars does not implement is an error" do
+      env = %{p: :pid}
+
+      assert {:error, msg, _env} =
+               TC.tc_expr(@ctx, env, @st_end, string(["p=", {:interp, var(:p)}]))
+
+      assert %Error{
+               category: :type_mismatch,
+               kind: :string_segment_type_mismatch,
+               details: %{segment: :interpolation, got: :pid}
+             } = msg
+    end
+
+    test "an unbound variable inside an interpolation is reported as unbound" do
+      assert {:error, msg, _env} =
+               TC.tc_expr(@ctx, %{}, @st_end, string([{:interp, var(:missing)}]))
+
+      assert %Error{category: :name_resolution, kind: :variable_not_exist} = msg
+    end
+
+    test "other bitstring syntax is unsupported" do
+      ast = {:<<>>, @meta, [{:"::", @meta, [1, 8]}]}
+
+      assert {:error, msg, _env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert %Error{category: :framework_usage, kind: :unsupported_bitstring} = msg
     end
   end
 

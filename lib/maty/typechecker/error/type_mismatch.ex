@@ -99,6 +99,19 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
     }
   end
 
+  # a part of a string had the wrong type
+  # `segment` is :interpolation for a `#{...}` value or :concatenation for a `<>` operand
+  def string_segment_type_mismatch(module, meta, segment, expected: expected, got: got)
+      when segment in [:interpolation, :concatenation] do
+    %Error{
+      category: :type_mismatch,
+      kind: :string_segment_type_mismatch,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{segment: segment, expected: expected, got: got}
+    }
+  end
+
   # A built-in (rn just: IO.puts + :timer.sleep) was called with an argument of the wrong type
   def builtin_arg_type_mismatch(module, meta, function, expected: expected, got: got) do
     %Error{

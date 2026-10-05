@@ -144,6 +144,11 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          expected: [:binary, :pid],
          got: :number
        )},
+      {{Error.TypeMismatch, :string_segment_type_mismatch},
+       Error.TypeMismatch.string_segment_type_mismatch(@m, @meta, :interpolation,
+         expected: [:atom, :binary],
+         got: :pid
+       )},
       {{Error.TypeMismatch, :builtin_arg_type_mismatch},
        Error.TypeMismatch.builtin_arg_type_mismatch(@m, @meta, "IO.puts",
          expected: [:binary],
@@ -216,6 +221,8 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FrameworkUsage.no_native_receive(@m, @meta)},
       {{Error.FrameworkUsage, :unsupported_anonymous_function},
        Error.FrameworkUsage.unsupported_anonymous_function(@m, @meta)},
+      {{Error.FrameworkUsage, :unsupported_bitstring},
+       Error.FrameworkUsage.unsupported_bitstring(@m, @meta)},
       {{Error.FrameworkUsage, :missing_session_registration},
        Error.FrameworkUsage.missing_session_registration(@m, @meta)},
       {{Error.FrameworkUsage, :on_link_altered_session_state},

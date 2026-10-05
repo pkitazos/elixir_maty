@@ -28,6 +28,16 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
+  # bitstring syntax other than string concatenation and interpolation was used
+  def unsupported_bitstring(module, meta) do
+    %Error{
+      category: :framework_usage,
+      kind: :unsupported_bitstring,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column])
+    }
+  end
+
   def missing_session_registration(module, meta) do
     %Error{
       category: :framework_usage,

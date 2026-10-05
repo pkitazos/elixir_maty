@@ -227,6 +227,18 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :type_mismatch, kind: :string_segment_type_mismatch} = e) do
+    %{segment: segment, expected: expected, got: got} = e.details
+
+    """
+    Type Mismatch Error: String #{render_string_segment(segment)}
+      Expected: #{render_string_segment_expected(expected)}
+      Got: #{render_type(got)}
+      --
+      #{render_string_segment_hint(segment)}
+    """
+  end
+
   defp render(%Error{category: :type_mismatch, kind: :logical_operator_type_mismatch} = e) do
     %{operator: operator, lhs: lhs_type, rhs: rhs_type} = e.details
 
@@ -638,6 +650,13 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :framework_usage, kind: :unsupported_bitstring}) do
+    """
+    Framework Usage Violation: Unsupported Bitstring
+      Only string concatenation (<>) and interpolation are supported, not other bitstring syntax
+    """
+  end
+
   defp render(%Error{category: :framework_usage, kind: :no_native_send}) do
     """
     Framework Usage Violation: Attempted Native Communication
@@ -712,6 +731,7 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render_pattern(pattern), do: Macro.to_string(pattern)
 
+  defp render_type(nil), do: "nil"
   defp render_type(type) when is_atom(type), do: ":#{type}"
   defp render_type(type), do: "#{inspect(type)}"
 
@@ -735,6 +755,20 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render_handler_names(names),
     do: names |> Enum.sort() |> Enum.map_join(", ", &render_type/1)
+
+  defp render_string_segment(:interpolation), do: "Interpolation"
+  defp render_string_segment(:concatenation), do: "Concatenation"
+
+  defp render_string_segment_expected([type]), do: render_type(type)
+
+  defp render_string_segment_expected(types),
+    do: "one of: " <> Enum.map_join(types, ", ", &render_type/1)
+
+  defp render_string_segment_hint(:interpolation),
+    do: "This value cannot be converted to a string."
+
+  defp render_string_segment_hint(:concatenation),
+    do: "Both operands of <> must be binaries."
 
   defp render_operator(op) when is_atom(op), do: "#{op}"
   defp render_operator(op), do: "#{inspect(op)}"

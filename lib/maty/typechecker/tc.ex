@@ -223,31 +223,13 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # Handles String Concatenation: <>
-
-  deftc tc_expr(
-          ctx,
-          env,
-          st,
-          {:<<>>, meta, [{:"::", _, [lhs_ast, _]}, {:"::", _, [rhs_ast, _]}]}
-        ) do
-    thread do
-      lhs_type <~ tc_expr(ctx, env, st, lhs_ast)
-      rhs_type <~ tc_expr(ctx, env, st, rhs_ast)
-
-      lift_result(
-        Helpers.op_type_rel(:<>, lhs_type, rhs_type),
-        Error.TypeMismatch.binary_operator_type_mismatch(
-          ctx.module,
-          meta,
-          :<>,
-          lhs_type,
-          rhs_type
-        ),
-        env,
-        st
-      )
-    end
+  # --- Strings: Concatenation and Interpolation ---
+  # after expansion both `"a" <> b <> "c"` and `"a=#{n}"` are a single `<<>>` with one `segment :: binary` per part
+  # Other bitstring syntax (sizes, integer segments, ...) is not supported
+  deftc tc_expr(ctx, env, st, {:<<>>, meta, segments}) when is_list(segments) do
+    segments
+    |> traverse(env, st, fn segment, env, st -> tc_string_segment(ctx, env, st, meta, segment) end)
+    |> map(fn _segment_types -> :binary end)
   end
 
   # Handles Boolean Ops: and, or
@@ -883,6 +865,68 @@ defmodule Maty.Typechecker.TC do
   # Atom literals (handler names included)
   deftc tc_expr(_ctx, env, st, value) when is_atom(value) and not is_nil(value) do
     ok(:atom, env, st)
+  end
+
+  # types that String.Chars implements
+  @interpolatable_types [:atom, :binary, :boolean, :date, :number, nil]
+
+  # an interpolated value: `String.Chars.to_string(x) :: binary`
+  defp tc_string_segment(
+         ctx,
+         env,
+         st,
+         meta,
+         {:"::", seg_meta,
+          [{{:., _, [String.Chars, :to_string]}, _, [value_ast]}, {:binary, _, _}]}
+       ) do
+    tc_expr(ctx, env, st, value_ast)
+    # todo: make it a bit nicer to guard booleans in a thread context
+    |> bind(fn value_type, env, st ->
+      if value_type in @interpolatable_types do
+        ok(value_type, env, st)
+      else
+        error(
+          Error.TypeMismatch.string_segment_type_mismatch(
+            ctx.module,
+            segment_meta(seg_meta, meta),
+            :interpolation,
+            expected: @interpolatable_types,
+            got: value_type
+          ),
+          env
+        )
+      end
+    end)
+  end
+
+  # a literal or concatenated operand: `x :: binary`
+  defp tc_string_segment(ctx, env, st, meta, {:"::", seg_meta, [value_ast, {:binary, _, _}]}) do
+    tc_expr(ctx, env, st, value_ast)
+    |> bind(fn value_type, env, st ->
+      if value_type == :binary do
+        ok(value_type, env, st)
+      else
+        error(
+          Error.TypeMismatch.string_segment_type_mismatch(
+            ctx.module,
+            segment_meta(seg_meta, meta),
+            :concatenation,
+            expected: [:binary],
+            got: value_type
+          ),
+          env
+        )
+      end
+    end)
+  end
+
+  defp tc_string_segment(ctx, env, _st, meta, _segment) do
+    error(Error.FrameworkUsage.unsupported_bitstring(ctx.module, meta), env)
+  end
+
+  # segments of literal parts carry no column of their own, fall back to the whole string
+  defp segment_meta(seg_meta, meta) do
+    if Keyword.has_key?(seg_meta, :line), do: seg_meta, else: meta
   end
 
   # Processes a list of expressions sequentially using tc_expr.
