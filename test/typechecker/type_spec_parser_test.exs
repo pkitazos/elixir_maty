@@ -133,7 +133,7 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
     end
 
     test "session_ctx" do
-      expected = Maty.Types.map()[:session_ctx]
+      expected = Type.session_ctx()
       assert {:ok, ^expected} = TypeSpecParser.parse(type_ast(:session_ctx))
     end
 

@@ -3,13 +3,15 @@ defmodule Maty.Types do
   Custom types used in Maty.
   """
 
+  alias Maty.Types.T
+
   @type session_id :: reference()
   @type init_token :: reference()
   @type role :: atom()
 
   # a session consists of:
   # - an ID
-  # - a map of session roles to pairs of (handlers x role you are being called as? not sure what this role is)
+  # - a map of session roles to pairs of `handler` * `role` you are being called as? not sure what this role is
   # - the address book
   # - some session-local state
 
@@ -27,16 +29,14 @@ defmodule Maty.Types do
 
   # a Maty actor stores:
   # - a map of sessions it is participating in
-  # - a map of initialisation token to pairs of (role x callback) to invoke when the session starts
-  # - some global state (maybe not actually)
+  # - a map of initialisation token to pairs of `role` * `callback` to invoke when the session starts
   @type maty_actor_state :: %{
           sessions: %{session_id() => session()},
-          callbacks: %{init_token() => {role(), function()}},
-          global_state: map()
+          callbacks: %{init_token() => {role(), function()}}
         }
 
   # an access point stores a map of candidate participants
-  # it maps roles to queues storing pairs of (PID x initialisation token)
+  # it maps roles to queues storing pairs of `PID` * `REF` (initialisation token)
   @type access_point_state :: %{
           participants: %{role() => :queue.queue({pid(), init_token()})}
         }
@@ -59,33 +59,13 @@ defmodule Maty.Types do
 
   # this maps our type names to their actual structural type
   def map do
-    session_id = :ref
-    init_token = :ref
-    role = :atom
-
-    session =
-      {:map,
-       %{
-         id: session_id,
-         handlers: {:map, %{role => {:tuple, [:function, role]}}},
-         participants: {:map, %{role => :pid}},
-         local_state: :any
-       }}
-
-    maty_actor_state =
-      {:map,
-       %{
-         sessions: {:map, %{session_id => session}},
-         callbacks: {:map, %{init_token => {:tuple, [role, :function]}}}
-       }}
-
     %{
-      session_id: session_id,
-      init_token: init_token,
-      role: role,
-      session: session,
-      session_ctx: {session, role},
-      maty_actor_state: maty_actor_state
+      session_id: T.session_id(),
+      init_token: T.init_token(),
+      role: T.role(),
+      session: T.session(),
+      session_ctx: T.session_ctx(),
+      maty_actor_state: T.maty_actor_state()
     }
   end
 
@@ -202,9 +182,6 @@ defmodule Maty.Types do
           s_valid? and h_valid? and p_valid?
       end
     end
-
-    # standardise what 2-tuple types look like
-    def is?({session, role}, :session_ctx), do: is?(session, :session) and is?(role, :role)
 
     def is?({:tuple, [session, role]}, :session_ctx),
       do: is?(session, :session) and is?(role, :role)
