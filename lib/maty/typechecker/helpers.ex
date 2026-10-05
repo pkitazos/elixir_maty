@@ -249,6 +249,14 @@ defmodule Maty.Typechecker.Helpers do
     end
   end
 
+  @doc "Argument types an init handler accepts, one per clause signature."
+  def init_handler_arg_types(ctx, handler_name) do
+    with {:ok, %{function: func_id}} <- Map.fetch(ctx.delta_I, handler_name) do
+      # a missing psi entry is reported as a missing spec on the handler itself
+      {:ok, ctx.psi |> Map.get(func_id, []) |> Enum.map(fn {[arg | _], _} -> arg end)}
+    end
+  end
+
   def extract_capture_fun_id({:&, _, [{:/, _, [{{:., _, [_mod, fun]}, _, _}, arity]}]})
       when is_atom(fun) and is_integer(arity),
       do: {:ok, {fun, arity}}

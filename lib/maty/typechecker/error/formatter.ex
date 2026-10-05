@@ -323,7 +323,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     Type Mismatch Error: Register Argument Type
       Argument: #{render_register_argument(argument)}
-      Expected: #{render_expected(expected)}
+      Expected: #{render_register_expected(argument, expected)}
       Got: #{render_type(got)}
       --
       MatyDSL.register/4 was called with an argument of the wrong type.
@@ -686,9 +686,18 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render_expected(description) when is_binary(description), do: description
   defp render_expected(type), do: render_type(type)
 
+  # init handler args can match any one of the handler's clause signatures
+  defp render_register_expected(:init_handler_args, [type]), do: render_type(type)
+
+  defp render_register_expected(:init_handler_args, types),
+    do: "one of: " <> Enum.map_join(types, ", ", &render_type/1)
+
+  defp render_register_expected(_argument, expected), do: render_expected(expected)
+
   defp render_register_argument(:access_point), do: "1 (access point)"
   defp render_register_argument(:role), do: "2 (role)"
-  defp render_register_argument(:init_handler), do: "3 (init handler)"
+  defp render_register_argument(:init_handler), do: "3 (init handler label)"
+  defp render_register_argument(:init_handler_args), do: "4 (init handler args)"
 
   defp render_operator(op) when is_atom(op), do: "#{op}"
   defp render_operator(op), do: "#{inspect(op)}"

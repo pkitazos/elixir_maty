@@ -91,41 +91,6 @@ defmodule Maty.Typechecker.TC do
     ok(:any, env, st)
   end
 
-  # todo: either add support for keyword lists or make this just work properly
-  # as in this part of the register macro could either straight up expand to an anonymous function
-  # or it could require a list of 2-tuples where
-  # the first element is a tagged tuple containing an atom which maps to a handler
-  # and the second element is a tagged tuple containing a list of arguments of whatever type
-  # and the types need to match the type of the handler somehow?
-
-  # --- Init Handler reference (Keyword list is technically a List)---
-  # Handles passing a reference to an init_handler when registering
-  deftc tc_expr(ctx, env, st, [callback: init_handler, args: args_ast] = _ast)
-        when is_list(args_ast) do
-    if Map.has_key?(ctx.delta_I, init_handler) do
-      ok({:fun, length(args_ast)}, env, st)
-    else
-      error(Error.FrameworkUsage.invalid_init_handler(ctx.module, ctx.meta), env)
-    end
-  end
-
-  deftc tc_expr(ctx, env, st, [callback: init_handler, args: args_ast] = _ast)
-        when is_nil(args_ast) do
-    if Map.has_key?(ctx.delta_I, init_handler) do
-      ok({:fun, 0}, env, st)
-    else
-      error(Error.FrameworkUsage.invalid_init_handler(ctx.module, ctx.meta), env)
-    end
-  end
-
-  deftc tc_expr(ctx, env, st, [callback: init_handler] = _ast) do
-    if Map.has_key?(ctx.delta_I, init_handler) do
-      ok({:fun, 0}, env, st)
-    else
-      error(Error.FrameworkUsage.invalid_init_handler(ctx.module, ctx.meta), env)
-    end
-  end
-
   # List Construction [v1, v2, ...] (Val-Cons / Val-EmptyList adaptation)
   # Enforces homogeneity. Preserves session state.
   deftc tc_expr(_ctx, env, st, []) do
@@ -766,7 +731,9 @@ defmodule Maty.Typechecker.TC do
           st,
           {{:., _m1, [Maty.DSL, :register]}, meta,
            [ap_pid_ast, role_ast, handler_name, args_ast, state_ast]}
-        ) do
+        )
+        # this probably means I need a separate clause to error that the handler name is not right?
+        when is_atom(handler_name) do
     # the argument checks report register_arg_type_mismatch, naming the argument at fault.
     # What is left waits for the register / init_handler rework: the init handler argument
     # should show the signature it is expected to have
@@ -808,62 +775,62 @@ defmodule Maty.Typechecker.TC do
 
       # todo: also check session type is not progressing
 
-      handler_name_type <~ tc_expr(ctx, env, st, handler_name)
+      # so i pass in a handler name `:some_atom` (let's call it ι)
+      # and the handler's args `{:some, :args, 1, 2, 3}` (let's call them X)
+      #
+      # In my function type environment Ψ, I have the type of every function (including handlers)
+      # so what we need to do is get the type of ι from Ψ.
+      # first we neef the function id f which we get from Δ_i
+      # f = Δ_i[ι].function  and this looks something like {:some_atom, 3}
+      # then using f we index Ψ to get the type of the handler function
+      # typ = Ψ[f]  returns something like `{args_type, return_type}`
+      #             where return type is always :no_return
+      #             and args_type is a list of 3 elements
+      #             where the last two elements are the state and session ctx, so we just need the first one
+      #
+      # so at this point we have:
+      #
+      # a list of signatures `[A -> B]`
+      # and we know that init handlers always return `:no_return` so we know that the list looks like this
+      # `[A -> ⊥]` which for the sake of our error message we can probably convert to
+      # `[A] -> ⊥` (all I'm saying is that we can have our message say something like
+      # "init handler args `X` don't match, args must match one of `[A]`"
+      # or something to that effect)
+      #
+      #
+      # we also have the actual type of the args passed `X`
+      #
+      #
+      # because we have these types we know that the handler name corresponds to an actual init handler
+      # which means before we even do this, we can handle the case where the atom we pass in does not correspond
+      # to an init handler and return a proper error
+      #
+      # and then we do all our type-checking based on that init handler
+      #
+      # what we can't do just yet, is know that we are registering this init handler with the correct role,
+      # but that's just not possible with the information we have at this point.
 
-      _
-      <~ lift_bool(
-        handler_name_type == :maty_handler_init,
-        # ? or did I change this to `atom`?
-        # ? and where do i check that it's the correct handler name?
-        Error.TypeMismatch.register_arg_type_mismatch(
-          ctx.module,
-          meta,
-          :init_handler,
-          expected: :atom,
-          got: handler_name_type
-        ),
-        env,
-        st
-      )
-
-      entry
+      accepted
       <~ lift_result(
-        Map.fetch(ctx.delta_I, handler_name),
-        # todo: come back and clean this up
-        Error.FrameworkUsage.invalid_init_handler(
-          ctx.module,
-          meta
-        ),
-        env,
-        st
-      )
-
-      init_handler_signatures
-      <~ lift_result(
-        # this actually stores a list of signatures
-        Map.fetch(ctx.psi, entry.function),
-        # todo: come back and clean this up
-        Error.FrameworkUsage.invalid_init_handler(
-          ctx.module,
-          meta
-        ),
+        Helpers.init_handler_arg_types(ctx, handler_name),
+        # todo: should make this more specific, something like "trying to register with something that is not an init_handler"
+        Error.FrameworkUsage.invalid_init_handler(ctx.module, meta),
         env,
         st
       )
 
       args_type <~ tc_expr(ctx, env, st, args_ast)
 
-      # todo: show the signature the init handler is expected to have (e.g. `A -> B`) instead of "a function"
-
       _
       <~ lift_bool(
-        Enum.any?(init_handler_signatures, fn {args, _} -> args_type == hd(args) end),
+        accepted == [] or args_type in accepted,
         Error.TypeMismatch.register_arg_type_mismatch(
           ctx.module,
           meta,
-          # probably needs another variant?
-          :init_handler,
-          expected: Enum.map(init_handler_signatures, fn {args, _} -> hd(args) end),
+          # todo: make this handle the possibility that there are multiple specs
+          # todo: show the signature the init handler is expected to have (e.g. `A -> B`) instead of "a function" or just the possible multiple `A`s
+          :init_handler_args,
+          expected: accepted,
           got: args_type
         ),
         env,
@@ -890,6 +857,27 @@ defmodule Maty.Typechecker.TC do
 
       ok({:tuple, [:ok, maty_actor_state_type]}, env, st)
     end
+  end
+
+  deftc tc_expr(
+          ctx,
+          env,
+          _st,
+          {{:., _m1, [Maty.DSL, :register]}, meta,
+           [_ap_pid_ast, _role_ast, _handler_name, _args_ast, _state_ast]}
+        ) do
+    # `handler_name` is not an atom
+    error(Error.FrameworkUsage.invalid_init_handler(ctx.module, meta), env)
+  end
+
+  deftc tc_expr(
+          ctx,
+          env,
+          _st,
+          {{:., _m1, [Maty.DSL, :register]}, meta, _args}
+        ) do
+    # function is called with the wrong number of args
+    error(Error.FrameworkUsage.invalid_init_handler(ctx.module, meta), env)
   end
 
   # --- Function Application (T-App) ---
@@ -951,6 +939,7 @@ defmodule Maty.Typechecker.TC do
   deftc tc_expr(ctx, env, st, value)
         when is_atom(value) and not is_nil(value) do
     cond do
+      # not sure if these should remain...
       Map.has_key?(ctx.delta_M, value) -> ok(:maty_handler_msg, env, st)
       Map.has_key?(ctx.delta_I, value) -> ok(:maty_handler_init, env, st)
       # Not a handler name, treat as a standard atom literal.
