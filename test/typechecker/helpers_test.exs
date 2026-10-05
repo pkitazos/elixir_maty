@@ -379,6 +379,16 @@ defmodule Maty.Typechecker.HelpersTest do
     test "non-state type returns error" do
       assert :error = Helpers.check_maty_state_type(:number)
     end
+
+    test "state type with extra keys returns error" do
+      {:map, fields} = Type.maty_actor_state()
+      state_type = {:map, Map.put(fields, :extra, :any)}
+      assert :error = Helpers.check_maty_state_type(state_type)
+    end
+
+    test "map with the right keys but wrong shape returns error" do
+      assert :error = Helpers.check_maty_state_type({:map, %{sessions: :any, callbacks: :any}})
+    end
   end
 
   # --- extract_capture_fun_id/1 ---

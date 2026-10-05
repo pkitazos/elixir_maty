@@ -240,8 +240,10 @@ defmodule Maty.Typechecker.Helpers do
 
   # Checks if a type is compatible with maty_actor_state
   def check_maty_state_type(state_type) do
-    if Type.is?(state_type, :maty_actor_state) do
-      {:ok, Type.maty_actor_state()}
+    expected = Type.maty_actor_state()
+
+    if state_type == expected do
+      {:ok, expected}
     else
       :error
     end

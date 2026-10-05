@@ -11,12 +11,15 @@ defmodule Maty.Types do
 
   # a session consists of:
   # - an ID
-  # - a map of session roles to pairs of `handler` * `role` you are being called as? not sure what this role is
+  # - a map of session roles to pairs of `handler` * `role`
+  #   the key is the role this actor plays in the session
+  #   and the paired role is the one the handler expects to receive from (see `__handler_expects__`)
   # - the address book
   # - some session-local state
 
   @type session :: %{
           id: session_id(),
+          # todo: the handler is stored by name, so this should be atom(), not function()
           handlers: %{role() => {function(), role()}},
           participants: %{role() => pid()},
           local_state: map()
@@ -32,6 +35,7 @@ defmodule Maty.Types do
   # - a map of initialisation token to pairs of `role` * `callback` to invoke when the session starts
   @type maty_actor_state :: %{
           sessions: %{session_id() => session()},
+          # todo: tighten function() to the init handler's actual signature
           callbacks: %{init_token() => {role(), function()}}
         }
 
@@ -40,22 +44,6 @@ defmodule Maty.Types do
   @type access_point_state :: %{
           participants: %{role() => :queue.queue({pid(), init_token()})}
         }
-
-  # these are the names of our types
-  @maty_types [
-    :session_id,
-    :init_token,
-    :role,
-    :session,
-    :session_ctx,
-    :maty_actor_state,
-    :suspend,
-    :done
-  ]
-
-  def get do
-    @maty_types
-  end
 
   # this maps our type names to their actual structural type
   def map do
@@ -126,6 +114,7 @@ defmodule Maty.Types do
         {:map,
          %{
            id: T.session_id(),
+           # todo: :function is not a T.t(); the handler is stored by name, so this should be :atom
            handlers: {:map, %{T.role() => {:tuple, [:function, T.role()]}}},
            participants: {:map, %{T.role() => :pid}},
            local_state: :any
@@ -138,85 +127,8 @@ defmodule Maty.Types do
         {:map,
          %{
            sessions: {:map, %{T.session_id() => T.session()}},
+           # todo: :function is not a T.t(); decide how to represent the init handler callback
            callbacks: {:map, %{T.init_token() => {:tuple, [T.role(), :function]}}}
          }}
-
-    # ------------------------------------------------------------------
-
-    # these are boolean functions which check if a given type is the same as some other type
-
-    def is?(:ref, :session_id), do: true
-    def is?(:ref, :init_token), do: true
-
-    def is?(:atom, :role), do: true
-
-    def is?({:map, map}, :session) do
-      has_all_keys? =
-        Map.has_key?(map, :id) and Map.has_key?(map, :handlers) and
-          Map.has_key?(map, :participants) and Map.has_key?(map, :local_state)
-
-      cond do
-        not has_all_keys? ->
-          false
-
-        true ->
-          %{
-            id: session_id,
-            handlers: {:map, handler_map},
-            participants: {:map, participant_map},
-            local_state: :any
-          } = map
-
-          s_valid? = is?(session_id, :session_id)
-
-          h_valid? =
-            handler_map
-            |> Map.to_list()
-            |> Enum.all?(fn {k, v} -> is?(k, :role) and v == {:tuple, [:function, T.role()]} end)
-
-          p_valid? =
-            participant_map
-            |> Map.to_list()
-            |> Enum.all?(fn {k, v} -> is?(k, :role) and v == :pid end)
-
-          s_valid? and h_valid? and p_valid?
-      end
-    end
-
-    def is?({:tuple, [session, role]}, :session_ctx),
-      do: is?(session, :session) and is?(role, :role)
-
-    def is?({:map, map}, :maty_actor_state) do
-      has_all_keys? = Map.has_key?(map, :sessions) and Map.has_key?(map, :callbacks)
-
-      cond do
-        not has_all_keys? ->
-          false
-
-        true ->
-          %{sessions: {:map, session_map}, callbacks: {:map, callback_map}} = map
-
-          s_valid? =
-            session_map
-            |> Map.to_list()
-            |> Enum.all?(fn {k, v} -> is?(k, :session_id) and is?(v, :session) end)
-
-          c_valid? =
-            callback_map
-            |> Map.to_list()
-            |> Enum.all?(fn {k, v} ->
-              is?(k, :init_token) and v == {:tuple, [T.role(), :function]}
-            end)
-
-          s_valid? and c_valid?
-      end
-    end
-
-    def is?({:tuple, [:atom, :atom, state]}, :suspend),
-      do: is?(state, :maty_actor_state)
-
-    def is?({:tuple, [:atom, :atom, state]}, :done), do: is?(state, :maty_actor_state)
-
-    def is?(_, _), do: false
   end
 end
