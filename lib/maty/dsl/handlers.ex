@@ -88,6 +88,7 @@ defmodule Maty.DSL.Handlers do
           unquote(body)
         catch
           {:suspend, next_handler, new_state} -> {:suspend, next_handler, new_state}
+          {:done, new_state} -> {:done, new_state}
         end
       end
     end

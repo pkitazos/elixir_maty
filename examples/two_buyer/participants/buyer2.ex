@@ -12,7 +12,8 @@ defmodule TwoBuyer.Participants.Buyer2 do
     MatyDSL.register(
       ap_pid,
       @role,
-      [callback: :install, args: nil],
+      :install,
+      nil,
       initial_state
     )
   end

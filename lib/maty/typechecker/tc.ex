@@ -765,7 +765,7 @@ defmodule Maty.Typechecker.TC do
           env,
           st,
           {{:., _m1, [Maty.DSL, :register]}, meta,
-           [ap_pid_ast, role_ast, reg_info_ast, state_ast]}
+           [ap_pid_ast, role_ast, handler_name, args_ast, state_ast]}
         ) do
     # the argument checks report register_arg_type_mismatch, naming the argument at fault.
     # What is left waits for the register / init_handler rework: the init handler argument
@@ -794,6 +794,7 @@ defmodule Maty.Typechecker.TC do
       _
       <~ lift_bool(
         role_type == :atom,
+        # ? where do i check that it's the correct role?
         Error.TypeMismatch.register_arg_type_mismatch(
           ctx.module,
           meta,
@@ -807,18 +808,63 @@ defmodule Maty.Typechecker.TC do
 
       # todo: also check session type is not progressing
 
-      init_handler_type <~ tc_expr(ctx, env, st, reg_info_ast)
+      handler_name_type <~ tc_expr(ctx, env, st, handler_name)
 
-      # todo: show the signature the init handler is expected to have (e.g. `A -> B`) instead of "a function"
       _
       <~ lift_bool(
-        match?({:fun, _}, init_handler_type),
+        handler_name_type == :maty_handler_init,
+        # ? or did I change this to `atom`?
+        # ? and where do i check that it's the correct handler name?
         Error.TypeMismatch.register_arg_type_mismatch(
           ctx.module,
           meta,
           :init_handler,
-          expected: "a function",
-          got: init_handler_type
+          expected: :atom,
+          got: handler_name_type
+        ),
+        env,
+        st
+      )
+
+      entry
+      <~ lift_result(
+        Map.fetch(ctx.delta_I, handler_name),
+        # todo: come back and clean this up
+        Error.FrameworkUsage.invalid_init_handler(
+          ctx.module,
+          meta
+        ),
+        env,
+        st
+      )
+
+      init_handler_signatures
+      <~ lift_result(
+        # this actually stores a list of signatures
+        Map.fetch(ctx.psi, entry.function),
+        # todo: come back and clean this up
+        Error.FrameworkUsage.invalid_init_handler(
+          ctx.module,
+          meta
+        ),
+        env,
+        st
+      )
+
+      args_type <~ tc_expr(ctx, env, st, args_ast)
+
+      # todo: show the signature the init handler is expected to have (e.g. `A -> B`) instead of "a function"
+
+      _
+      <~ lift_bool(
+        Enum.any?(init_handler_signatures, fn {args, _} -> args_type == hd(args) end),
+        Error.TypeMismatch.register_arg_type_mismatch(
+          ctx.module,
+          meta,
+          # probably needs another variant?
+          :init_handler,
+          expected: Enum.map(init_handler_signatures, fn {args, _} -> hd(args) end),
+          got: args_type
         ),
         env,
         st

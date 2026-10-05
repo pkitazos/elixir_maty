@@ -327,6 +327,10 @@ defmodule Maty.Typechecker do
       # if we found any errors, fail compilation
       raise_type_errors!(env, errors)
     else
+      # todo: sort these messages
+      # modules compile in parallel so needs collecting the results after compilation
+      # (e.g. a compiler tracer or a mix compiler step) since each module is checked in its own after_compile hook
+      # (maybe more trouble than it's worth)
       Logger.info("\n[#{env.module}] No communication errors", ansi_color: :light_green)
     end
   end

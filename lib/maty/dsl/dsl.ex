@@ -36,28 +36,23 @@ defmodule Maty.DSL do
   @spec register(
           ap_pid :: pid(),
           role :: Types.role(),
-          reg_info :: keyword(),
+          handler :: atom(),
+          # no way to get around this `term()` I don't think
+          args :: term(),
           state :: Types.maty_actor_state()
-        ) :: {:ok, Types.maty_actor_state()} | {:error, atom()}
-  def register(ap_pid, role, reg_info, state) do
+        ) :: {:ok, Types.maty_actor_state()}
+  def register(ap_pid, role, handler, args, state) do
     ap_pid = sanitise_ap_pid(ap_pid)
+    # identified the suspended callback
+    init_token = make_ref()
+    Kernel.send(ap_pid, {:register, role, self(), init_token})
 
-    with {:ok, handler_name} when is_atom(handler_name) <- Keyword.fetch(reg_info, :callback),
-         {:ok, init_args} <- Keyword.fetch(reg_info, :args) do
-      # identified the suspended callback
-
-      init_token = make_ref()
-      Kernel.send(ap_pid, {:register, role, self(), init_token})
-
-      callback = fn module, state, session_ctx ->
-        apply(module, handler_name, [init_args, state, session_ctx])
-      end
-
-      updated_state = put_in(state, [:callbacks, init_token], {role, callback})
-      {:ok, updated_state}
-    else
-      :error -> {:error, :invalid_registration_info}
+    callback = fn module, state, session_ctx ->
+      apply(module, handler, [args, state, session_ctx])
     end
+
+    updated_state = put_in(state, [:callbacks, init_token], {role, callback})
+    {:ok, updated_state}
   end
 
   @spec internal_send({Types.session(), Types.role()}, Types.role(), {atom(), any()}) :: atom()
