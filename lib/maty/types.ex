@@ -10,6 +10,9 @@ defmodule Maty.Types do
   @type role :: atom()
   @type handler_label :: atom()
 
+  # todo: this should be tightened a bit more than `any()`
+  @type message :: {atom(), any()}
+
   # a session consists of:
   # - an ID
   # - a map of session roles to pairs of `handler` * `role`
@@ -37,7 +40,8 @@ defmodule Maty.Types do
   @type maty_actor_state :: %{
           sessions: %{session_id() => session()},
           # any() cause you can choose to pass any argument to the function
-          callbacks: %{init_token() => {role(), handler_label(), any()}}
+          callbacks: %{init_token() => {role(), handler_label(), any()}},
+          stash: list({session_id(), role(), role(), message()})
         }
 
   # an access point stores a map of candidate participants
@@ -108,6 +112,8 @@ defmodule Maty.Types do
     def role, do: :atom
     def handler_label, do: :atom
 
+    def message, do: {:tuple, [:atom, :any]}
+
     def session,
       do:
         {:map,
@@ -115,6 +121,7 @@ defmodule Maty.Types do
            id: T.session_id(),
            handlers: {:map, %{T.role() => {:tuple, [T.handler_label(), T.role()]}}},
            participants: {:map, %{T.role() => :pid}},
+           # todo: see if I can make this a little nicer..
            local_state: :any
          }}
 
@@ -125,7 +132,8 @@ defmodule Maty.Types do
         {:map,
          %{
            sessions: {:map, %{T.session_id() => T.session()}},
-           callbacks: {:map, %{T.init_token() => {:tuple, [T.role(), T.handler_label(), :any]}}}
+           callbacks: {:map, %{T.init_token() => {:tuple, [T.role(), T.handler_label(), :any]}}},
+           stash: {:list, {:tuple, [T.session_id(), T.role(), T.role(), T.message()]}}
          }}
   end
 end
