@@ -45,11 +45,7 @@ defmodule Maty.DSL do
     init_token = make_ref()
     Kernel.send(ap_pid, {:register, role, self(), init_token})
 
-    callback = fn module, state, session_ctx ->
-      apply(module, handler, [args, state, session_ctx])
-    end
-
-    updated_state = put_in(state, [:callbacks, init_token], {role, callback})
+    updated_state = put_in(state, [:callbacks, init_token], {role, handler, args})
     {:ok, updated_state}
   end
 

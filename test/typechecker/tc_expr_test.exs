@@ -507,36 +507,25 @@ defmodule Maty.Typechecker.TCExprTest do
     end
   end
 
-  # --- Anonymous functions
+  # --- Anonymous functions and captures are rejected
 
-  describe "tc_expr/4 anonymous functions" do
-    test "fn with 1 arg" do
+  describe "tc_expr/4 anonymous functions and captures" do
+    test "fn is rejected" do
       ast = {:fn, @meta, [{:->, @meta, [[var(:x)], var(:x)]}]}
-      assert {:ok, {:fun, 1}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:error, msg, _env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert %Error{category: :framework_usage, kind: :unsupported_anonymous_function} = msg
     end
 
-    test "fn with 2 args" do
-      ast = {:fn, @meta, [{:->, @meta, [[var(:x), var(:y)], var(:x)]}]}
-      assert {:ok, {:fun, 2}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
-    end
-
-    test "fn with 0 args" do
-      ast = {:fn, @meta, [{:->, @meta, [[], 42]}]}
-      assert {:ok, {:fun, 0}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
-    end
-  end
-
-  # --- Function captures
-
-  describe "tc_expr/4 function captures" do
-    test "remote function capture &Mod.fun/arity" do
+    test "remote function capture &Mod.fun/arity is rejected" do
       ast = {:&, @meta, [{:/, @meta, [{{:., @meta, [String, :length]}, @meta, []}, 1]}]}
-      assert {:ok, {:fun, 1}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:error, msg, _env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert %Error{category: :framework_usage, kind: :unsupported_anonymous_function} = msg
     end
 
-    test "local function capture &fun/arity" do
+    test "local function capture &fun/arity is rejected" do
       ast = {:&, @meta, [{:/, @meta, [:my_fun, 2]}]}
-      assert {:ok, {:fun, 2}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:error, msg, _env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert %Error{category: :framework_usage, kind: :unsupported_anonymous_function} = msg
     end
   end
 

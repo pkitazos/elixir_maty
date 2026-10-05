@@ -78,10 +78,11 @@ defmodule Maty.Actor do
 
         initial_actor_state = put_in(actor_state, [:sessions, session_id], partial_session)
 
-        {role, init_handler} = initial_actor_state.callbacks[init_token]
+        {{role, init_handler, args}, initial_actor_state} =
+          pop_in(initial_actor_state, [:callbacks, init_token])
 
         updated_actor_state =
-          case init_handler.(module, initial_actor_state, {partial_session, role}) do
+          case apply(module, init_handler, [args, initial_actor_state, {partial_session, role}]) do
             {:suspend, handler_name, intermediate_state} ->
               expected_role = module.__handler_expects__(handler_name)
 

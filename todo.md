@@ -44,7 +44,7 @@ It's been a while since I wrote most of this and I remember some of it was a bit
 ## tasks
 
 - [ ] proper map type support for actor state and destructuring in the DSL
-- [ ] fix list / keyword list situation
+- [x] fix list / keyword list situation
 
 ## Questions
 

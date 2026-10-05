@@ -292,31 +292,18 @@ defmodule Maty.Typechecker.TC do
   end
 
   # --- Anonymous Functions and Captures ---
-  # todo: these are a bit rudimentary
-  # for proper typechecking of anonymous functions and/or captures we may need to either introduce more syntax
-  # or change the typechecker to use constraints and unification
+  # not supported: would require either type annotations (which do not exist in the language in any capacity)
+  # or type inference (which was not really the point of this project)
+  # Reject them explicitly so they do not fall through to T-App
 
   # Anonymous function: fn args -> ... end
-  deftc tc_expr(_ctx, env, st, {:fn, _meta, [{:->, _, [args_ast, _body_ast]}]}) do
-    arity = length(args_ast)
-    ok({:fun, arity}, env, st)
+  deftc tc_expr(ctx, env, _st, {:fn, meta, _clauses}) do
+    error(Error.FrameworkUsage.unsupported_anonymous_function(ctx.module, meta), env)
   end
 
-  # Remote function capture: &Mod.fun/arity
-  deftc tc_expr(
-          _ctx,
-          env,
-          st,
-          {:&, _meta, [{:/, _, [{{:., _, [_mod, _fun]}, _, _}, arity]}]}
-        )
-        when is_integer(arity) do
-    ok({:fun, arity}, env, st)
-  end
-
-  # Local function capture: &fun/arity
-  deftc tc_expr(_ctx, env, st, {:&, _meta, [{:/, _, [fun_atom, arity]}]})
-        when is_atom(fun_atom) and is_integer(arity) do
-    ok({:fun, arity}, env, st)
+  # Function capture: &Mod.fun/arity, &fun/arity, &(&1 + 1)
+  deftc tc_expr(ctx, env, _st, {:&, meta, [_capture]}) do
+    error(Error.FrameworkUsage.unsupported_anonymous_function(ctx.module, meta), env)
   end
 
   # --- Block Scope ---
@@ -584,30 +571,20 @@ defmodule Maty.Typechecker.TC do
            [{:{}, meta, [:suspend, handler_ast, {_state_var, _, _} = state_ast]}]}
         ) do
     thread do
-      handler_type
-      <~ (
-        st_pre = st
-        tc_expr(ctx, env, st, handler_ast)
-      )
-
-      :ok <~ Helpers.check_st_unchanged(st_pre, st, meta)
-
+      # TV-MsgHandler
+      # instead of typing the handler name as a value, the literal atom is checked against Δ_M directly
       _
-      <~ case Helpers.check_handler_type(handler_type) do
-        :ok ->
-          ok(nil, env, st)
-
-        {:error, :not_a_handler} ->
-          error(
-            Error.ProtocolViolation.suspend_invalid_handler_type(
-              ctx.module,
-              meta,
-              [got: handler_ast],
-              st
-            ),
-            env
-          )
-      end
+      <~ lift_bool(
+        Map.has_key?(ctx.delta_M, handler_ast),
+        Error.ProtocolViolation.suspend_invalid_handler_type(
+          ctx.module,
+          meta,
+          [got: handler_ast],
+          st
+        ),
+        env,
+        st
+      )
 
       state_type
       <~ (
@@ -772,6 +749,8 @@ defmodule Maty.Typechecker.TC do
 
       # todo: also check session type is not progressing
 
+      # TV-InitHandler
+      # instead of typing the handler name as a value, the literal atom is checked against Δ_I directly
       accepted_arg_types
       <~ lift_result(
         Helpers.init_handler_arg_types(ctx, handler_name),
@@ -901,25 +880,7 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # Clause for TV-MsgHandler, TV-InitHandler (Handler names as values)
-  # These need access to the Delta environment. Preserves session state.
-  # --- Simplified Handler Name / Atom Logic ---
-  # Assumes variable shadowing doesn't occur for handler names.
-
-  # This clause handles atoms that might be handler names.
-  deftc tc_expr(ctx, env, st, value)
-        when is_atom(value) and not is_nil(value) do
-    cond do
-      # not sure if these should remain...
-      Map.has_key?(ctx.delta_M, value) -> ok(:maty_handler_msg, env, st)
-      Map.has_key?(ctx.delta_I, value) -> ok(:maty_handler_init, env, st)
-      # Not a handler name, treat as a standard atom literal.
-      # Fall through by calling the more general atom clause.
-      true -> ok(:atom, env, st)
-    end
-  end
-
-  # General Atom Literal Clause (catches atoms not matched above)
+  # Atom literals (handler names included)
   deftc tc_expr(_ctx, env, st, value) when is_atom(value) and not is_nil(value) do
     ok(:atom, env, st)
   end

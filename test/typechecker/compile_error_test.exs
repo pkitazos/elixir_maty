@@ -495,7 +495,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ ~r/Trace:\n\s+in case branch #1 .*\n\s+via f\/1/
     end
 
-    test "a wrongly typed argument to register is reported, not crashed on" do
+    test "a wrongly typed argument to register is reported" do
       src =
         """
         defmodule MatyCompileErrorFixture.RegisterBadAp do
@@ -920,7 +920,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.line == line_of(src, "MatyDSL.register(")
     end
 
-    test "register with the wrong number of arguments is reported, not crashed on" do
+    test "register with the wrong number of arguments is reported" do
       src =
         register_src(
           "RegisterWrongArity",
@@ -932,6 +932,62 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Wrong Number of Arguments to register"
       assert error.description =~ "Got: 4"
       assert error.line == line_of(src, "MatyDSL.register(")
+    end
+  end
+
+  describe "suspend" do
+    # the :seller actor whose init handler suspends with `next_handler` the session type continues as `title_handler`
+    defp suspend_src(module_name, next_handler) do
+      """
+      defmodule MatyCompileErrorFixture.#{module_name} do
+        use Maty.Actor
+
+        @role :seller
+
+        @st {:install, ~q/title_handler/}
+        @st {:title_handler, ~q/&buyer:{title(binary).end}/}
+
+        on_link ap_pid :: pid(), initial_state do
+          MatyDSL.register(ap_pid, @role, :install, nil, initial_state)
+        end
+
+        init_handler :install, nil, state do
+          next_handler = :title_handler
+          _ = next_handler
+          MatyDSL.suspend(#{next_handler}, state)
+        end
+
+        handler :title_handler, :buyer, {:title, _title :: binary()}, state do
+          MatyDSL.done(state)
+        end
+      end
+      """
+    end
+
+    test "suspending with an init handler is reported" do
+      src = suspend_src("SuspendInitHandler", ":install")
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Suspended with Invalid Handler"
+      assert error.description =~ "Tried: :install"
+      assert error.line == line_of(src, "MatyDSL.suspend(")
+    end
+
+    test "suspending with a variable is reported" do
+      src = suspend_src("SuspendVariable", "next_handler")
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Suspended with Invalid Handler"
+      assert error.description =~ "Tried: next_handler"
+      assert error.line == line_of(src, "MatyDSL.suspend(")
+    end
+
+    test "suspending with the message handler the session type names compiles" do
+      src = suspend_src("SuspendMessageHandler", ":title_handler")
+
+      assert [{MatyCompileErrorFixture.SuspendMessageHandler, _}] = Code.compile_string(src)
     end
   end
 end

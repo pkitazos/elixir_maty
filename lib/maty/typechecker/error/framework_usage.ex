@@ -19,6 +19,15 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
+  def unsupported_anonymous_function(module, meta) do
+    %Error{
+      category: :framework_usage,
+      kind: :unsupported_anonymous_function,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column])
+    }
+  end
+
   def missing_session_registration(module, meta) do
     %Error{
       category: :framework_usage,

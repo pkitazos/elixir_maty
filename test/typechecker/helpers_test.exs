@@ -352,22 +352,6 @@ defmodule Maty.Typechecker.HelpersTest do
     end
   end
 
-  # --- check_handler_type/1 ---
-
-  describe "check_handler_type/1" do
-    test "message handler" do
-      assert :ok = Helpers.check_handler_type(:maty_handler_msg)
-    end
-
-    test "init handler" do
-      assert :ok = Helpers.check_handler_type(:maty_handler_init)
-    end
-
-    test "other type" do
-      assert {:error, :not_a_handler} = Helpers.check_handler_type(:number)
-    end
-  end
-
   # --- check_maty_state_type/1 ---
 
   describe "check_maty_state_type/1" do
@@ -388,24 +372,6 @@ defmodule Maty.Typechecker.HelpersTest do
 
     test "map with the right keys but wrong shape returns error" do
       assert :error = Helpers.check_maty_state_type({:map, %{sessions: :any, callbacks: :any}})
-    end
-  end
-
-  # --- extract_capture_fun_id/1 ---
-
-  describe "extract_capture_fun_id/1" do
-    test "remote capture &Mod.fun/arity" do
-      ast = {:&, [], [{:/, [], [{{:., [], [String, :length]}, [], []}, 1]}]}
-      assert {:ok, {:length, 1}} = Helpers.extract_capture_fun_id(ast)
-    end
-
-    test "local capture &fun/arity" do
-      ast = {:&, [], [{:/, [], [:my_fun, 2]}]}
-      assert {:ok, {:my_fun, 2}} = Helpers.extract_capture_fun_id(ast)
-    end
-
-    test "non-capture returns error" do
-      assert :error = Helpers.extract_capture_fun_id(42)
     end
   end
 

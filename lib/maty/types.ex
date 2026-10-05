@@ -8,6 +8,7 @@ defmodule Maty.Types do
   @type session_id :: reference()
   @type init_token :: reference()
   @type role :: atom()
+  @type handler_label :: atom()
 
   # a session consists of:
   # - an ID
@@ -19,8 +20,7 @@ defmodule Maty.Types do
 
   @type session :: %{
           id: session_id(),
-          # todo: the handler is stored by name, so this should be atom(), not function()
-          handlers: %{role() => {function(), role()}},
+          handlers: %{role() => {handler_label(), role()}},
           participants: %{role() => pid()},
           local_state: map()
         }
@@ -32,11 +32,12 @@ defmodule Maty.Types do
 
   # a Maty actor stores:
   # - a map of sessions it is participating in
-  # - a map of initialisation token to pairs of `role` * `callback` to invoke when the session starts
+  # - a map of initialisation token to triples of `role` * `init handler name` * `args`
+  #   the init handler is called with `args` when the session starts
   @type maty_actor_state :: %{
           sessions: %{session_id() => session()},
-          # todo: tighten function() to the init handler's actual signature
-          callbacks: %{init_token() => {role(), function()}}
+          # any() cause you can choose to pass any argument to the function
+          callbacks: %{init_token() => {role(), handler_label(), any()}}
         }
 
   # an access point stores a map of candidate participants
@@ -94,9 +95,6 @@ defmodule Maty.Types do
             | :no_return
             | :pid
             | :ref
-            | :maty_handler_msg
-            | :maty_handler_init
-            | {:fun, non_neg_integer()}
             | {:tuple, [t()]}
             | {:list, t()}
             | {:map, %{atom() => t()}}
@@ -108,14 +106,14 @@ defmodule Maty.Types do
     def session_id, do: :ref
     def init_token, do: :ref
     def role, do: :atom
+    def handler_label, do: :atom
 
     def session,
       do:
         {:map,
          %{
            id: T.session_id(),
-           # todo: :function is not a T.t(); the handler is stored by name, so this should be :atom
-           handlers: {:map, %{T.role() => {:tuple, [:function, T.role()]}}},
+           handlers: {:map, %{T.role() => {:tuple, [T.handler_label(), T.role()]}}},
            participants: {:map, %{T.role() => :pid}},
            local_state: :any
          }}
@@ -127,8 +125,7 @@ defmodule Maty.Types do
         {:map,
          %{
            sessions: {:map, %{T.session_id() => T.session()}},
-           # todo: :function is not a T.t(); decide how to represent the init handler callback
-           callbacks: {:map, %{T.init_token() => {:tuple, [T.role(), :function]}}}
+           callbacks: {:map, %{T.init_token() => {:tuple, [T.role(), T.handler_label(), :any]}}}
          }}
   end
 end

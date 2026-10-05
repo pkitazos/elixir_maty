@@ -233,11 +233,6 @@ defmodule Maty.Typechecker.Helpers do
     # end
   end
 
-  # Checks if a type is one of the valid handler types we defined earlier
-  def check_handler_type(:maty_handler_msg), do: :ok
-  def check_handler_type(:maty_handler_init), do: :ok
-  def check_handler_type(_other_type), do: {:error, :not_a_handler}
-
   # Checks if a type is compatible with maty_actor_state
   def check_maty_state_type(state_type) do
     expected = Type.maty_actor_state()
@@ -269,16 +264,6 @@ defmodule Maty.Typechecker.Helpers do
       {:ok, ctx.psi |> Map.get(func_id, []) |> Enum.map(fn {[arg | _], _} -> arg end)}
     end
   end
-
-  def extract_capture_fun_id({:&, _, [{:/, _, [{{:., _, [_mod, fun]}, _, _}, arity]}]})
-      when is_atom(fun) and is_integer(arity),
-      do: {:ok, {fun, arity}}
-
-  def extract_capture_fun_id({:&, _, [{:/, _, [fun, arity]}]})
-      when is_atom(fun) and is_integer(arity),
-      do: {:ok, {fun, arity}}
-
-  def extract_capture_fun_id(_other_ast), do: :error
 
   @spec contains_register_call?(Macro.t()) :: boolean()
 

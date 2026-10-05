@@ -158,7 +158,7 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Protocol Violation: Suspended with Invalid Handler
-      Tried: #{got}
+      Tried: #{Macro.to_string(got)}
       --
       Session Type: #{Maty.ST.repr(e.st)}
     """
@@ -628,6 +628,13 @@ defmodule Maty.Typechecker.Error.Formatter do
     Framework Usage Violation: Wrong Number of Arguments to register
       Expected: 5 (access point, role, init handler, init handler args, state)
       Got: #{got}
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :unsupported_anonymous_function}) do
+    """
+    Framework Usage Violation: Unsupported Anonymous Function
+      Anonymous functions are not supported in Maty actors
     """
   end
 
