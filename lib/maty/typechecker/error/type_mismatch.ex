@@ -85,10 +85,11 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
     }
   end
 
-  # MatyDSL.register/4 was called with an argument of the wrong type. `argument` names which one,
-  # `expected` is a type, or a readable description where there is no single type (the init handler)
+  # MatyDSL.register/5 was called with an argument of the wrong type.
+  # - `argument` names which arg was wrong
+  # - `expected` is a type or (for the init handler args) the list of types its clauses accept
   def register_arg_type_mismatch(module, meta, argument, expected: expected, got: got)
-      when argument in [:access_point, :role, :init_handler, :init_handler_args] do
+      when argument in [:access_point, :role, :init_handler_args] do
     %Error{
       category: :type_mismatch,
       kind: :register_arg_type_mismatch,

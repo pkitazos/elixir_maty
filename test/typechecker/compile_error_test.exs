@@ -791,4 +791,147 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.line == b_line
     end
   end
+
+  describe "register" do
+    # the :seller actor, registering with `register_call` from on_link
+    # `init_handlers` replaces the default single-clause init handler taking a {pid, binary}
+    defp register_src(module_name, register_call, init_handlers \\ nil) do
+      init_handlers =
+        init_handlers ||
+          """
+          init_handler :install, {_ap_pid, _title} :: {pid(), binary()}, state do
+            MatyDSL.suspend(:decision_handler, state)
+          end
+          """
+
+      """
+      defmodule MatyCompileErrorFixture.#{module_name} do
+        use Maty.Actor
+
+        @role :seller
+
+        @st {:install, ~q/decision_handler/}
+        @st {:decision_handler, ~q/&buyer2:{address(binary).+buyer2:{date(binary).end},quit(nil).end}/}
+
+        on_link ap_pid :: pid(), initial_state do
+          #{register_call}
+        end
+
+        #{init_handlers}
+
+        #{@valid_handlers}
+      end
+      """
+    end
+
+    @two_clause_init_handler """
+    init_handler :install, {_ap_pid, _title} :: {pid(), binary()}, state do
+      MatyDSL.suspend(:decision_handler, state)
+    end
+
+    init_handler :install, {_ap_pid, _stock, _quantity} :: {pid(), number(), number()}, state do
+      MatyDSL.suspend(:decision_handler, state)
+    end
+    """
+
+    test "args of the wrong type are reported as register's fourth argument" do
+      src =
+        register_src(
+          "RegisterBadArgs",
+          "MatyDSL.register(ap_pid, @role, :install, {ap_pid, false}, initial_state)"
+        )
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Register Argument Type"
+      assert error.description =~ "Argument: 4 (init handler args)"
+      assert error.description =~ "Expected: {:tuple, [:pid, :binary]}\n"
+      assert error.description =~ "Got: {:tuple, [:pid, :boolean]}"
+      assert error.line == line_of(src, "MatyDSL.register(")
+    end
+
+    test "args are checked against every clause of a multi-clause init handler" do
+      src =
+        register_src(
+          "RegisterBadArgsTwoClauses",
+          "MatyDSL.register(ap_pid, @role, :install, 1, initial_state)",
+          @two_clause_init_handler
+        )
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Argument: 4 (init handler args)"
+      assert error.description =~ "Expected: one of: "
+      assert error.description =~ "{:tuple, [:pid, :binary]}"
+      assert error.description =~ "{:tuple, [:pid, :number, :number]}"
+      assert error.description =~ "Got: :number"
+    end
+
+    test "args matching any clause of a multi-clause init handler are accepted" do
+      src =
+        register_src(
+          "RegisterSecondClause",
+          "MatyDSL.register(ap_pid, @role, :install, {ap_pid, 5, 10}, initial_state)",
+          @two_clause_init_handler
+        )
+
+      assert [{MatyCompileErrorFixture.RegisterSecondClause, _}] = Code.compile_string(src)
+    end
+
+    test "an atom that is not an init handler is reported with the known init handlers" do
+      src =
+        register_src(
+          "RegisterUnknownHandler",
+          ~s|MatyDSL.register(ap_pid, @role, :nope, {ap_pid, "title"}, initial_state)|
+        )
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Unknown Init Handler"
+      assert error.description =~ "Got: :nope"
+      assert error.description =~ "Init handlers: :install"
+      assert error.line == line_of(src, "MatyDSL.register(")
+    end
+
+    test "a message handler is not accepted as an init handler" do
+      src =
+        register_src(
+          "RegisterMessageHandler",
+          ~s|MatyDSL.register(ap_pid, @role, :decision_handler, {ap_pid, "title"}, initial_state)|
+        )
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Unknown Init Handler"
+      assert error.description =~ "Got: :decision_handler"
+    end
+
+    test "an init handler that is not a literal atom is reported" do
+      src =
+        register_src("RegisterNonLiteralHandler", """
+        handler_name = :install
+        MatyDSL.register(ap_pid, @role, handler_name, {ap_pid, "title"}, initial_state)
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Init Handler Not a Literal"
+      assert error.description =~ "Got: handler_name"
+      assert error.line == line_of(src, "MatyDSL.register(")
+    end
+
+    test "register with the wrong number of arguments is reported, not crashed on" do
+      src =
+        register_src(
+          "RegisterWrongArity",
+          "MatyDSL.register(ap_pid, @role, :install, initial_state)"
+        )
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Wrong Number of Arguments to register"
+      assert error.description =~ "Got: 4"
+      assert error.line == line_of(src, "MatyDSL.register(")
+    end
+  end
 end

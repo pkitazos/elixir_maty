@@ -19,19 +19,18 @@ defmodule Maty.DSL do
   initialisation information (role, handler name, initial arguments)
   in the actor's state, associated with a unique token.
 
+  The handler name and its arguments together stand in for the callback closure of the Maty calculus
+  when the session starts, the init handler is called with: `args`, the actor state and the session context.
+
   ## Parameters
     - `ap_pid`: The PID of the Access Point process.
     - `role`: The role this actor will play in the session (atom).
-    - `reg_info`: A keyword list containing registration details,
-      specifically `[callback: handler_name, args: init_args]`.
-      - `handler_name`: The atom name of the `init_handler` to be called
-        when the session starts.
-      - `init_args`: The arguments to pass to the `init_handler`.
+    - `handler`: The name of the `init_handler` to be called when the session starts, as a literal atom
+    - `args`: The single value passed to the `init_handler` (use a tuple for several values, and `nil` for none).
     - `state`: The current actor state (`maty_actor_state`).
 
   ## Returns
-    - `{:ok, updated_state}` on successful registration.
-    - `{:error, :invalid_registration_info}` if `reg_info` is malformed.
+    - `{:ok, updated_state}`.
   """
   @spec register(
           ap_pid :: pid(),
@@ -42,8 +41,7 @@ defmodule Maty.DSL do
           state :: Types.maty_actor_state()
         ) :: {:ok, Types.maty_actor_state()}
   def register(ap_pid, role, handler, args, state) do
-    ap_pid = sanitise_ap_pid(ap_pid)
-    # identified the suspended callback
+    # the init token identifies the suspended callback
     init_token = make_ref()
     Kernel.send(ap_pid, {:register, role, self(), init_token})
 
@@ -78,8 +76,4 @@ defmodule Maty.DSL do
       throw({:done, unquote(state)})
     end
   end
-
-  # ! I still don't know why this happens
-  defp sanitise_ap_pid([pid | _]), do: pid
-  defp sanitise_ap_pid(pid), do: pid
 end

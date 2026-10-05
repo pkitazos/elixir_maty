@@ -732,11 +732,7 @@ defmodule Maty.Typechecker.TC do
           {{:., _m1, [Maty.DSL, :register]}, meta,
            [ap_pid_ast, role_ast, handler_name, args_ast, state_ast]}
         )
-        # this probably means I need a separate clause to error that the handler name is not right?
         when is_atom(handler_name) do
-    # the argument checks report register_arg_type_mismatch, naming the argument at fault.
-    # What is left waits for the register / init_handler rework: the init handler argument
-    # should show the signature it is expected to have
     thread do
       pid_type <~ tc_expr(ctx, env, st, ap_pid_ast)
 
@@ -761,7 +757,8 @@ defmodule Maty.Typechecker.TC do
       _
       <~ lift_bool(
         role_type == :atom,
-        # ? where do i check that it's the correct role?
+        # the role cannot be checked against the protocol here
+        # currently, the roles only exist in the access point at runtime (see issue #29)
         Error.TypeMismatch.register_arg_type_mismatch(
           ctx.module,
           meta,
@@ -775,46 +772,15 @@ defmodule Maty.Typechecker.TC do
 
       # todo: also check session type is not progressing
 
-      # so i pass in a handler name `:some_atom` (let's call it ι)
-      # and the handler's args `{:some, :args, 1, 2, 3}` (let's call them X)
-      #
-      # In my function type environment Ψ, I have the type of every function (including handlers)
-      # so what we need to do is get the type of ι from Ψ.
-      # first we neef the function id f which we get from Δ_i
-      # f = Δ_i[ι].function  and this looks something like {:some_atom, 3}
-      # then using f we index Ψ to get the type of the handler function
-      # typ = Ψ[f]  returns something like `{args_type, return_type}`
-      #             where return type is always :no_return
-      #             and args_type is a list of 3 elements
-      #             where the last two elements are the state and session ctx, so we just need the first one
-      #
-      # so at this point we have:
-      #
-      # a list of signatures `[A -> B]`
-      # and we know that init handlers always return `:no_return` so we know that the list looks like this
-      # `[A -> ⊥]` which for the sake of our error message we can probably convert to
-      # `[A] -> ⊥` (all I'm saying is that we can have our message say something like
-      # "init handler args `X` don't match, args must match one of `[A]`"
-      # or something to that effect)
-      #
-      #
-      # we also have the actual type of the args passed `X`
-      #
-      #
-      # because we have these types we know that the handler name corresponds to an actual init handler
-      # which means before we even do this, we can handle the case where the atom we pass in does not correspond
-      # to an init handler and return a proper error
-      #
-      # and then we do all our type-checking based on that init handler
-      #
-      # what we can't do just yet, is know that we are registering this init handler with the correct role,
-      # but that's just not possible with the information we have at this point.
-
-      accepted
+      accepted_arg_types
       <~ lift_result(
         Helpers.init_handler_arg_types(ctx, handler_name),
-        # todo: should make this more specific, something like "trying to register with something that is not an init_handler"
-        Error.FrameworkUsage.invalid_init_handler(ctx.module, meta),
+        Error.FrameworkUsage.unknown_init_handler(
+          ctx.module,
+          meta,
+          handler_name,
+          Map.keys(ctx.delta_I)
+        ),
         env,
         st
       )
@@ -823,14 +789,13 @@ defmodule Maty.Typechecker.TC do
 
       _
       <~ lift_bool(
-        accepted == [] or args_type in accepted,
+        # no signatures means the init handler has no spec, which is reported on the handler itself separately
+        accepted_arg_types == [] or args_type in accepted_arg_types,
         Error.TypeMismatch.register_arg_type_mismatch(
           ctx.module,
           meta,
-          # todo: make this handle the possibility that there are multiple specs
-          # todo: show the signature the init handler is expected to have (e.g. `A -> B`) instead of "a function" or just the possible multiple `A`s
           :init_handler_args,
-          expected: accepted,
+          expected: accepted_arg_types,
           got: args_type
         ),
         env,
@@ -864,20 +829,20 @@ defmodule Maty.Typechecker.TC do
           env,
           _st,
           {{:., _m1, [Maty.DSL, :register]}, meta,
-           [_ap_pid_ast, _role_ast, _handler_name, _args_ast, _state_ast]}
+           [_ap_pid_ast, _role_ast, handler_ast, _args_ast, _state_ast]}
         ) do
     # `handler_name` is not an atom
-    error(Error.FrameworkUsage.invalid_init_handler(ctx.module, meta), env)
+    error(Error.FrameworkUsage.init_handler_not_literal(ctx.module, meta, handler_ast), env)
   end
 
   deftc tc_expr(
           ctx,
           env,
           _st,
-          {{:., _m1, [Maty.DSL, :register]}, meta, _args}
+          {{:., _m1, [Maty.DSL, :register]}, meta, args}
         ) do
     # function is called with the wrong number of args
-    error(Error.FrameworkUsage.invalid_init_handler(ctx.module, meta), env)
+    error(Error.FrameworkUsage.register_wrong_arity(ctx.module, meta, length(args)), env)
   end
 
   # --- Function Application (T-App) ---
@@ -892,6 +857,12 @@ defmodule Maty.Typechecker.TC do
       arg_asts
       |> traverse(env, st, fn arg_ast, env, st -> tc_expr(ctx, env, st, arg_ast) end)
       |> bind(fn arg_types, env, st ->
+        # todo: this accepts the call if the arguments fit *any* clause's spec, but at runtime the
+        # first clause whose *pattern* matches is the one that runs. With overlapping patterns and
+        # different specs, a call can be accepted against one clause and run another.
+        # Should instead pick the first clause whose pattern matches the argument types and check against its spec only
+        # (this would need access to the clause patterns here, psi currently only has the specs).
+        # Same issue in `Helpers.init_handler_arg_types/2` for register
         case Enum.find(signatures, fn {param_types, _return_type} -> arg_types == param_types end) do
           {_param_types, return_type} ->
             ok(return_type, env, st)

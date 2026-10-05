@@ -248,6 +248,9 @@ defmodule Maty.Typechecker.TC.WF do
          :ok <- check_on_link_session_state(ctx, final_st),
          # must contain at least one call to Maty.DSL.register
          :ok <- check_contains_register(ctx, body),
+         # todo: also check the module defines at least one init handler without one the actor can never start a session
+         # (which is a bit odd for a Maty actor)
+
          # must return {:ok, actor_state}
          :ok <- check_on_link_return_type(ctx, return_type) do
       :ok

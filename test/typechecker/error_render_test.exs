@@ -140,9 +140,9 @@ defmodule Maty.Typechecker.ErrorRenderTest do
       {{Error.TypeMismatch, :send_message_not_tuple},
        Error.TypeMismatch.send_message_not_tuple(@m, @meta, got: {:title, [], nil})},
       {{Error.TypeMismatch, :register_arg_type_mismatch},
-       Error.TypeMismatch.register_arg_type_mismatch(@m, @meta, :init_handler,
-         expected: "a function",
-         got: :atom
+       Error.TypeMismatch.register_arg_type_mismatch(@m, @meta, :init_handler_args,
+         expected: [:binary, :pid],
+         got: :number
        )},
       {{Error.TypeMismatch, :builtin_arg_type_mismatch},
        Error.TypeMismatch.builtin_arg_type_mismatch(@m, @meta, "IO.puts",
@@ -220,8 +220,12 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FrameworkUsage.on_link_altered_session_state(@m, @meta, @st_out)},
       {{Error.FrameworkUsage, :on_link_bad_return},
        Error.FrameworkUsage.on_link_bad_return(@m, @meta, :number)},
-      {{Error.FrameworkUsage, :invalid_init_handler},
-       Error.FrameworkUsage.invalid_init_handler(@m, @meta)},
+      {{Error.FrameworkUsage, :unknown_init_handler},
+       Error.FrameworkUsage.unknown_init_handler(@m, @meta, :nope, [:install])},
+      {{Error.FrameworkUsage, :init_handler_not_literal},
+       Error.FrameworkUsage.init_handler_not_literal(@m, @meta, {:handler, [], nil})},
+      {{Error.FrameworkUsage, :register_wrong_arity},
+       Error.FrameworkUsage.register_wrong_arity(@m, @meta, 4)},
 
       # :name_resolution
       {{Error.NameResolution, :variable_not_exist},

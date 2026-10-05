@@ -48,16 +48,36 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
-  # the whole register / init_handler path needs rework
-  # init_handlers are passed as references which would be okay,
-  # BUT anonymous functions aren't really supported yet (see todos in tc.ex)
-  # marked as :framework_usage for now, though its home and shape are likely to change.
-  def invalid_init_handler(module, meta) do
+  # register was given an atom that does not name an init handler of this module
+  def unknown_init_handler(module, meta, handler_name, known) do
     %Error{
       category: :framework_usage,
-      kind: :invalid_init_handler,
+      kind: :unknown_init_handler,
       module: module,
-      meta: Keyword.take(meta, [:line, :column])
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: handler_name, known: known}
+    }
+  end
+
+  # register was given an expression for the init handler, not a literal atom
+  def init_handler_not_literal(module, meta, got_ast) do
+    %Error{
+      category: :framework_usage,
+      kind: :init_handler_not_literal,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: got_ast}
+    }
+  end
+
+  # register was called with the wrong number of arguments
+  def register_wrong_arity(module, meta, got) do
+    %Error{
+      category: :framework_usage,
+      kind: :register_wrong_arity,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: got}
     }
   end
 end

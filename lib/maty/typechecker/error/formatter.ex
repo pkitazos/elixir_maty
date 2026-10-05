@@ -326,7 +326,7 @@ defmodule Maty.Typechecker.Error.Formatter do
       Expected: #{render_register_expected(argument, expected)}
       Got: #{render_type(got)}
       --
-      MatyDSL.register/4 was called with an argument of the wrong type.
+      MatyDSL.register/5 was called with an argument of the wrong type.
     """
   end
 
@@ -598,10 +598,36 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :framework_usage, kind: :invalid_init_handler}) do
+  defp render(%Error{category: :framework_usage, kind: :unknown_init_handler} = e) do
+    %{got: got, known: known} = e.details
+
     """
-    Framework Usage Violation: Invalid Initialisation Handler
-      Actor tries to register with an invalid initialisation handler.
+    Framework Usage Violation: Unknown Init Handler
+      Got: #{render_type(got)}
+      Init handlers: #{render_handler_names(known)}
+      --
+      MatyDSL.register/5 must be given the name of an init handler defined in this module.
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :init_handler_not_literal} = e) do
+    %{got: got} = e.details
+
+    """
+    Framework Usage Violation: Init Handler Not a Literal
+      Got: #{Macro.to_string(got)}
+      --
+      MatyDSL.register/5 must be given the init handler as a literal atom, e.g. :install.
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :register_wrong_arity} = e) do
+    %{got: got} = e.details
+
+    """
+    Framework Usage Violation: Wrong Number of Arguments to register
+      Expected: 5 (access point, role, init handler, init handler args, state)
+      Got: #{got}
     """
   end
 
@@ -696,8 +722,12 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render_register_argument(:access_point), do: "1 (access point)"
   defp render_register_argument(:role), do: "2 (role)"
-  defp render_register_argument(:init_handler), do: "3 (init handler label)"
   defp render_register_argument(:init_handler_args), do: "4 (init handler args)"
+
+  defp render_handler_names([]), do: "(none)"
+
+  defp render_handler_names(names),
+    do: names |> Enum.sort() |> Enum.map_join(", ", &render_type/1)
 
   defp render_operator(op) when is_atom(op), do: "#{op}"
   defp render_operator(op), do: "#{inspect(op)}"
