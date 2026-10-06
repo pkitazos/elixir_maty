@@ -1,5 +1,27 @@
 defmodule Maty.Actor do
-  alias Maty.{Types, Envelope}
+  @moduledoc """
+  An actor can have multiple roles in different or even in the same session
+  at any point in time an actor has suspended with a handler that is able to process the next message in the session for a given role
+  that is why an actor keeps an internal state at runtime which maps session IDs to another map which maps roles to handler
+  For any given session * role pair, an actor only has one valid handler and one valid continuation.
+
+  The BEAM is not really designed with this in mind, so actors only really have a single mailbox which just interleaves all messages
+  from all sessions. The runtime _does_ guarantee that messages from a given process will arrive in order in another process' mailbox
+  but that's about it. The Maty runtime allows us to reorder messages in the mailbox keeping the relative order between participant messages
+  the same, which essentially gives us the power to reason about our mailbox as a set of mailboxes indexed by a session
+
+  To emulate this behaviour, a Maty actor keeps an internal stash which acts in the same way (ish).
+  An actor is constantly looping over the stash and its mailbox trying to process messages.
+  A message from another Maty actor always arrives as a `Maty.Envelope`, which carries the
+  session it belongs to, the role it is addressed to and the role it is sent from.
+
+  As explained above, to identify what message can currently be processed according to the session type,
+  we need to look at our suspended handlers, and to do that we need the `session_id` and `to` from a given message.
+  The `handlers` map will return an expected role and if the `from` of the message we're currently inspecting matches,
+  then we process this message.
+  """
+
+  alias Maty.{Envelope, Session, Types}
   alias Maty.DSL.State
 
   require Logger
@@ -40,149 +62,128 @@ defmodule Maty.Actor do
     loop(module, actor_state, [])
   end
 
-  # An actor can have multiple roles in different or even in the same session
-  # at any point in time an actor has suspended with a handler that is able to process the next message in the session for a given role
-  # that is why an actor keeps an internal state at runtime which maps session IDs to another map which maps roles to handler
-  # For any given session * role pair, an actor only has one valid handler and one valid continuation.
-  #
-  # The BEAM is not really designed with this in mind, so actors only really have a single mailbox which just interleaves all messages
-  # from all sessions. The runtime _does_ guarantee that messages from a given process will arrive in order in another process' mailbox
-  # but that's about it. The Maty runtime allows us to reorder messages in the mailbox keeping the relative order between participant messages
-  # the same, which essentially gives us the power to reason about our mailbox as a set of mailboxes indexed by a session
-  #
-  # To emulate this behaviour, a Maty actor keeps an internal stash which acts in the same way (ish).
-  # An actor is constantly looping over the stash and its mailbox trying to process messages.
-  # A message from another Maty actor always arrives as a `Maty.Envelope`, which carries the
-  # session it belongs to, the role it is addressed to and the role it is sent from.
-  #
-  # As explained above, to identify what message can currently be processed according to the session type,
-  # we need to look at our suspended handlers, and to do that we need the `session_id` and `to` from a given message.
-  # The `handlers` map will return an expected role and if the `from` of the message we're currently inspecting matches,
-  # then we process this message. Since processing a message progresses the session (via suspend or done)
-  # we must then loop back to the start of the stash as messages which previously were unprocessable, may now be processable.
-  # This is the common case: a message is stashed because its sender wasn't expected yet and becomes processable once the session moves on.
-  #
-  # If we traverse the entire stash and find no message that any of our currently suspended handlers can process
-  # we move on to processing messages from our mailbox. A similar process is done here.
-  # We inspect which session and to which role this message was addressed and check whether the suspended handler can process this message.
-  # If it can, we process the message and loop back to the start, otherwise we stash this message and then loop back to the start.
   @spec loop(module(), State.t(), list(Envelope.t())) :: no_return()
   defp loop(module, actor_state, stash) do
     traverse_stash(module, actor_state, stash, [])
   end
 
-  @spec traverse_stash(module(), State.t(), list(Envelope.t()), list(Envelope.t())) ::
-          no_return()
-  defp traverse_stash(module, actor_state, [], traversed_stash) do
+  # Since processing a message progresses the session (via suspend or done)
+  # we must then loop back to the start of the stash as messages which previously were unprocessable, may now be processable.
+  # This is the common case: a message is stashed because its sender wasn't expected yet and becomes processable once the session moves on.
+  @spec traverse_stash(module(), State.t(), list(Envelope.t()), list(Envelope.t())) :: no_return()
+  defp traverse_stash(module, actor_state, [envelope | rest], skipped) do
+    if can_process?(actor_state, envelope) do
+      updated_actor_state = process_message(module, actor_state, envelope)
+      loop(module, updated_actor_state, skipped ++ rest)
+    else
+      traverse_stash(module, actor_state, rest, skipped ++ [envelope])
+    end
+  end
+
+  defp traverse_stash(module, actor_state, [], stash) do
     # in this clause we've checked every message in the stash and no handler can process any of them
     # so we take the first message in our mailbox
+    receive_next(module, actor_state, stash)
+  end
 
+  # If we traverse the entire stash and find no message that any of our currently suspended handlers can process
+  # we move on to processing messages from our mailbox. A similar process is done here.
+  # We inspect which session and to which role this message was addressed and check whether the suspended handler can process this message.
+  # If it can, we process the message and loop back to the start, otherwise we stash this message and then loop back to the start.
+  @spec receive_next(module(), State.t(), list(Envelope.t())) :: no_return()
+  defp receive_next(module, actor_state, stash) do
     receive do
       {:maty_message, %Envelope{} = envelope} ->
-        {_, _, expected_role} =
-          next_receive_in_session(actor_state, envelope.session_id, envelope.to)
-
-        if envelope.from == expected_role do
+        if can_process?(actor_state, envelope) do
           updated_actor_state = process_message(module, actor_state, envelope)
-          loop(module, updated_actor_state, traversed_stash)
+          loop(module, updated_actor_state, stash)
         else
-          loop(module, actor_state, traversed_stash ++ [envelope])
+          loop(module, actor_state, stash ++ [envelope])
         end
 
-      # thoughts for later:
-      # this kinda means that we may wait a while before we initialise a session
-      # ig if we wanted to prioritise this we would have a receive that catches init messages up top
-      # and just buffers everything else (?) or just loops
       {:init_session, session_id, participants, init_token} ->
-        partial_session = %{
-          id: session_id,
-          participants: participants,
-          handlers: %{},
-          local_state: %{}
-        }
-
-        init_actor_state = put_in(actor_state, [:sessions, session_id], partial_session)
-
-        {{role, init_handler, args}, initial_actor_state} =
-          pop_in(init_actor_state, [:callbacks, init_token])
-
-        updated_actor_state =
-          case apply(module, init_handler, [args, initial_actor_state, {partial_session, role}]) do
-            {:suspend, handler_name, intermediate_state} ->
-              expected_role = module.__handler_expects__(handler_name)
-
-              put_in(
-                intermediate_state,
-                [:sessions, session_id, :handlers, role],
-                {handler_name, expected_role}
-              )
-
-            {:done, intermediate_state} ->
-              update_in(intermediate_state, [:sessions], &Map.delete(&1, session_id))
-          end
-
-        loop(module, updated_actor_state, traversed_stash)
+        updated_actor_state = init_role(module, actor_state, session_id, participants, init_token)
+        loop(module, updated_actor_state, stash)
 
       # discard malformed messages
       other ->
         Logger.warning("[#{inspect(module)}] discarding unexpected message: #{inspect(other)}")
-        loop(module, actor_state, traversed_stash)
+        loop(module, actor_state, stash)
     end
   end
 
-  defp traverse_stash(
-         module,
-         actor_state,
-         [envelope | rest],
-         traversed_stash
-       ) do
-    {_, _, expected_role} =
-      next_receive_in_session(actor_state, envelope.session_id, envelope.to)
+  @spec process_message(module(), State.t(), Envelope.t()) :: State.t()
+  defp process_message(module, actor_state, %Envelope{
+         session_id: session_id,
+         to: to,
+         from: from,
+         message: msg
+       }) do
+    session = actor_state.sessions[session_id]
+    {handler_label, _} = session.handlers[to]
 
-    if envelope.from == expected_role do
-      updated_actor_state = process_message(module, actor_state, envelope)
-      loop(module, updated_actor_state, traversed_stash ++ rest)
-    else
-      traverse_stash(
-        module,
-        actor_state,
-        rest,
-        traversed_stash ++ [envelope]
-      )
-    end
+    result = apply(module, handler_label, [from, msg, actor_state, {session, to}])
+    handle_result(module, result, session_id, to)
   end
 
-  @spec process_message(
+  @spec init_role(
           module(),
           State.t(),
-          Envelope.t()
+          Types.session_id(),
+          %{Types.role() => pid()},
+          Types.init_token()
         ) :: State.t()
-  defp process_message(
-         module,
-         actor_state,
-         %Envelope{session_id: session_id, to: to, from: from, message: msg}
-       ) do
-    {session, handler_label, _} = next_receive_in_session(actor_state, session_id, to)
+  defp init_role(module, actor_state, session_id, participants, init_token) do
+    # take the `role` and `callback` for the given `init_token`
+    {{role, init_handler, args}, initial_state} = pop_in(actor_state.callbacks[init_token])
 
-    case apply(module, handler_label, [from, msg, actor_state, {session, to}]) do
-      {:suspend, next, intermediate_state} ->
-        expected = module.__handler_expects__(next)
+    # it's possible that at this stage the actor has already initiated the session with a different role
+    # or maybe not, so we must ensure that a session exists
+    updated_state = ensure_session(initial_state, session_id, participants)
+    session = updated_state.sessions[session_id]
 
-        put_in(
-          intermediate_state,
-          [:sessions, session_id, :handlers, to],
-          {next, expected}
-        )
+    result = apply(module, init_handler, [args, updated_state, {session, role}])
+    handle_result(module, result, session_id, role)
+  end
 
-      {:done, intermediate_state} ->
-        update_in(intermediate_state, [:sessions], &Map.delete(&1, session_id))
+  @spec handle_result(
+          module(),
+          {:suspend, Types.handler_label(), State.t()} | {:done, State.t()},
+          Types.session_id(),
+          Types.role()
+        ) :: State.t()
+  defp handle_result(module, {:suspend, next_handler, actor_state}, session_id, role) do
+    expected = module.__handler_expects__(next_handler)
+
+    put_in(actor_state.sessions[session_id].handlers[role], {next_handler, expected})
+  end
+
+  defp handle_result(_module, {:done, actor_state}, session_id, role) do
+    remaining = Map.delete(actor_state.sessions[session_id].handlers, role)
+
+    if remaining == %{} do
+      update_in(actor_state.sessions, &Map.delete(&1, session_id))
+    else
+      put_in(actor_state.sessions[session_id].handlers, remaining)
     end
   end
 
-  defp next_receive_in_session(actor_state, session_id, to) do
-    session = actor_state.sessions[session_id]
-    {handler_label, expected_role} = session.handlers[to]
+  @spec can_process?(State.t(), Envelope.t()) :: boolean()
+  defp can_process?(actor_state, envelope) do
+    with {:ok, session} <- Map.fetch(actor_state.sessions, envelope.session_id),
+         {:ok, {_, expected_role}} <- Map.fetch(session.handlers, envelope.to) do
+      expected_role == envelope.from
+    else
+      :error -> false
+    end
+  end
 
-    {session, handler_label, expected_role}
+  @spec ensure_session(State.t(), Types.session_id(), %{Types.role() => pid()}) :: State.t()
+  defp ensure_session(actor_state, session_id, participants) do
+    %{
+      actor_state
+      | sessions:
+          Map.put_new(actor_state.sessions, session_id, Session.new(session_id, participants))
+    }
   end
 end

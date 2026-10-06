@@ -1,40 +1,28 @@
 defmodule Maty.DSL.State do
-  @behaviour Access
+  @moduledoc """
+  The state of a Maty actor, passed to every handler. Holds the sessions the actor is
+  participating in, and the init handler registered under each pending init token
 
-  alias Maty.Types
+  Inside a handler, `get/1` and `set/2` read and write the local state of the session
+  the handler is running in
+  """
+
+  alias Maty.{Session, Types}
+
+  @enforce_keys [:sessions, :callbacks]
+  defstruct @enforce_keys
 
   @type t :: %__MODULE__{
-          sessions: %{Types.session_id() => Types.session()},
+          sessions: %{Types.session_id() => Session.t()},
           callbacks: %{Types.init_token() => {Types.role(), Types.handler_label(), any()}}
         }
-
-  @state_keys [:sessions, :callbacks]
-  defstruct @state_keys
-
-  @impl Access
-  def fetch(state, key) when key in @state_keys do
-    Map.fetch(state, key)
-  end
-
-  @impl Access
-  def get_and_update(state, key, function) when key in @state_keys do
-    current_value = Map.get(state, key)
-    {get_value, new_value} = function.(current_value)
-    new_state = Map.put(state, key, new_value)
-    {get_value, new_state}
-  end
-
-  @impl Access
-  def pop(state, key) when key in @state_keys do
-    {Map.get(state, key), Map.put(state, key, nil)}
-  end
 
   def new do
     %Maty.DSL.State{sessions: %{}, callbacks: %{}}
   end
 
   def set(state, local_state, {session, _}) do
-    put_in(state, [:sessions, session.id, :local_state], local_state)
+    put_in(state.sessions[session.id].local_state, local_state)
   end
 
   defmacro set(state, local_state) do
@@ -43,9 +31,9 @@ defmodule Maty.DSL.State do
     end
   end
 
-  @spec internal_get(Types.maty_actor_state(), Types.session_ctx()) :: map()
+  @spec internal_get(t(), Types.session_ctx()) :: map()
   def internal_get(state, {session, _}) do
-    get_in(state, [:sessions, session.id, :local_state])
+    get_in(state.sessions[session.id].local_state)
   end
 
   defmacro get(state) do

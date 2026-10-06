@@ -13,35 +13,14 @@ defmodule Maty.Types do
   # todo: this should be tightened a bit more than `any()`
   @type message :: {atom(), any()}
 
-  # a session consists of:
-  # - an ID
-  # - a map of session roles to pairs of `handler` * `role`
-  #   the key is the role this actor plays in the session
-  #   and the paired role is the one the handler expects to receive from (see `__handler_expects__`)
-  # - the address book
-  # - some session-local state
-
-  @type session :: %{
-          id: session_id(),
-          handlers: %{role() => {handler_label(), role()}},
-          participants: %{role() => pid()},
-          local_state: map()
-        }
+  @type session :: Maty.Session.t()
 
   # this is a custom wrapper type
   # a particular handler always needs some session context
   # that is, the actual session, and the role of the actor for the given handler
   @type session_ctx :: {session(), role()}
 
-  # a Maty actor stores:
-  # - a map of sessions it is participating in
-  # - a map of initialisation token to triples of `role` * `init handler name` * `args`
-  #   the init handler is called with `args` when the session starts
-  @type maty_actor_state :: %{
-          sessions: %{session_id() => session()},
-          # any() cause you can choose to pass any argument to the function
-          callbacks: %{init_token() => {role(), handler_label(), any()}}
-        }
+  @type maty_actor_state :: Maty.DSL.State.t()
 
   # an access point stores a map of candidate participants
   # it maps roles to queues storing pairs of `PID` * `REF` (initialisation token)
