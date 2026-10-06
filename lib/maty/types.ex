@@ -40,8 +40,7 @@ defmodule Maty.Types do
   @type maty_actor_state :: %{
           sessions: %{session_id() => session()},
           # any() cause you can choose to pass any argument to the function
-          callbacks: %{init_token() => {role(), handler_label(), any()}},
-          stash: list({session_id(), role(), role(), message()})
+          callbacks: %{init_token() => {role(), handler_label(), any()}}
         }
 
   # an access point stores a map of candidate participants
@@ -132,8 +131,7 @@ defmodule Maty.Types do
         {:map,
          %{
            sessions: {:map, %{T.session_id() => T.session()}},
-           callbacks: {:map, %{T.init_token() => {:tuple, [T.role(), T.handler_label(), :any]}}},
-           stash: {:list, {:tuple, [T.session_id(), T.role(), T.role(), T.message()]}}
+           callbacks: {:map, %{T.init_token() => {:tuple, [T.role(), T.handler_label(), :any]}}}
          }}
   end
 end

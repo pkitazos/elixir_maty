@@ -5,11 +5,10 @@ defmodule Maty.DSL.State do
 
   @type t :: %__MODULE__{
           sessions: %{Types.session_id() => Types.session()},
-          callbacks: %{Types.init_token() => {Types.role(), Types.handler_label(), any()}},
-          stash: list({Types.session_id(), Types.role(), Types.role(), Types.message()})
+          callbacks: %{Types.init_token() => {Types.role(), Types.handler_label(), any()}}
         }
 
-  @state_keys [:sessions, :callbacks, :stash]
+  @state_keys [:sessions, :callbacks]
   defstruct @state_keys
 
   @impl Access
@@ -31,7 +30,7 @@ defmodule Maty.DSL.State do
   end
 
   def new do
-    %Maty.DSL.State{sessions: %{}, callbacks: %{}, stash: []}
+    %Maty.DSL.State{sessions: %{}, callbacks: %{}}
   end
 
   def set(state, local_state, {session, _}) do

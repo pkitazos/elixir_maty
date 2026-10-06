@@ -1,6 +1,8 @@
 defmodule Maty.Actor do
-  alias Maty.Types
+  alias Maty.{Types, Envelope}
   alias Maty.DSL.State
+
+  require Logger
 
   @callback on_link(args :: any(), initial_state :: Types.maty_actor_state()) ::
               {:ok, Types.maty_actor_state()}
@@ -35,29 +37,57 @@ defmodule Maty.Actor do
 
     {:ok, actor_state} = module.on_link(args, initial_state)
 
-    loop(module, actor_state)
+    loop(module, actor_state, [])
   end
 
-  def traverse_stash(module, %State{stash: []} = actor_state, stash) do
-    # if we get to here, it means our big stash is empty then we should try and read a message from our mailbox
+  # An actor can have multiple roles in different or even in the same session
+  # at any point in time an actor has suspended with a handler that is able to process the next message in the session for a given role
+  # that is why an actor keeps an internal state at runtime which maps session IDs to another map which maps roles to handler
+  # For any given session * role pair, an actor only has one valid handler and one valid continuation.
+  #
+  # The BEAM is not really designed with this in mind, so actors only really have a single mailbox which just interleaves all messages
+  # from all sessions. The runtime _does_ guarantee that messages from a given process will arrive in order in another process' mailbox
+  # but that's about it. The Maty runtime allows us to reorder messages in the mailbox keeping the relative order between participant messages
+  # the same, which essentially gives us the power to reason about our mailbox as a set of mailboxes indexed by a session
+  #
+  # To emulate this behaviour, a Maty actor keeps an internal stash which acts in the same way (ish).
+  # An actor is constantly looping over the stash and its mailbox trying to process messages.
+  # A message from another Maty actor always arrives as a `Maty.Envelope`, which carries the
+  # session it belongs to, the role it is addressed to and the role it is sent from.
+  #
+  # As explained above, to identify what message can currently be processed according to the session type,
+  # we need to look at our suspended handlers, and to do that we need the `session_id` and `to` from a given message.
+  # The `handlers` map will return an expected role and if the `from` of the message we're currently inspecting matches,
+  # then we process this message. Since processing a message progresses the session (via suspend or done)
+  # we must then loop back to the start of the stash as messages which previously were unprocessable, may now be processable.
+  # This is the common case: a message is stashed because its sender wasn't expected yet and becomes processable once the session moves on.
+  #
+  # If we traverse the entire stash and find no message that any of our currently suspended handlers can process
+  # we move on to processing messages from our mailbox. A similar process is done here.
+  # We inspect which session and to which role this message was addressed and check whether the suspended handler can process this message.
+  # If it can, we process the message and loop back to the start, otherwise we stash this message and then loop back to the start.
+  @spec loop(module(), State.t(), list(Envelope.t())) :: no_return()
+  defp loop(module, actor_state, stash) do
+    traverse_stash(module, actor_state, stash, [])
+  end
+
+  @spec traverse_stash(module(), State.t(), list(Envelope.t()), list(Envelope.t())) ::
+          no_return()
+  defp traverse_stash(module, actor_state, [], traversed_stash) do
+    # in this clause we've checked every message in the stash and no handler can process any of them
+    # so we take the first message in our mailbox
 
     receive do
-      {:maty_message, session_id, to, from, msg} ->
-        # so I know for sure that the stash has nothing of interest, which means I only care about exit conditions  II and III
-        {_, _, expected_role} = next_receive_in_session(actor_state, session_id, to)
+      {:maty_message, %Envelope{} = envelope} ->
+        {_, _, expected_role} =
+          next_receive_in_session(actor_state, envelope.session_id, envelope.to)
 
-        updated_actor_state =
-          if from == expected_role do
-            # exit condition II
-            # the current message is compatible, so we process it
-            process_message(module, %{actor_state | stash: stash}, {session_id, to, from, msg})
-          else
-            # exit condition III
-            # not the current message either, so just stash and loop
-            put_in(actor_state, [:stash], stash ++ [{session_id, to, from, msg}])
-          end
-
-        loop(module, updated_actor_state)
+        if envelope.from == expected_role do
+          updated_actor_state = process_message(module, actor_state, envelope)
+          loop(module, updated_actor_state, traversed_stash)
+        else
+          loop(module, actor_state, traversed_stash ++ [envelope])
+        end
 
       # thoughts for later:
       # this kinda means that we may wait a while before we initialise a session
@@ -71,10 +101,10 @@ defmodule Maty.Actor do
           local_state: %{}
         }
 
-        initial_actor_state = put_in(actor_state, [:sessions, session_id], partial_session)
+        init_actor_state = put_in(actor_state, [:sessions, session_id], partial_session)
 
         {{role, init_handler, args}, initial_actor_state} =
-          pop_in(initial_actor_state, [:callbacks, init_token])
+          pop_in(init_actor_state, [:callbacks, init_token])
 
         updated_actor_state =
           case apply(module, init_handler, [args, initial_actor_state, {partial_session, role}]) do
@@ -91,87 +121,46 @@ defmodule Maty.Actor do
               update_in(intermediate_state, [:sessions], &Map.delete(&1, session_id))
           end
 
-        loop(module, %{updated_actor_state | stash: stash})
+        loop(module, updated_actor_state, traversed_stash)
 
       # discard malformed messages
-      _ ->
-        loop(module, %{actor_state | stash: stash})
+      other ->
+        Logger.warning("[#{inspect(module)}] discarding unexpected message: #{inspect(other)}")
+        loop(module, actor_state, traversed_stash)
     end
   end
 
-  def traverse_stash(
-        module,
-        %State{stash: [{session_id, to, from, _msg} = m | rest]} = actor_state,
-        traversed_stash
-      ) do
-    {_, _, expected_role} = next_receive_in_session(actor_state, session_id, to)
+  defp traverse_stash(
+         module,
+         actor_state,
+         [envelope | rest],
+         traversed_stash
+       ) do
+    {_, _, expected_role} =
+      next_receive_in_session(actor_state, envelope.session_id, envelope.to)
 
-    if from == expected_role do
-      # we can process this message and loop back out
-
-      # first we remove it from the stash
-      intermediate_actor_state = put_in(actor_state, [:stash], traversed_stash ++ rest)
-
-      # then we actually process the message
-      updated_actor_state = process_message(module, intermediate_actor_state, m)
-
-      # then we loop back to the start
-      loop(module, updated_actor_state)
+    if envelope.from == expected_role do
+      updated_actor_state = process_message(module, actor_state, envelope)
+      loop(module, updated_actor_state, traversed_stash ++ rest)
     else
       traverse_stash(
         module,
-        %{actor_state | stash: rest},
-        traversed_stash ++ [m]
+        actor_state,
+        rest,
+        traversed_stash ++ [envelope]
       )
     end
-
-    # otherwise we continue on to check the next message
-  end
-
-  @spec loop(module(), State.t()) :: no_return()
-  def loop(module, actor_state) do
-    # {
-    #    id: SessionID,
-    #    handlers: Map<Role, (HandlerLabel, Role)>,
-    #    participants: Map<Role, PID>,
-    #    stash: List<(Role, Role, Message)>,
-    # }
-
-    # Let's say that this actor is a participant in multiple sessions S_i and each session keeps its own stash Q
-    #     > so if some actor A takes part in two sessions we would identify the stashes as S_1.Q and S_2.Q
-    #
-    # An actor on the BEAM however only has a single mailbox so messages only arrive in one mailbox M.
-    #
-    # It's important to note that in each Session an actor may play multiple roles. Hence when we suspend we do so
-    # for a given role.
-    # So when we want to figure out if we can process some next message what we ought to do is:
-    #
-    # look at our stash
-    # for each message in the stash we look at the role of the actor it was addressed to.
-    # then we lookup for that role the handler it has suspended with/to.
-    # if the suspended handler can process this message we go ahead and process it
-    # otherwise we move on to the next message in the stash and repeat the process (??) until we have processed all the messages in the stash
-    # at which point we move on and look at the mailbox?
-    #
-    # this doesn't seem right...
-    #
-    #
-    # Actually let's say that this actor is a participant in multiple sessions S_i and rather than keeping a stash per session
-    # we keep one central stash keyed by `session_id` and `to` which makes keying into the actor state and grabbing out
-    # the handler we want
-
-    traverse_stash(module, actor_state, [])
   end
 
   @spec process_message(
           module(),
           State.t(),
-          {Types.session_id(), Types.role(), Types.role(), Types.message()}
+          Envelope.t()
         ) :: State.t()
   defp process_message(
          module,
          actor_state,
-         {session_id, to, from, msg}
+         %Envelope{session_id: session_id, to: to, from: from, message: msg}
        ) do
     {session, handler_label, _} = next_receive_in_session(actor_state, session_id, to)
 

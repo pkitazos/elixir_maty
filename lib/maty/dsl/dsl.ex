@@ -1,6 +1,6 @@
 defmodule Maty.DSL do
   alias Maty.DSL
-  alias Maty.Types
+  alias Maty.{Types, Envelope}
 
   defmacro __using__(_opts) do
     quote do
@@ -49,9 +49,10 @@ defmodule Maty.DSL do
     {:ok, updated_state}
   end
 
-  @spec internal_send({Types.session(), Types.role()}, Types.role(), {atom(), any()}) :: atom()
+  @spec internal_send({Types.session(), Types.role()}, Types.role(), Types.message()) :: atom()
   def internal_send({session, from}, to, msg) do
-    Kernel.send(session.participants[to], {:maty_message, session.id, to, from, msg})
+    envelope = %Envelope{session_id: session.id, to: to, from: from, message: msg}
+    Kernel.send(session.participants[to], {:maty_message, envelope})
     :ok
   end
 
