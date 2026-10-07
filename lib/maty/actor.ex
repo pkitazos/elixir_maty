@@ -105,7 +105,6 @@ defmodule Maty.Actor do
         updated_actor_state = init_role(module, actor_state, session_id, participants, init_token)
         loop(module, updated_actor_state, stash)
 
-      # discard malformed messages
       other ->
         Logger.warning("[#{inspect(module)}] discarding unexpected message: #{inspect(other)}")
         loop(module, actor_state, stash)

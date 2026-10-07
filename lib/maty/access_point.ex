@@ -1,61 +1,67 @@
 defmodule Maty.AccessPoint do
   alias Maty.Types
 
+  require Logger
+
   @spec start_link([Types.role()]) :: {:ok, pid()}
   def start_link(roles) do
-    initial_state = %{participants: Map.from_keys(roles, :queue.new())}
-
-    pid = spawn_link(fn -> loop(initial_state) end)
+    pid = spawn_link(fn -> loop(Map.from_keys(roles, :queue.new())) end)
     {:ok, pid}
   end
 
-  @spec loop(%{
-          participants: %{required(Types.role()) => :queue.queue({pid(), Types.init_token()})}
-        }) :: no_return()
-  defp loop(%{participants: participants} = state) do
+  @spec loop(Types.access_point_state()) :: no_return()
+  defp loop(state) do
     receive do
       {:register, role, pid, init_token} ->
-        new_participants = Map.update!(participants, role, &:queue.in({pid, init_token}, &1))
+        updated_state = Map.update!(state, role, &:queue.in({pid, init_token}, &1))
 
-        if not session_ready?(new_participants) do
-          loop(%{state | participants: new_participants})
+        case take_participants(updated_state) do
+          {:ok, mailing_list, address_book, remaining_state} ->
+            session_id = make_ref()
+
+            for {pid, tok} <- mailing_list do
+              send(pid, {:init_session, session_id, address_book, tok})
+            end
+
+            loop(remaining_state)
+
+          :not_ready ->
+            loop(updated_state)
         end
 
-        session_id = make_ref()
+      other ->
+        Logger.warning(
+          "[#{inspect(__MODULE__)}] discarding unexpected message: #{inspect(other)}"
+        )
 
-        {ready_participants, updated_participants} = get_ready_participants!(new_participants)
-
-        session_participants =
-          ready_participants
-          |> Enum.map(fn {pid, role, _} -> {role, pid} end)
-          |> Enum.into(%{})
-
-        ready_participants
-        |> Enum.map(fn {pid, _, token} ->
-          send(pid, {:init_session, session_id, session_participants, token})
-        end)
-
-        loop(%{state | participants: updated_participants})
+        loop(state)
     end
   end
 
-  @spec session_ready?(%{Types.role() => :queue.queue({pid(), Types.init_token()})}) :: boolean()
-  def session_ready?(%{} = participants) do
-    not Enum.any?(participants, fn {_, q} -> :queue.is_empty(q) end)
+  @type address_book :: %{Types.role() => pid()}
+  @type mailing_list :: list(Types.candidate())
+
+  @typep acc :: {:ok, mailing_list(), address_book(), Types.access_point_state()}
+
+  # takes the first candidate from every role's queue
+  # if any queue is empty, no session can start yet
+  @spec take_participants(Types.access_point_state()) :: acc() | :not_ready
+  defp take_participants(state) do
+    Enum.reduce_while(state, {:ok, [], %{}, %{}}, &take_head/2)
   end
 
-  @spec get_ready_participants!(%{Types.role() => :queue.queue({pid(), Types.init_token()})}) ::
-          {[{pid(), Types.role(), Types.init_token()}], %{Types.role() => :queue.queue()}}
-  def get_ready_participants!(participants) do
-    {ready_participants, role_queue_pairs} =
-      participants
-      |> Map.to_list()
-      |> Enum.map(fn {role, q} ->
-        {{:value, {pid, token}}, updated_queue} = :queue.out(q)
-        {{pid, role, token}, {role, updated_queue}}
-      end)
-      |> Enum.unzip()
+  @spec take_head({Types.role(), :queue.queue(Types.candidate())}, acc()) ::
+          {:cont, acc()} | {:halt, :not_ready}
+  defp take_head({role, queue}, {:ok, mailing, book, remaining}) do
+    case :queue.out(queue) do
+      {{:value, {pid, tok}}, rest} ->
+        mailing = [{pid, tok} | mailing]
+        book = Map.put(book, role, pid)
+        remaining = Map.put(remaining, role, rest)
+        {:cont, {:ok, mailing, book, remaining}}
 
-    {ready_participants, Enum.into(role_queue_pairs, %{})}
+      {:empty, _} ->
+        {:halt, :not_ready}
+    end
   end
 end

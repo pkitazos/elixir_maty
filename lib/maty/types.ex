@@ -22,11 +22,10 @@ defmodule Maty.Types do
 
   @type maty_actor_state :: Maty.DSL.State.t()
 
-  # an access point stores a map of candidate participants
+  @type candidate :: {pid(), init_token()}
+  # an access point holds a map of candidate participants
   # it maps roles to queues storing pairs of `PID` * `REF` (initialisation token)
-  @type access_point_state :: %{
-          participants: %{role() => :queue.queue({pid(), init_token()})}
-        }
+  @type access_point_state :: %{role() => :queue.queue(candidate())}
 
   # this maps our type names to their actual structural type
   def map do
