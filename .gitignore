@@ -27,9 +27,8 @@ out/
 
 .vscode/
 .zed/
-*.t.*
-.DS_Store
 docs/notes/
 docs/squiggles/**/*.pdf
 .obsidian/
-_tmp/
+.nix-mix/
+.nix-hex/
