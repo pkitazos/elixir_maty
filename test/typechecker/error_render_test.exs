@@ -237,6 +237,10 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          :buyer2,
          :seller
        ])},
+      {{Error.FrameworkUsage, :role_not_literal},
+       Error.FrameworkUsage.role_not_literal(@m, @meta, {:role, [], nil})},
+      {{Error.FrameworkUsage, :undeclared_role},
+       Error.FrameworkUsage.undeclared_role(@m, @meta, :buyer1, [:seller])},
       {{Error.FrameworkUsage, :init_handler_not_literal},
        Error.FrameworkUsage.init_handler_not_literal(@m, @meta, {:handler, [], nil})},
       {{Error.FrameworkUsage, :register_wrong_arity},

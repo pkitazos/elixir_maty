@@ -634,6 +634,29 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :framework_usage, kind: :role_not_literal} = e) do
+    %{got: got} = e.details
+
+    """
+    Framework Usage Violation: Role Not a Literal
+      Got: #{Macro.to_string(got)}
+      --
+      MatyDSL.register/5 must be given the role as a literal atom, e.g. :seller.
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :undeclared_role} = e) do
+    %{got: got, known: known} = e.details
+
+    """
+    Framework Usage Violation: Undeclared Role
+      Got: #{inspect(got)}
+      Declared roles: #{Enum.map_join(known, ", ", &inspect/1)}
+      --
+      MatyDSL.register/5 must be given a role declared in this module's use Maty.Actor.
+    """
+  end
+
   defp render(%Error{category: :framework_usage, kind: :init_handler_not_literal} = e) do
     %{got: got} = e.details
 
@@ -760,7 +783,6 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render_register_expected(_argument, expected), do: render_expected(expected)
 
   defp render_register_argument(:access_point), do: "1 (access point)"
-  defp render_register_argument(:role), do: "2 (role)"
   defp render_register_argument(:init_handler_args), do: "4 (init handler args)"
 
   defp render_handler_names([]), do: "(none)"

@@ -89,7 +89,7 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
   # - `argument` names which arg was wrong
   # - `expected` is a type or (for the init handler args) the list of types its clauses accept
   def register_arg_type_mismatch(module, meta, argument, expected: expected, got: got)
-      when argument in [:access_point, :role, :init_handler_args] do
+      when argument in [:access_point, :init_handler_args] do
     %Error{
       category: :type_mismatch,
       kind: :register_arg_type_mismatch,

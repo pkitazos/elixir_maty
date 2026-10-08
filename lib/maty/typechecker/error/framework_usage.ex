@@ -89,6 +89,28 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
+  # register was given an expression for the role, not a literal atom
+  def role_not_literal(module, meta, got_ast) do
+    %Error{
+      category: :framework_usage,
+      kind: :role_not_literal,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: got_ast}
+    }
+  end
+
+  # register was given a role not in the protocol
+  def undeclared_role(module, meta, role, declared_roles) do
+    %Error{
+      category: :framework_usage,
+      kind: :undeclared_role,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: role, known: declared_roles}
+    }
+  end
+
   # register was given an expression for the init handler, not a literal atom
   def init_handler_not_literal(module, meta, got_ast) do
     %Error{

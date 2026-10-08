@@ -700,7 +700,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.line == line_of(src, "def f(1)")
     end
 
-    test "a role that is not an atom is reported as register's second argument" do
+    test "a role that is not a literal atom is reported" do
       src =
         """
         defmodule MatyCompileErrorFixture.RegisterBadRole do
@@ -722,9 +722,59 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
       error = compile_error!(src)
 
-      assert error.description =~ "Argument: 2 (role)"
-      assert error.description =~ "Expected: :atom"
-      assert error.description =~ "Got: :binary"
+      assert error.description =~ "Role Not a Literal"
+      assert error.description =~ ~s(Got: "seller")
+    end
+
+    test "registering a role the module does not declare is reported" do
+      src =
+        """
+        defmodule MatyCompileErrorFixture.RegisterUndeclaredRole do
+          use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
+
+          @st {:install, ~q/end/}
+
+          on_link ap_pid :: pid(), initial_state do
+            MatyDSL.register(ap_pid, :buyer1, :install, ap_pid, initial_state)
+          end
+
+          init_handler :install, _ap_pid :: pid(), state do
+            MatyDSL.done(state)
+          end
+        end
+        """
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Undeclared Role"
+      assert error.description =~ "Got: :buyer1"
+      assert error.description =~ "Declared roles: :seller"
+      assert error.line == line_of(src, "MatyDSL.register(")
+    end
+
+    test "declaring a role that is not in the protocol is reported" do
+      src =
+        """
+        defmodule MatyCompileErrorFixture.UnknownProtocolRole do
+          use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller, :auditor]
+
+          @st {:install, ~q/end/}
+
+          on_link ap_pid :: pid(), initial_state do
+            MatyDSL.register(ap_pid, :seller, :install, ap_pid, initial_state)
+          end
+
+          init_handler :install, _ap_pid :: pid(), state do
+            MatyDSL.done(state)
+          end
+        end
+        """
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Unknown Roles"
+      assert error.description =~ "Got: :auditor"
+      assert error.description =~ "Roles of TwoBuyer.Protocol: :buyer1, :buyer2, :seller"
     end
 
     test "a multi-clause function without a spec reports the missing spec once" do

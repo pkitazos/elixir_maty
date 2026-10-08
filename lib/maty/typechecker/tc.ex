@@ -711,18 +711,11 @@ defmodule Maty.Typechecker.TC do
 
       # todo: also check session type is not progressing
 
-      role_type <~ tc_expr(ctx, env, st, role_ast)
-
+      # the role must be known statically, as it is what pairs the init handler with a projection of the protocol
       _
       <~ lift_bool(
-        role_type == :atom,
-        Error.TypeMismatch.register_arg_type_mismatch(
-          ctx.module,
-          meta,
-          :role,
-          expected: :atom,
-          got: role_type
-        ),
+        is_atom(role_ast),
+        Error.FrameworkUsage.role_not_literal(ctx.module, meta, role_ast),
         env,
         st
       )
@@ -730,15 +723,7 @@ defmodule Maty.Typechecker.TC do
       _
       <~ lift_bool(
         role_ast in ctx.roles,
-        # todo: add new variant
-        Error.TypeMismatch.register_arg_type_mismatch(
-          ctx.module,
-          meta,
-          :role,
-          # todo: handle formatting/wording for list of roles
-          expected: ctx.roles,
-          got: role_ast
-        ),
+        Error.FrameworkUsage.undeclared_role(ctx.module, meta, role_ast, ctx.roles),
         env,
         st
       )
