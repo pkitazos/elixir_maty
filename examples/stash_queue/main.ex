@@ -4,7 +4,7 @@ defmodule StashQueue.Main do
   def start do
     # IO.puts("main process: #{inspect(self())}")
 
-    {:ok, ap} = Maty.AccessPoint.start_link([:p, :q, :r])
+    {:ok, ap} = Maty.AccessPoint.start_link(StashQueue.Protocol)
     # IO.puts("access point started at: #{inspect(ap)}")
 
     {:ok, _q_pid} = Q.start_link(ap)

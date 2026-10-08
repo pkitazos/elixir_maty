@@ -3,16 +3,19 @@ defmodule Maty.AccessPoint do
 
   require Logger
 
-  @spec start_link([Types.role()]) :: {:ok, pid()}
-  def start_link(roles) do
-    pid = spawn_link(fn -> loop(Map.from_keys(roles, :queue.new())) end)
+  @doc """
+  Starts an access point for `protocol` (a module implementing `Maty.Protocol`)
+  """
+  @spec start_link(module()) :: {:ok, pid()}
+  def start_link(protocol) do
+    pid = spawn_link(fn -> loop(Map.from_keys(protocol.__roles__(), :queue.new())) end)
     {:ok, pid}
   end
 
   @spec loop(Types.access_point_state()) :: no_return()
   defp loop(state) do
     receive do
-      {:register, role, pid, init_token} ->
+      {:register, role, pid, init_token} when is_map_key(state, role) ->
         updated_state = Map.update!(state, role, &:queue.in({pid, init_token}, &1))
 
         case take_participants(updated_state) do
@@ -28,6 +31,10 @@ defmodule Maty.AccessPoint do
           :not_ready ->
             loop(updated_state)
         end
+
+      {:register, role, _, _} ->
+        Logger.warning("[#{inspect(__MODULE__)}] invalid role for session: #{inspect(role)}")
+        loop(state)
 
       other ->
         Logger.warning(

@@ -4,7 +4,7 @@ defmodule TwoBuyer.Main do
   def start do
     # IO.puts("main process: #{inspect(self())}")
 
-    {:ok, ap} = Maty.AccessPoint.start_link([:seller, :buyer1, :buyer2])
+    {:ok, ap} = Maty.AccessPoint.start_link(TwoBuyer.Protocol)
     # IO.puts("access point started at: #{inspect(ap)}")
 
     {:ok, _seller_pid} = Seller.start_link(ap)

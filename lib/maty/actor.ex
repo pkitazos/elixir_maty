@@ -26,6 +26,7 @@ defmodule Maty.Actor do
 
   require Logger
 
+  # todo: check if this is still necessary and if it is, potentially also make the `init_handler` necessary
   @callback on_link(args :: any(), initial_state :: Types.maty_actor_state()) ::
               {:ok, Types.maty_actor_state()}
 
