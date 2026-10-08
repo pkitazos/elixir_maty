@@ -10,7 +10,7 @@
         let
           # One BEAM package set, so Erlang, Elixir and tooling all agree on OTP
           beamPkgs = pkgs.beam.packages.erlang_27;
-          elixir = beamPkgs.elixir_1_17;
+          elixir = beamPkgs.elixir_1_19;
         in {
           default = pkgs.mkShell {
             packages = [
