@@ -4,7 +4,7 @@ defmodule Maty.Typechecker.TCExprTest do
   alias Maty.Typechecker.{TC, Ctx, Error}
   @st_end %ST.SEnd{}
   @st_out ST.output_one(:server, :msg, :binary, @st_end)
-  @ctx %Ctx{module: nil, meta: [line: 0], delta_M: %{}, delta_I: %{}, psi: %{}}
+  @ctx %Ctx{module: nil, meta: [line: 0], roles: [], delta_M: %{}, delta_I: %{}, psi: %{}}
 
   # The typechecker operates on expanded AST (from bytecode debug info), not the surface-level AST from `quote`
   # These helpers produce the correct AST shapes.

@@ -68,13 +68,40 @@ defmodule Maty.Typechecker do
 
     errors =
       Module.get_attribute(env.module, :spec_errors) ++
-        Module.get_attribute(env.module, :handler_errors)
+        Module.get_attribute(env.module, :handler_errors) ++
+        unknown_role_errors(env)
 
     # we fail here, before the bodies are checked in `handle_after_compile`, on purpose:
     # a spec or handler annotation that did not validate leaves psi and delta incomplete,
     # so checking bodies against them would only pile follow-on errors on top of the real one
     if errors != [] do
       raise_type_errors!(env, errors)
+    end
+  end
+
+  # every role an actor declares in `use Maty.Actor` must be a role of its protocol
+  @spec unknown_role_errors(Macro.Env.t()) :: [{nil, Error.t()}]
+  defp unknown_role_errors(env) do
+    protocol = Module.get_attribute(env.module, :maty_protocol)
+    roles = Module.get_attribute(env.module, :maty_roles)
+
+    protocol_roles = protocol.__roles__()
+
+    case Enum.uniq(roles -- protocol_roles) do
+      [] ->
+        []
+
+      unknown_roles ->
+        error =
+          Error.FrameworkUsage.unknown_roles(
+            env.module,
+            [line: env.line],
+            protocol,
+            unknown_roles,
+            protocol_roles
+          )
+
+        [{nil, error}]
     end
   end
 
@@ -105,6 +132,7 @@ defmodule Maty.Typechecker do
       module: env.module,
       # until a clause sets its own, errors that have no location of their own point at the module
       meta: [line: env.line],
+      roles: Module.get_attribute(env.module, :maty_roles),
       delta_M: delta_m,
       delta_I: delta_i,
       psi: psi
@@ -404,6 +432,10 @@ defmodule Maty.Typechecker do
     do: TC.Bind.with_frame(result, {:clause, func_id, index})
 
   defp with_clause_frame(result, _func_id, _index, _total_clauses), do: result
+
+  def display_error(location, {nil, error_msg}) do
+    "#{location}: #{Formatter.format(error_msg)}"
+  end
 
   def display_error(location, {func_id, error_msg}) do
     "#{location}: [#{Utils.to_func(func_id)}] #{Formatter.format(error_msg)}"

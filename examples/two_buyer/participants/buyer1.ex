@@ -1,19 +1,11 @@
 defmodule TwoBuyer.Participants.Buyer1 do
-  use Maty.Actor
-
-  @role :buyer1
+  use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:buyer1]
 
   @st {:install, ~q/+seller:{title(binary).quote_handler}/}
   @st {:quote_handler, ~q/&seller:{quote(number).+buyer2:{share(number).end}}/}
 
   on_link {ap_pid, title} :: {pid(), binary()}, initial_state do
-    MatyDSL.register(
-      ap_pid,
-      @role,
-      :install,
-      title,
-      initial_state
-    )
+    MatyDSL.register(ap_pid, :buyer1, :install, title, initial_state)
   end
 
   init_handler :install, title :: binary(), state do

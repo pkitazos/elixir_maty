@@ -9,7 +9,7 @@ defmodule Maty.Typechecker.HelpersTest do
   @module TestModule
   @st_end %ST.SEnd{}
   @st_out ST.output_one(:server, :msg, :binary, @st_end)
-  @ctx %Ctx{module: @module, meta: @meta}
+  @ctx %Ctx{module: @module, meta: @meta, roles: []}
 
   # --- unify_list_types/1 ---
 

@@ -622,6 +622,18 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :framework_usage, kind: :unknown_roles} = e) do
+    %{protocol: protocol, got: got, known: known} = e.details
+
+    """
+    Framework Usage Violation: Unknown Roles
+      Got: #{Enum.map_join(got, ", ", &inspect/1)}
+      Roles of #{inspect(protocol)}: #{Enum.map_join(known, ", ", &inspect/1)}
+      --
+      Maty.Actor must only declare roles of its protocol.
+    """
+  end
+
   defp render(%Error{category: :framework_usage, kind: :init_handler_not_literal} = e) do
     %{got: got} = e.details
 

@@ -1,7 +1,7 @@
 defmodule Maty.Hook do
   alias Maty.{Typechecker, Utils}
 
-  defmacro __using__(_) do
+  defmacro __using__(_opts) do
     quote do
       import Maty.Hook
 

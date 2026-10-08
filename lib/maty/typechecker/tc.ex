@@ -716,14 +716,28 @@ defmodule Maty.Typechecker.TC do
       _
       <~ lift_bool(
         role_type == :atom,
-        # the role cannot be checked against the protocol here
-        # currently, the roles only exist in the access point at runtime (see issue #29)
         Error.TypeMismatch.register_arg_type_mismatch(
           ctx.module,
           meta,
           :role,
           expected: :atom,
           got: role_type
+        ),
+        env,
+        st
+      )
+
+      _
+      <~ lift_bool(
+        role_ast in ctx.roles,
+        # todo: add new variant
+        Error.TypeMismatch.register_arg_type_mismatch(
+          ctx.module,
+          meta,
+          :role,
+          # todo: handle formatting/wording for list of roles
+          expected: ctx.roles,
+          got: role_ast
         ),
         env,
         st

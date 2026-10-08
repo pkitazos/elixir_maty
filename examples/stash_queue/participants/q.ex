@@ -1,7 +1,5 @@
 defmodule StashQueue.Participants.Q do
-  use Maty.Actor
-
-  @role :q
+  use Maty.Actor, protocol: StashQueue.Protocol, roles: [:q]
 
   @st {:install, ~q/p1_handler/}
   @st {:p1_handler, ~q/&p:{a(number).r1_handler}/}
@@ -10,13 +8,7 @@ defmodule StashQueue.Participants.Q do
   @st {:p2_handler, ~q/&p:{a(number).end}/}
 
   on_link ap_pid :: pid(), initial_state do
-    MatyDSL.register(
-      ap_pid,
-      @role,
-      :install,
-      nil,
-      initial_state
-    )
+    MatyDSL.register(ap_pid, :q, :install, nil, initial_state)
   end
 
   # Q waits until all four messages are in its mailbox before it starts reading it.

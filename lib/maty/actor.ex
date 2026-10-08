@@ -30,8 +30,13 @@ defmodule Maty.Actor do
   @callback on_link(args :: any(), initial_state :: Types.maty_actor_state()) ::
               {:ok, Types.maty_actor_state()}
 
-  defmacro __using__(_opts) do
+  defmacro __using__(opts) do
+    protocol = Keyword.fetch!(opts, :protocol)
+    roles = Keyword.fetch!(opts, :roles)
+
     quote do
+      @maty_protocol unquote(protocol)
+      @maty_roles unquote(roles)
       use Maty.Hook
       use Maty.DSL
       import ST.Sigils

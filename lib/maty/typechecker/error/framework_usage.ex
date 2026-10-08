@@ -78,6 +78,17 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
+  # `use Maty.Actor` declared roles that are not roles of the given protocol
+  def unknown_roles(module, meta, protocol, unknown_roles, protocol_roles) do
+    %Error{
+      category: :framework_usage,
+      kind: :unknown_roles,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{protocol: protocol, got: unknown_roles, known: protocol_roles}
+    }
+  end
+
   # register was given an expression for the init handler, not a literal atom
   def init_handler_not_literal(module, meta, got_ast) do
     %Error{

@@ -15,7 +15,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       # the :buyer1 actor, but the init handler sends `title` to :buyer2 when the session declares +seller
       src = """
       defmodule MatyCompileErrorFixture.BadTarget do
-        use Maty.Actor
+        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:buyer1]
 
         @role :buyer1
 
@@ -46,7 +46,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       # a handler annotated with a label that has no @st declaration.
       src = """
       defmodule MatyCompileErrorFixture.MissingHandler do
-        use Maty.Actor
+        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:buyer1]
 
         @role :buyer1
 
@@ -100,7 +100,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
     defp seller_src(module_name, body) do
       """
       defmodule MatyCompileErrorFixture.#{module_name} do
-        use Maty.Actor
+        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
         @role :seller
 
@@ -303,7 +303,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         """
         defmodule MatyCompileErrorFixture.OnLinkNoSpec do
-          use Maty.Actor
+          use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
           @role :seller
 
@@ -429,7 +429,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
     test "a hand-written init handler without a spec reports the missing spec" do
       src = """
       defmodule MatyCompileErrorFixture.RawInitNoSpec do
-        use Maty.Actor
+        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
         @role :seller
 
@@ -499,7 +499,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         """
         defmodule MatyCompileErrorFixture.RegisterBadAp do
-          use Maty.Actor
+          use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
           @role :seller
 
@@ -526,7 +526,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
     test "an on_link that never registers is reported at the on_link clause" do
       src = """
       defmodule MatyCompileErrorFixture.OnLinkNoRegister do
-        use Maty.Actor
+        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
         @role :seller
 
@@ -571,7 +571,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
     test "an init handler whose session type starts with a receive is reported at that clause" do
       src = """
       defmodule MatyCompileErrorFixture.InitStartsWithReceive do
-        use Maty.Actor
+        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
         @role :seller
 
@@ -704,7 +704,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         """
         defmodule MatyCompileErrorFixture.RegisterBadRole do
-          use Maty.Actor
+          use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
           @role :seller
 
@@ -806,7 +806,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
       """
       defmodule MatyCompileErrorFixture.#{module_name} do
-        use Maty.Actor
+        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
         @role :seller
 
@@ -940,7 +940,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
     defp suspend_src(module_name, next_handler) do
       """
       defmodule MatyCompileErrorFixture.#{module_name} do
-        use Maty.Actor
+        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
         @role :seller
 

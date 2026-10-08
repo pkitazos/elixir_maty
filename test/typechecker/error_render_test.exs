@@ -231,6 +231,12 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FrameworkUsage.on_link_bad_return(@m, @meta, :number)},
       {{Error.FrameworkUsage, :unknown_init_handler},
        Error.FrameworkUsage.unknown_init_handler(@m, @meta, :nope, [:install])},
+      {{Error.FrameworkUsage, :unknown_roles},
+       Error.FrameworkUsage.unknown_roles(@m, @meta, TwoBuyer.Protocol, [:sellr], [
+         :buyer1,
+         :buyer2,
+         :seller
+       ])},
       {{Error.FrameworkUsage, :init_handler_not_literal},
        Error.FrameworkUsage.init_handler_not_literal(@m, @meta, {:handler, [], nil})},
       {{Error.FrameworkUsage, :register_wrong_arity},
