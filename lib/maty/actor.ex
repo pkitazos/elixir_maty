@@ -19,6 +19,20 @@ defmodule Maty.Actor do
   we need to look at our suspended handlers, and to do that we need the `session_id` and `to` from a given message.
   The `handlers` map will return an expected role and if the `from` of the message we're currently inspecting matches,
   then we process this message.
+
+  ## Options
+
+  `use Maty.Actor` requires two options:
+
+    - `protocol`: the protocol module (implementing `Maty.Protocol`) whose sessions this actor takes part in
+    - `roles`: the roles of that protocol this actor plays
+
+  Every `MatyDSL.register/5` call in the actor must be given one of these roles as a literal atom.
+
+      defmodule TwoBuyer.Participants.Seller do
+        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
+        ...
+      end
   """
 
   alias Maty.{Envelope, Session, Types}
