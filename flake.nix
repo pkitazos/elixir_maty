@@ -1,8 +1,6 @@
 {
-  description = "Elixir implementation of the Maty actor language";
-  inputs = {
-    nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/*";
-  };
+  inputs.nixpkgs.url = "https://flakehub.com/f/NixOS/nixpkgs/*";
+
   outputs =
     { nixpkgs, ... }:
     let
@@ -12,11 +10,11 @@
         "aarch64-linux"
         "x86_64-linux"
       ];
-      forEachSupportedSystem =
-        f: nixpkgs.lib.genAttrs supportedSystems (system: f { pkgs = import nixpkgs { inherit system; }; });
+      eachSystem =
+        f: nixpkgs.lib.genAttrs supportedSystems (system: f { pkgs = nixpkgs.legacyPackages.${system}; });
     in
     {
-      devShells = forEachSupportedSystem (
+      devShells = eachSystem (
         { pkgs }:
         let
           beamPkgs = pkgs.beam.packages.erlang_27;
