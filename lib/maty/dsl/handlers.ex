@@ -12,7 +12,7 @@ defmodule Maty.DSL.Handlers do
   a more declarative syntax for handlers and communication operations.
   """
 
-  defmacro handler(handler_name, role, pattern, state_var, do: body) do
+  defmacro handler(handler_name, role, pattern, local_state_var, global_state_var, do: body) do
     # first verify we have a proper tagged tuple pattern
     # the pattern should be a 2-tuple with an atom tag as the first element
     case pattern do
@@ -36,7 +36,8 @@ defmodule Maty.DSL.Handlers do
           def unquote(handler_name)(
                 unquote(role),
                 unquote(clean_pattern),
-                unquote(state_var),
+                unquote(local_state_var),
+                unquote(global_state_var),
                 session_ctx
               ) do
             try do
@@ -46,8 +47,11 @@ defmodule Maty.DSL.Handlers do
               _ = var!(session_ctx)
               unquote(body)
             catch
-              {:suspend, next_handler, new_state} -> {:suspend, next_handler, new_state}
-              {:done, new_state} -> {:done, new_state}
+              {:suspend, next_handler, new_local_state, new_global_state} ->
+                {:suspend, next_handler, new_local_state, new_global_state}
+
+              {:done, new_local_state, new_global_state} ->
+                {:done, new_local_state, new_global_state}
             end
           end
 
@@ -64,7 +68,7 @@ defmodule Maty.DSL.Handlers do
     end
   end
 
-  defmacro init_handler(handler_name, pattern, state_var, do: body) do
+  defmacro init_handler(handler_name, pattern, local_state_var, global_state_var, do: body) do
     {clean_pattern, type_spec} = process_init_pattern(pattern)
 
     quote do
@@ -77,7 +81,8 @@ defmodule Maty.DSL.Handlers do
             ) :: no_return()
       def unquote(handler_name)(
             unquote(clean_pattern),
-            unquote(state_var),
+            unquote(local_state_var),
+            unquote(global_state_var),
             session_ctx
           ) do
         try do
@@ -87,20 +92,23 @@ defmodule Maty.DSL.Handlers do
           _ = var!(session_ctx)
           unquote(body)
         catch
-          {:suspend, next_handler, new_state} -> {:suspend, next_handler, new_state}
-          {:done, new_state} -> {:done, new_state}
+          {:suspend, next_handler, new_local_state, new_global_state} ->
+            {:suspend, next_handler, new_local_state, new_global_state}
+
+          {:done, new_local_state, new_global_state} ->
+            {:done, new_local_state, new_global_state}
         end
       end
     end
   end
 
-  defmacro on_link(pattern, initial_state_var, do: body) do
+  defmacro on_link(pattern, initial_global_state_var, do: body) do
     {clean_pattern, type_spec} = process_init_pattern(pattern)
 
     quote do
       @impl true
       @spec on_link(unquote(type_spec), maty_actor_state()) :: {:ok, maty_actor_state()}
-      def on_link(unquote(clean_pattern), unquote(initial_state_var)) do
+      def on_link(unquote(clean_pattern), unquote(initial_global_state_var)) do
         unquote(body)
       end
     end

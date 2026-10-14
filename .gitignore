@@ -32,3 +32,4 @@ docs/squiggles/**/*.pdf
 .obsidian/
 .nix-mix/
 .nix-hex/
+scratch/
