@@ -15,7 +15,7 @@ defmodule Maty.AccessPoint do
   @spec loop(Types.access_point_state()) :: no_return()
   defp loop(state) do
     receive do
-      {:register, role, pid, init_token} when is_map_key(state, role) ->
+      {:maty_register_in_session, role, pid, init_token} when is_map_key(state, role) ->
         updated_state = Map.update!(state, role, &:queue.in({pid, init_token}, &1))
 
         case take_participants(updated_state) do
@@ -23,7 +23,7 @@ defmodule Maty.AccessPoint do
             session_id = make_ref()
 
             for {pid, tok} <- mailing_list do
-              send(pid, {:init_session, session_id, address_book, tok})
+              send(pid, {:maty_init_session, session_id, address_book, tok})
             end
 
             loop(remaining_state)
@@ -32,7 +32,7 @@ defmodule Maty.AccessPoint do
             loop(updated_state)
         end
 
-      {:register, role, _, _} ->
+      {:maty_register_in_session, role, _, _} ->
         Logger.warning("[#{inspect(__MODULE__)}] invalid role for session: #{inspect(role)}")
         loop(state)
 

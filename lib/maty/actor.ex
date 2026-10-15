@@ -47,8 +47,6 @@ defmodule Maty.Actor do
       use Maty.Hook
       use Maty.DSL
       import ST.Sigils
-      require Maty.DSL
-      require Maty.Runtime.InternalState
       @behaviour Maty.Actor
 
       def start_link(args) do

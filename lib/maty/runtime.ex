@@ -56,7 +56,20 @@ defmodule Maty.Runtime do
           loop(module, s, stash ++ [envelope])
         end
 
-      {:init_session, session_id, participants, init_token} ->
+      {:maty_register, ap_pid, %{role: role} = info} ->
+        # the init token identifies the suspended callback
+        init_token = make_ref()
+        send(ap_pid, {:maty_register_in_session, role, self(), init_token})
+
+        updated_s =
+          put_in(
+            s.callbacks[init_token],
+            info
+          )
+
+        receive_next(module, updated_s, stash)
+
+      {:maty_init_session, session_id, participants, init_token} ->
         updated_s = init_role(module, s, session_id, participants, init_token)
         loop(module, updated_s, stash)
 
@@ -80,7 +93,7 @@ defmodule Maty.Runtime do
       apply(module, handler_label, [
         from,
         msg,
-        InternalState.get_actor_state(s, session_id, to),
+        %{global: s.global_actor_state, local: session.roles[to].state},
         {session, to}
       ])
 
@@ -96,7 +109,12 @@ defmodule Maty.Runtime do
         ) :: InternalState.t()
   defp init_role(module, s, session_id, participants, init_token) do
     # take the `role` and `callback` for the given `init_token`
-    {{role, init_handler, args}, initial_s} = pop_in(s.callbacks[init_token])
+    {%{
+       role: role,
+       init_handler: init_handler,
+       args: args,
+       local: initial_session_role_state
+     }, initial_s} = pop_in(s.callbacks[init_token])
 
     # it's possible that at this stage the actor has already initiated the session with a different role
     # or maybe not, so we must ensure that a session exists
@@ -106,7 +124,7 @@ defmodule Maty.Runtime do
     result =
       apply(module, init_handler, [
         args,
-        InternalState.get_actor_state(updated_s, session_id, role),
+        %{global: updated_s.global_actor_state, local: initial_session_role_state},
         {session, role}
       ])
 
@@ -166,9 +184,40 @@ defmodule Maty.Runtime do
   @spec ensure_session(InternalState.t(), Types.session_id(), %{Types.role() => pid()}) ::
           InternalState.t()
   defp ensure_session(s, session_id, participants) do
-    %{
-      s
-      | sessions: Map.put_new(s.sessions, session_id, Session.new(session_id, participants))
-    }
+    update_in(
+      s.sessions,
+      &Map.put_new_lazy(&1, session_id, fn -> Session.new(session_id, participants) end)
+    )
   end
+
+  @doc false
+  @spec register(pid(), Types.role(), Types.handler_label(), term(), term()) :: :ok
+  def register(ap_pid, role, handler, args, initial_session_role_state) do
+    Kernel.send(
+      self(),
+      {:maty_register, ap_pid,
+       %{
+         role: role,
+         init_handler: handler,
+         args: args,
+         local: initial_session_role_state
+       }}
+    )
+
+    :ok
+  end
+
+  @doc false
+  @spec send_session_message({Session.t(), Types.role()}, Types.role(), Types.message()) :: atom()
+  def send_session_message({session, from}, to, msg) do
+    envelope = %Envelope{session_id: session.id, to: to, from: from, message: msg}
+    Kernel.send(session.participants[to], {:maty_message, envelope})
+    :ok
+  end
+
+  @doc false
+  def suspend(next_handler, state), do: throw({:maty_suspend, next_handler, state})
+
+  @doc false
+  def done(state), do: throw({:maty_done, state})
 end

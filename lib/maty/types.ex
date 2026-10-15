@@ -22,6 +22,13 @@ defmodule Maty.Types do
 
   @type maty_actor_state :: Maty.Runtime.InternalState.t()
 
+  @type registration_info :: %{
+          role: role(),
+          init_handler: handler_label(),
+          args: term(),
+          local: term()
+        }
+
   @type candidate :: {pid(), init_token()}
   # an access point holds a map of candidate participants
   # it maps roles to queues storing pairs of `PID` * `REF` (initialisation token)
