@@ -307,4 +307,39 @@ defmodule Maty.Typechecker.PatternBindingTest do
       assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
     end
   end
+
+  # -- Pat-Match
+
+  describe "tc_pattern/4 match (p1 = p2) patterns" do
+    @person {:map_record, %{name: :binary, age: :number}}
+
+    test "binds the variables of both sides" do
+      pattern = quote(do: %{name: n} = person)
+
+      assert {:ok, bindings, env} = PatternBinding.tc_pattern(@ctx, pattern, @person, %{})
+      assert bindings == %{n: :binary, person: @person}
+      assert env == %{n: :binary, person: @person}
+    end
+
+    test "the variable can be on either side" do
+      pattern = quote(do: person = %{age: a})
+
+      assert {:ok, %{a: :number, person: @person}, _env} =
+               PatternBinding.tc_pattern(@ctx, pattern, @person, %{})
+    end
+
+    test "both sides are checked against the expected type" do
+      pattern = quote(do: %{missing: x} = person)
+
+      assert {:error, msg, %{}} = PatternBinding.tc_pattern(@ctx, pattern, @person, %{})
+      assert %Error{category: :pattern_matching, kind: :pattern_map_key_not_found} = msg
+    end
+
+    test "binding the same variable on both sides is a conflict" do
+      pattern = quote(do: %{name: x} = x)
+
+      assert {:error, msg, _env} = PatternBinding.tc_pattern(@ctx, pattern, @person, %{})
+      assert %Error{category: :pattern_matching, kind: :conflicting_pattern_bindings} = msg
+    end
+  end
 end

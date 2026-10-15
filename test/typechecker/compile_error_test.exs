@@ -224,6 +224,18 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert [{MatyCompileErrorFixture.MapRecordSpec, _}] = Code.compile_string(src)
     end
 
+    test "a match pattern in a function head compiles" do
+      src =
+        seller_src("MatchPatternHead", """
+        #{@valid_handlers}
+
+        @spec rename(%{name: binary(), age: number()}) :: {binary(), %{name: binary(), age: number()}}
+        def rename(%{name: name} = person), do: {name, person}
+        """)
+
+      assert [{MatyCompileErrorFixture.MatchPatternHead, _}] = Code.compile_string(src)
+    end
+
     test "a spec error is reported on its own, body errors wait until it is fixed" do
       # `g/0` has a body error that must not be reported yet
       src =

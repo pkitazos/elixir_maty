@@ -181,6 +181,24 @@ defmodule Maty.Typechecker.PatternBinding do
     end
   end
 
+  # Pat-Match: Pattern is 'p1 = p2', e.g. `%{global: g} = state`
+  # both sides match the same value so both are checked against the expected type,
+  # and like every other compound pattern the two sides must bind disjoint variables
+  deftc tc_pattern(ctx, {:=, meta, [p1_ast, p2_ast]}, expected_type, var_env) do
+    with {:p1, {:ok, bindings1, env1}} <- {:p1, tc_pattern(ctx, p1_ast, expected_type, var_env)},
+         {:p2, {:ok, bindings2, _env2}} <- {:p2, tc_pattern(ctx, p2_ast, expected_type, env1)},
+         # pass env1 because env2 already contains bindings1
+         {:merge, {:ok, merged_bindings, final_env}} <-
+           {:merge,
+            Helpers.check_and_merge_bindings(ctx.module, meta, bindings1, bindings2, env1)} do
+      {:ok, merged_bindings, final_env}
+    else
+      {:p1, {:error, msg, env}} -> {:error, msg, env}
+      {:p2, {:error, msg, env}} -> {:error, msg, env}
+      {:merge, {:error, msg, env}} -> {:error, msg, env}
+    end
+  end
+
   # Pat-Tuple
   deftc tc_pattern(ctx, {p1_ast, p2_ast} = pattern_ast, expected_type, var_env) do
     with {:type, {:tuple, [type_a, type_b]}} <- {:type, expected_type},
