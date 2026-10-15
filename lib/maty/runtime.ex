@@ -57,13 +57,13 @@ defmodule Maty.Runtime do
         end
 
       {:maty_register, ap_pid, %{role: role} = info} ->
-        # the init token identifies the suspended callback
+        # the init token identifies the suspended `registration`
         init_token = make_ref()
         send(ap_pid, {:maty_register_in_session, role, self(), init_token})
 
         updated_s =
           put_in(
-            s.callbacks[init_token],
+            s.pending_registrations[init_token],
             info
           )
 
@@ -104,17 +104,17 @@ defmodule Maty.Runtime do
           module(),
           InternalState.t(),
           Types.session_id(),
-          %{Types.role() => pid()},
+          Types.address_book(),
           Types.init_token()
         ) :: InternalState.t()
   defp init_role(module, s, session_id, participants, init_token) do
-    # take the `role` and `callback` for the given `init_token`
+    # take the `registration` for the given `init_token`
     {%{
        role: role,
        init_handler: init_handler,
        args: args,
        local: initial_session_role_state
-     }, initial_s} = pop_in(s.callbacks[init_token])
+     }, initial_s} = pop_in(s.pending_registrations[init_token])
 
     # it's possible that at this stage the actor has already initiated the session with a different role
     # or maybe not, so we must ensure that a session exists
@@ -134,8 +134,7 @@ defmodule Maty.Runtime do
   @spec handle_result(
           module(),
           InternalState.t(),
-          {:suspend, Types.handler_label(), term()} | {:done, term()},
-          #                                   ^ gotta somehow type this
+          Types.handler_result(),
           Types.session_id(),
           Types.role()
         ) :: InternalState.t()
@@ -181,7 +180,7 @@ defmodule Maty.Runtime do
     end
   end
 
-  @spec ensure_session(InternalState.t(), Types.session_id(), %{Types.role() => pid()}) ::
+  @spec ensure_session(InternalState.t(), Types.session_id(), Types.address_book()) ::
           InternalState.t()
   defp ensure_session(s, session_id, participants) do
     update_in(
@@ -191,7 +190,7 @@ defmodule Maty.Runtime do
   end
 
   @doc false
-  @spec register(pid(), Types.role(), Types.handler_label(), term(), term()) :: :ok
+  @spec register(pid(), Types.role(), Types.handler_label(), term(), Types.local_state()) :: :ok
   def register(ap_pid, role, handler, args, initial_session_role_state) do
     Kernel.send(
       self(),
@@ -208,7 +207,7 @@ defmodule Maty.Runtime do
   end
 
   @doc false
-  @spec send_session_message({Session.t(), Types.role()}, Types.role(), Types.message()) :: atom()
+  @spec send_session_message(Types.session_ctx(), Types.role(), Types.message()) :: :ok
   def send_session_message({session, from}, to, msg) do
     envelope = %Envelope{session_id: session.id, to: to, from: from, message: msg}
     Kernel.send(session.participants[to], {:maty_message, envelope})
@@ -216,8 +215,10 @@ defmodule Maty.Runtime do
   end
 
   @doc false
+  @spec suspend(Types.handler_label(), Types.maty_actor_state()) :: no_return()
   def suspend(next_handler, state), do: throw({:maty_suspend, next_handler, state})
 
   @doc false
+  @spec done(Types.maty_actor_state()) :: no_return()
   def done(state), do: throw({:maty_done, state})
 end

@@ -45,10 +45,7 @@ defmodule Maty.AccessPoint do
     end
   end
 
-  @type address_book :: %{Types.role() => pid()}
-  @type mailing_list :: list(Types.candidate())
-
-  @typep acc :: {:ok, mailing_list(), address_book(), Types.access_point_state()}
+  @typep acc :: {:ok, list(Types.candidate()), Types.address_book(), Types.access_point_state()}
 
   # takes the first candidate from every role's queue
   # if any queue is empty, no session can start yet

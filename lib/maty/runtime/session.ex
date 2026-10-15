@@ -14,14 +14,15 @@ defmodule Maty.Runtime.Session do
           # the key is the role this actor plays in the session, the paired role is the one
           # the suspended handler expects to receive from (see `__handler_expects__`)
           roles: %{
-            # maybe this tuple could also be a map... or maybe I'm overdoing it with the maps
-            Types.role() => %{handler: {Types.handler_label(), Types.role()}, state: term()}
-            #                      figuring out how to type this will be interesting ^
+            Types.role() => %{
+              handler: {Types.handler_label(), Types.role()},
+              state: Types.local_state()
+            }
           },
-          participants: %{Types.role() => pid()}
+          participants: Types.address_book()
         }
 
-  @spec new(Types.session_id(), %{Types.role() => pid()}) :: t()
+  @spec new(Types.session_id(), Types.address_book()) :: t()
   def new(id, participants) do
     %__MODULE__{id: id, participants: participants, roles: %{}}
   end

@@ -10,6 +10,10 @@ defmodule Maty.Types do
   @type role :: atom()
   @type handler_label :: atom()
 
+  # placeholders / grep targets until I decide how to type local and global state
+  @type local_state :: term()
+  @type global_state :: term()
+
   # todo: this should be tightened a bit more than `any()`
   @type message :: {atom(), any()}
 
@@ -20,14 +24,19 @@ defmodule Maty.Types do
   # that is, the actual session, and the role of the actor for the given handler
   @type session_ctx :: {session(), role()}
 
-  @type maty_actor_state :: Maty.Runtime.InternalState.t()
+  @type maty_actor_state :: %{local: local_state(), global: global_state()}
+
+  @type handler_result ::
+          {:suspend, handler_label(), maty_actor_state()} | {:done, maty_actor_state()}
 
   @type registration_info :: %{
           role: role(),
           init_handler: handler_label(),
           args: term(),
-          local: term()
+          local: local_state()
         }
+
+  @type address_book :: %{role() => pid()}
 
   @type candidate :: {pid(), init_token()}
   # an access point holds a map of candidate participants
@@ -42,6 +51,8 @@ defmodule Maty.Types do
       role: T.role(),
       session: T.session(),
       session_ctx: T.session_ctx(),
+      local_state: T.local_state(),
+      global_state: T.global_state(),
       maty_actor_state: T.maty_actor_state()
     }
   end
@@ -87,8 +98,6 @@ defmodule Maty.Types do
             | {:list, t()}
             | {:map, %{atom() => t()}}
             # todo: eventually eliminate bare :map
-            # getState should return the properly typed actor state
-            # which likely requires some form of type inference
             | :map
 
     def session_id, do: :ref
@@ -98,24 +107,14 @@ defmodule Maty.Types do
 
     def message, do: {:tuple, [:atom, :any]}
 
-    def session,
-      do:
-        {:map,
-         %{
-           id: T.session_id(),
-           handlers: {:map, %{T.role() => {:tuple, [T.handler_label(), T.role()]}}},
-           participants: {:map, %{T.role() => :pid}}
-         }}
+    # opaque: users never look inside a session, they only pass the session context along, only needed to type `session_ctx`
+    def session, do: :any
 
     def session_ctx, do: {:tuple, [T.session(), T.role()]}
 
-    # I think this is about to become obsolete!
-    def maty_actor_state,
-      do:
-        {:map,
-         %{
-           sessions: {:map, %{T.session_id() => T.session()}},
-           callbacks: {:map, %{T.init_token() => {:tuple, [T.role(), T.handler_label(), :any]}}}
-         }}
+    def local_state, do: :any
+    def global_state, do: :any
+
+    def maty_actor_state, do: {:map, %{local: T.local_state(), global: T.global_state()}}
   end
 end

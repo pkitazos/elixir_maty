@@ -35,7 +35,7 @@ defmodule Maty.Actor do
       end
   """
 
-  @callback on_start(args :: term()) :: {:ok, global_state :: term()}
+  @callback on_start(args :: term()) :: {:ok, Maty.Types.global_state()}
 
   defmacro __using__(opts) do
     protocol = Keyword.fetch!(opts, :protocol)

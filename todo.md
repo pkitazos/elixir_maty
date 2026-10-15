@@ -34,12 +34,12 @@ It's been a while since I wrote most of this and I remember some of it was a bit
 
 - [ ] [typechecker/helpers](./lib/maty/typechecker/helpers.ex)
 
-- [ ] [access_point](./lib/maty/access_point.ex)
-- [ ] [actor](./lib/maty/actor.ex)
+- [x] [access_point](./lib/maty/access_point.ex)
+- [x] [actor](./lib/maty/actor.ex)
 
-- [ ] [dsl/dsl](./lib/maty/dsl/dsl.ex)
-- [ ] [dsl/handlers](./lib/maty/dsl/handlers.ex)
-- [ ] [dsl/state](./lib/maty/dsl/state.ex)
+- [x] [dsl/dsl](./lib/maty/dsl/dsl.ex)
+- [x] [dsl/handlers](./lib/maty/dsl/handlers.ex)
+- [x] [dsl/state](./lib/maty/dsl/state.ex)
 
 ## tasks
 
@@ -50,4 +50,4 @@ It's been a while since I wrote most of this and I remember some of it was a bit
 
 - How do I cut up a recursive session type? 
 
-tl;dr - unfold once and inline
+tl;dr - unfold once and inline. (see "Subtyping for session types in the pi calculus")

@@ -20,7 +20,7 @@ defmodule Maty.DSL do
 
     quote do
       @impl true
-      @spec on_start(unquote(type_spec)) :: {:ok, any()}
+      @spec on_start(unquote(type_spec)) :: {:ok, global_state()}
       #   somehow type the global state from this ^
       def on_start(unquote(clean_pattern)) do
         unquote(body)
@@ -35,10 +35,11 @@ defmodule Maty.DSL do
       @init_handler unquote(handler_name)
       @spec unquote(handler_name)(
               unquote(type_spec),
-              term(),
-              # ^ session-role local + global state
+              maty_actor_state(),
               session_ctx()
             ) :: no_return()
+      # no_return() describes the body as the typechecker sees it (it always ends in suspend/done),
+      # the generated function itself returns the caught {:suspend, ...} / {:done, ...} result
       def unquote(handler_name)(
             unquote(clean_pattern),
             unquote(state_var),
@@ -78,15 +79,12 @@ defmodule Maty.DSL do
 
         quote do
           @handler unquote(handler_name)
+          # no_return() describes the body as the typechecker sees it (it always ends in suspend/done),
+          # the generated function itself returns the caught {:suspend, ...} / {:done, ...} result
           @spec unquote(handler_name)(
                   unquote(role),
                   unquote(type_spec),
-                  # {}, # need to include the local and global state here
-                  # make sure to update these guys
-                  # not sure what the type should be here...
                   maty_actor_state(),
-                  # the internal state is probably going to be a maty_actor_state
-                  # but the local and global state are probably untyped? or perhaps typed by the programmer
                   session_ctx()
                 ) :: no_return()
           def unquote(handler_name)(

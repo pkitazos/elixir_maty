@@ -7,22 +7,22 @@ defmodule Maty.Runtime.InternalState do
   alias Maty.Types
   alias Maty.Runtime.Session
 
-  @enforce_keys [:sessions, :callbacks, :global_actor_state]
+  @enforce_keys [:sessions, :pending_registrations, :global_actor_state]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
           sessions: %{Types.session_id() => Session.t()},
-          callbacks: %{Types.init_token() => Types.registration_info()},
-          global_actor_state: term()
+          pending_registrations: %{Types.init_token() => Types.registration_info()},
+          global_actor_state: Types.global_state()
           #                   ^ figure out how to type this
         }
 
   # todo: could be named `new_from` or just `from` or `new_with`
-  @spec new(term()) :: t()
+  @spec new(Types.global_state()) :: t()
   def new(global_actor_state) do
     %Maty.Runtime.InternalState{
       sessions: %{},
-      callbacks: %{},
+      pending_registrations: %{},
       global_actor_state: global_actor_state
     }
   end
