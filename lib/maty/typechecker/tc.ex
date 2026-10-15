@@ -139,7 +139,7 @@ defmodule Maty.Typechecker.TC do
   # Map Construction %{k1 => v1, ...} (Val-Map / Val-EmptyMap adaptation)
   # Allows heterogeneous value types, deviates slightly from our formalisation
   deftc tc_expr(_ctx, env, st, {:%{}, _, []}) do
-    ok({:map, %{}}, env, st)
+    ok({:map_record, %{}}, env, st)
   end
 
   # Clause for Non-Empty Map %{k1 => v1, ...}
@@ -172,7 +172,7 @@ defmodule Maty.Typechecker.TC do
         ok({literal_key, val_t}, env, st)
       end
     end)
-    |> map(fn pairs -> {:map, Map.new(pairs)} end)
+    |> map(fn pairs -> {:map_record, Map.new(pairs)} end)
   end
 
   # --- Logical Not Operator (T-Not) ---

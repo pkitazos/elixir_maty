@@ -96,7 +96,7 @@ defmodule Maty.Types do
             | :ref
             | {:tuple, [t()]}
             | {:list, t()}
-            | {:map, %{atom() => t()}}
+            | {:map_record, %{atom() => t()}}
             # todo: eventually eliminate bare :map
             | :map
 
@@ -115,6 +115,6 @@ defmodule Maty.Types do
     def local_state, do: :any
     def global_state, do: :any
 
-    def maty_actor_state, do: {:map, %{local: T.local_state(), global: T.global_state()}}
+    def maty_actor_state, do: {:map_record, %{local: T.local_state(), global: T.global_state()}}
   end
 end

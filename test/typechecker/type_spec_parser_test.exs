@@ -114,6 +114,54 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
     end
   end
 
+  # -- Map record types
+
+  describe "parse/1 map records" do
+    test "empty map" do
+      assert {:ok, {:map_record, %{}}} = TypeSpecParser.parse(quote(do: %{}))
+    end
+
+    test "map with atom keys" do
+      ast = quote(do: %{name: binary(), age: number()})
+      assert {:ok, {:map_record, %{name: :binary, age: :number}}} = TypeSpecParser.parse(ast)
+    end
+
+    test "nested map record" do
+      ast = quote(do: %{user: %{name: binary()}, pair: {number(), atom()}})
+
+      assert {:ok,
+              {:map_record,
+               %{user: {:map_record, %{name: :binary}}, pair: {:tuple, [:number, :atom]}}}} =
+               TypeSpecParser.parse(ast)
+    end
+
+    test "an unknown field type is reported" do
+      assert {:error, %Maty.Typechecker.Error.Cause{kind: :unknown_type_constructor}} =
+               TypeSpecParser.parse(quote(do: %{name: wat()}))
+    end
+
+    test "required/optional keys are not supported" do
+      assert {:error, %Maty.Typechecker.Error.Cause{kind: :unsupported_type_constructor}} =
+               TypeSpecParser.parse(quote(do: %{required(:name) => binary()}))
+
+      assert {:error, %Maty.Typechecker.Error.Cause{kind: :unsupported_type_constructor}} =
+               TypeSpecParser.parse(quote(do: %{optional(:name) => binary()}))
+    end
+
+    test "non-atom keys are not supported" do
+      assert {:error, %Maty.Typechecker.Error.Cause{kind: :unsupported_type_constructor}} =
+               TypeSpecParser.parse(quote(do: %{"name" => binary()}))
+
+      assert {:error, %Maty.Typechecker.Error.Cause{kind: :unsupported_type_constructor}} =
+               TypeSpecParser.parse(quote(do: %{atom() => binary()}))
+    end
+
+    test "duplicate keys are not supported" do
+      assert {:error, %Maty.Typechecker.Error.Cause{kind: :unsupported_type_constructor}} =
+               TypeSpecParser.parse(quote(do: %{name: binary(), name: number()}))
+    end
+  end
+
   # --- Special types ---
 
   describe "parse/1 special types" do

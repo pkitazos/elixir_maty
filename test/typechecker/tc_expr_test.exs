@@ -210,20 +210,20 @@ defmodule Maty.Typechecker.TCExprTest do
   describe "tc_expr/4 maps" do
     test "empty map" do
       ast = {:%{}, @meta, []}
-      assert {:ok, {:map, %{}}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, {:map_record, %{}}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
     end
 
     test "map with atom keys" do
       ast = {:%{}, @meta, [name: "alice", age: 42]}
 
-      assert {:ok, {:map, %{name: :binary, age: :number}}, @st_end, %{}} =
+      assert {:ok, {:map_record, %{name: :binary, age: :number}}, @st_end, %{}} =
                TC.tc_expr(@ctx, %{}, @st_end, ast)
     end
 
     test "map preserves session state" do
       ast = {:%{}, @meta, [x: 1]}
 
-      assert {:ok, {:map, %{x: :number}}, @st_out, %{}} =
+      assert {:ok, {:map_record, %{x: :number}}, @st_out, %{}} =
                TC.tc_expr(@ctx, %{}, @st_out, ast)
     end
   end

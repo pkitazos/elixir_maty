@@ -115,7 +115,12 @@ defmodule Maty.Typechecker.PatternBindingTest do
   describe "tc_pattern/4 empty map" do
     test "matches map type" do
       assert {:ok, %{}, %{}} =
-               PatternBinding.tc_pattern(@ctx, {:%{}, @meta, []}, {:map, %{x: :number}}, %{})
+               PatternBinding.tc_pattern(
+                 @ctx,
+                 {:%{}, @meta, []},
+                 {:map_record, %{x: :number}},
+                 %{}
+               )
     end
 
     test "matches :any" do
@@ -258,7 +263,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
                PatternBinding.tc_pattern(
                  @ctx,
                  pattern,
-                 {:map, %{name: :binary}},
+                 {:map_record, %{name: :binary}},
                  %{}
                )
     end
@@ -270,7 +275,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
                PatternBinding.tc_pattern(
                  @ctx,
                  pattern,
-                 {:map, %{name: :binary}},
+                 {:map_record, %{name: :binary}},
                  %{}
                )
 
@@ -284,7 +289,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
                PatternBinding.tc_pattern(
                  @ctx,
                  pattern,
-                 {:map, %{name: :binary, age: :number}},
+                 {:map_record, %{name: :binary, age: :number}},
                  %{}
                )
 

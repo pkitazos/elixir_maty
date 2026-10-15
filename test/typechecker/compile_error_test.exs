@@ -212,6 +212,18 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.line == 9
     end
 
+    test "a function with map record types in its spec compiles" do
+      src =
+        seller_src("MapRecordSpec", """
+        #{@valid_handlers}
+
+        @spec name_of(%{name: binary(), age: number()}) :: %{name: binary()}
+        def name_of(%{name: name}), do: %{name: name}
+        """)
+
+      assert [{MatyCompileErrorFixture.MapRecordSpec, _}] = Code.compile_string(src)
+    end
+
     test "a spec error is reported on its own, body errors wait until it is fixed" do
       # `g/0` has a body error that must not be reported yet
       src =

@@ -129,7 +129,7 @@ defmodule Maty.Typechecker.PatternBinding do
   # Pat-EmptyMap: Pattern is '%{}'
   deftc tc_pattern(ctx, {:%{}, _, []} = pattern_ast, expected_type, var_env) do
     case expected_type do
-      {:map, _} ->
+      {:map_record, _} ->
         {:ok, %{}, var_env}
 
       :any ->
@@ -140,7 +140,7 @@ defmodule Maty.Typechecker.PatternBinding do
           Error.PatternMatching.pattern_type_mismatch(ctx.module, ctx.meta,
             pattern: pattern_ast,
             expected: expected_type,
-            got: {:map, %{}}
+            got: {:map_record, %{}}
           )
 
         {:error, error, var_env}
@@ -290,7 +290,7 @@ defmodule Maty.Typechecker.PatternBinding do
   # Assuming keys k_i are literal atoms.
   deftc tc_pattern(ctx, {:%{}, meta, pairs} = pattern_ast, expected_type, var_env) do
     case expected_type do
-      {:map, expected_type_map} ->
+      {:map_record, expected_type_map} ->
         initial_acc = {:ok, %{}, var_env}
 
         Enum.reduce_while(
@@ -352,7 +352,8 @@ defmodule Maty.Typechecker.PatternBinding do
           Error.PatternMatching.pattern_type_mismatch(ctx.module, meta,
             pattern: pattern_ast,
             expected: other_type,
-            got: {:map, for({key, _value} <- pairs, is_atom(key), into: %{}, do: {key, :any})}
+            got:
+              {:map_record, for({key, _value} <- pairs, is_atom(key), into: %{}, do: {key, :any})}
           )
 
         {:error, error, var_env}

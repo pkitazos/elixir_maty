@@ -10,6 +10,7 @@ defmodule Maty.Typechecker.TypeSpecParser do
   - {atom_name, _, []}  (looks up atom_name in type_env or treats as basic type)
   - {ast1, ast2}        (2-tuple)
   - {:{}, _, elements} (n-tuple)
+  - {:%{}, _, fields}  (map record with literal atom keys, e.g. %{name: binary()})
   """
   @spec parse(type_ast :: Macro.t()) :: {:ok, Type.t()} | {:error, Error.Cause.t()}
   def parse(type_ast) do
@@ -41,7 +42,8 @@ defmodule Maty.Typechecker.TypeSpecParser do
   end
 
   # Case 1: Zero-arity Type Constructor {name, _, []}
-  defp do_parse({atom_name, _meta, []}, type_env) when is_atom(atom_name) do
+  # (`%{}` has the same shape, it is handled by the map record case below)
+  defp do_parse({atom_name, _meta, []}, type_env) when is_atom(atom_name) and atom_name != :%{} do
     case Map.fetch(type_env, atom_name) do
       {:ok, internal_type} ->
         {:ok, internal_type}
@@ -67,6 +69,20 @@ defmodule Maty.Typechecker.TypeSpecParser do
     parse_list_elements(elements_list, type_env)
   end
 
+  # Case 5: Map record %{k1: t1, ...}
+  # only literal atom keys, each at most once
+  # `required(...)`/`optional(...)` and other keys are not supported
+  defp do_parse({:%{}, _meta, fields} = map_ast, type_env) when is_list(fields) do
+    atom_keyed? = Enum.all?(fields, &match?({key, _type_ast} when is_atom(key), &1))
+
+    if atom_keyed? and length(Enum.uniq_by(fields, fn {k, _} -> k end)) == length(fields) do
+      parse_map_record_fields(fields, type_env)
+    else
+      error = Error.TypeSpecification.unsupported_type_constructor(map_ast)
+      {:error, error}
+    end
+  end
+
   # Catch-all for unsupported AST formats
   defp do_parse(other_ast, _type_env) do
     error = Error.TypeSpecification.unsupported_type_constructor(other_ast)
@@ -83,6 +99,20 @@ defmodule Maty.Typechecker.TypeSpecParser do
     end)
     |> case do
       {:ok, types_reversed} -> {:ok, {:tuple, Enum.reverse(types_reversed)}}
+      {:error, _} = err -> err
+    end
+  end
+
+  defp parse_map_record_fields(fields, type_env) do
+    fields
+    |> Enum.reduce_while({:ok, []}, fn {key, type_ast}, {:ok, acc} ->
+      case do_parse(type_ast, type_env) do
+        {:ok, parsed_type} -> {:cont, {:ok, [{key, parsed_type} | acc]}}
+        {:error, _} = err -> {:halt, err}
+      end
+    end)
+    |> case do
+      {:ok, parsed_fields} -> {:ok, {:map_record, Map.new(parsed_fields)}}
       {:error, _} = err -> err
     end
   end

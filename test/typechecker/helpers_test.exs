@@ -365,13 +365,14 @@ defmodule Maty.Typechecker.HelpersTest do
     end
 
     test "state type with extra keys returns error" do
-      {:map, fields} = Type.maty_actor_state()
-      state_type = {:map, Map.put(fields, :extra, :any)}
+      {:map_record, fields} = Type.maty_actor_state()
+      state_type = {:map_record, Map.put(fields, :extra, :any)}
       assert :error = Helpers.check_maty_state_type(state_type)
     end
 
     test "map with the right keys but wrong shape returns error" do
-      assert :error = Helpers.check_maty_state_type({:map, %{sessions: :any, callbacks: :any}})
+      assert :error =
+               Helpers.check_maty_state_type({:map_record, %{sessions: :any, callbacks: :any}})
     end
   end
 
