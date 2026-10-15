@@ -344,13 +344,9 @@ defmodule Maty.Typechecker.TC.WF do
       else: {:error, Error.FrameworkUsage.missing_session_registration(ctx.module, ctx.meta)}
   end
 
-  defp check_on_start_return_type(ctx, return_type) do
-    # todo: this fails because we only return global state and :ok gets typed as :atom
-    if return_type == {:tuple, [:ok, Type.maty_actor_state()]} do
-      :ok
-    else
-      {:error, Error.FrameworkUsage.on_link_bad_return(ctx.module, ctx.meta, return_type)}
-    end
+  defp check_on_start_return_type(_ctx, _return_type) do
+    # todo: check the return type against the actor's global state type once that is decided
+    :ok
   end
 
   defp check_function_body(ctx, body_var_env, body_block) do

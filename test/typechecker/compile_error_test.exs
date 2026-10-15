@@ -24,7 +24,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
         on_start {ap_pid, title} :: {pid(), binary()} do
           Maty.DSL.register(ap_pid, @role, :install, title, %{})
-          {:ok, %{}}
+          %{}
         end
 
         init_handler :install, title :: binary(), state do
@@ -55,7 +55,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
         on_start {ap_pid, title} :: {pid(), binary()} do
           Maty.DSL.register(ap_pid, @role, :install, title, %{})
-          {:ok, %{}}
+          %{}
         end
 
         handler :no_such_session_type, :seller, {:quote, amount :: number()}, state do
@@ -111,7 +111,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
         on_start ap_pid :: pid() do
           Maty.DSL.register(ap_pid, @role, :install, ap_pid, %{})
-          {:ok, %{}}
+          %{}
         end
 
         init_handler :install, _ap_pid :: pid(), state do
@@ -199,7 +199,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
         on_start ap_pid :: pid() do
           Maty.DSL.register(ap_pid, @role, :install, ap_pid, %{})
-          {:ok, %{}}
+          %{}
         end
         """)
 
@@ -413,7 +413,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
         on_start ap_pid :: pid() do
           Maty.DSL.register(ap_pid, @role, :install, ap_pid, %{})
-          {:ok, %{}}
+          %{}
         end
 
         @init_handler :install
@@ -484,7 +484,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
           on_start ap_pid :: pid() do
             Maty.DSL.register(:not_a_pid, @role, :install, ap_pid, %{})
-            {:ok, %{}}
+            %{}
           end
 
           init_handler :install, _ap_pid :: pid(), state do
@@ -511,7 +511,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
         @st {:install, ~q/end/}
 
         on_start _ap_pid :: pid() do
-          {:ok, %{}}
+          %{}
         end
 
         init_handler :install, _ap_pid :: pid(), state do
@@ -557,7 +557,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
         on_start ap_pid :: pid() do
           Maty.DSL.register(ap_pid, @role, :install, ap_pid, %{})
-          {:ok, %{}}
+          %{}
         end
 
         init_handler :install, _ap_pid :: pid(), state do
@@ -691,7 +691,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
           on_start ap_pid :: pid() do
             Maty.DSL.register(ap_pid, "seller", :install, ap_pid, %{})
-            {:ok, %{}}
+            %{}
           end
 
           init_handler :install, _ap_pid :: pid(), state do
@@ -716,7 +716,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
           on_start ap_pid :: pid() do
             Maty.DSL.register(ap_pid, :buyer1, :install, ap_pid, %{})
-            {:ok, %{}}
+            %{}
           end
 
           init_handler :install, _ap_pid :: pid(), state do
@@ -743,7 +743,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
           on_start ap_pid :: pid() do
             Maty.DSL.register(ap_pid, :seller, :install, ap_pid, %{})
-            {:ok, %{}}
+            %{}
           end
 
           init_handler :install, _ap_pid :: pid(), state do
@@ -847,7 +847,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
         on_start ap_pid :: pid() do
           #{register_call}
-          {:ok, %{}}
+          %{}
         end
 
         #{init_handlers}
@@ -982,7 +982,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
         on_start ap_pid :: pid() do
           Maty.DSL.register(ap_pid, @role, :install, nil, %{})
-          {:ok, %{}}
+          %{}
         end
 
         init_handler :install, nil, state do

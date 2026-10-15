@@ -5,7 +5,7 @@ defmodule StashQueue.Participants.P do
 
   on_start {ap_pid, {n1, n2}} :: {pid(), {number(), number()}} do
     Maty.DSL.register(ap_pid, :p, :install, {n1, n2}, %{})
-    {:ok, %{}}
+    %{}
   end
 
   # the timings set up Q's mailbox as [b(n1), a(n1), a(n2), b(n2)] (see docs/stash-queue.md)

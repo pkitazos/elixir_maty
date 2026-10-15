@@ -8,7 +8,7 @@ defmodule TwoBuyer.Participants.Buyer2 do
 
   on_start ap_pid :: pid() do
     Maty.DSL.register(ap_pid, :buyer2, :install, nil, %{})
-    {:ok, %{}}
+    %{}
   end
 
   init_handler :install, nil, state do

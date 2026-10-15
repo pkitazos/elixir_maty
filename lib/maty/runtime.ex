@@ -11,7 +11,7 @@ defmodule Maty.Runtime do
   @doc false
   @spec init_and_run(module(), any()) :: no_return()
   def init_and_run(module, args) do
-    {:ok, global_s} = module.on_start(args)
+    global_s = module.on_start(args)
 
     loop(module, InternalState.new(global_s), [])
   end

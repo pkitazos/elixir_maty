@@ -20,7 +20,7 @@ defmodule Maty.DSL do
 
     quote do
       @impl true
-      @spec on_start(unquote(type_spec)) :: {:ok, global_state()}
+      @spec on_start(unquote(type_spec)) :: global_state()
       #   somehow type the global state from this ^
       def on_start(unquote(clean_pattern)) do
         unquote(body)

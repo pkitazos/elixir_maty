@@ -9,7 +9,7 @@ defmodule StashQueue.Participants.Q do
 
   on_start ap_pid :: pid() do
     Maty.DSL.register(ap_pid, :q, :install, nil, %{})
-    {:ok, %{}}
+    %{}
   end
 
   # Q waits until all four messages are in its mailbox before it starts reading it.
