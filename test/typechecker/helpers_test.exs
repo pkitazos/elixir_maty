@@ -379,7 +379,7 @@ defmodule Maty.Typechecker.HelpersTest do
 
   describe "contains_register_call?/1" do
     test "AST with register call" do
-      ast = {{:., [], [Maty.DSL, :register]}, [], [:ap, :role, [], :state]}
+      ast = {{:., [], [Maty.Runtime, :register]}, [], [:ap, :role, [], :state]}
       assert Helpers.contains_register_call?(ast)
     end
 
@@ -389,7 +389,7 @@ defmodule Maty.Typechecker.HelpersTest do
     end
 
     test "nested register call" do
-      register = {{:., [], [Maty.DSL, :register]}, [], [:ap, :role, [], :state]}
+      register = {{:., [], [Maty.Runtime, :register]}, [], [:ap, :role, [], :state]}
       ast = {:__block__, [], [42, register]}
       assert Helpers.contains_register_call?(ast)
     end

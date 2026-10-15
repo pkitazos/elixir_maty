@@ -270,7 +270,7 @@ defmodule Maty.Typechecker.Helpers do
   def contains_register_call?(ast) do
     {_, found} =
       Macro.prewalk(ast, false, fn
-        {{:., _, [Maty.DSL, :register]}, _meta, _args} = node, _acc -> {node, true}
+        {{:., _, [Maty.Runtime, :register]}, _meta, _args} = node, _acc -> {node, true}
         node, acc -> {node, acc}
       end)
 

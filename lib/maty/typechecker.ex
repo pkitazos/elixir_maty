@@ -251,7 +251,7 @@ defmodule Maty.Typechecker do
               end
 
             # the next thing we check is whether the function we're type-checking is the on_link callback
-            func_id == {:on_link, 2} ->
+            func_id == {:on_start, 1} ->
               # in which case we can fetch its type spec definition to begin our typechecking
               # a hand-written on_link may have no spec at all, which should be reported below
               type_signatures = psi |> Map.get(func_id, []) |> Enum.reverse()
@@ -260,7 +260,7 @@ defmodule Maty.Typechecker do
               # to make sure we have only defined a single on_link function clause
               with {:clause, [clause]} <- {:clause, func_clauses},
                    {:signature, [type_signature]} <- {:signature, type_signatures} do
-                TC.WF.check_wf_on_link_callback(
+                TC.WF.check_wf_on_start_callback(
                   ctx,
                   clause,
                   type_signature

@@ -353,7 +353,8 @@ defmodule Maty.Typechecker.TC do
           ctx,
           env,
           %ST.SOut{to: expected_role, branches: branches} = st,
-          {{:., meta, [Maty.DSL, :internal_send]}, _, [_session_ctx, recipient_ast, message_ast]}
+          {{:., meta, [Maty.Runtime, :send_session_message]}, _,
+           [_session_ctx, recipient_ast, message_ast]}
         ) do
     thread do
       _recipient_type
@@ -466,7 +467,8 @@ defmodule Maty.Typechecker.TC do
           ctx,
           env,
           st,
-          {{:., meta, [Maty.DSL, :internal_send]}, _, [_session_ctx, recipient_ast, message_ast]}
+          {{:., meta, [Maty.Runtime, :send_session_message]}, _,
+           [_session_ctx, recipient_ast, message_ast]}
         ) do
     error(
       Error.ProtocolViolation.incorrect_action(
@@ -478,62 +480,6 @@ defmodule Maty.Typechecker.TC do
       env
     )
   end
-
-  # todo: figure out what to do with this
-  # # --- Maty setState (T-Set) ---
-  # deftc tc_expr(
-  #         ctx,
-  #         env,
-  #         st,
-  #         {{:., meta, [Maty.Runtime.InternalState, :set]}, _,
-  #          [{state_var, _, _} = state_ast, _new_state, _session_ctx]}
-  #       ) do
-  #   thread do
-  #     state_type <~ tc_expr(ctx, env, st, state_ast)
-
-  #     maty_actor_state_type
-  #     <~ lift_result(
-  #       Helpers.check_maty_state_type(state_type),
-  #       # todo: fix error stuff later
-  #       Error.TypeMismatch.invalid_maty_state_type(
-  #         ctx.module,
-  #         meta,
-  #         Error.TypeMismatch.invalid_maty_state_cause(state_type)
-  #       ),
-  #       env,
-  #       st
-  #     )
-
-  #     ok(maty_actor_state_type, Map.put(env, state_var, maty_actor_state_type), st)
-  #   end
-  # end
-
-  # # --- Maty getState (T-Get) ---
-  # deftc tc_expr(
-  #         ctx,
-  #         env,
-  #         st,
-  #         {{:., meta, [Maty.Runtime.InternalState, :get]}, _,
-  #          [{state_var, _, _} = state_ast, _session_ctx]}
-  #       ) do
-  #   thread do
-  #     state_type <~ tc_expr(ctx, env, st, state_ast)
-
-  #     maty_actor_state_type
-  #     <~ lift_result(
-  #       Helpers.check_maty_state_type(state_type),
-  #       Error.TypeMismatch.invalid_maty_state_type(
-  #         ctx.module,
-  #         meta,
-  #         Error.TypeMismatch.invalid_maty_state_cause(state_type)
-  #       ),
-  #       env,
-  #       st
-  #     )
-
-  #     ok(:map, Map.put(env, state_var, maty_actor_state_type), st)
-  #   end
-  # end
 
   # --- IO ---
   deftc tc_expr(ctx, var_env, st_pre, {{:., _, [IO, _]}, _, _} = ast) do
@@ -551,8 +497,7 @@ defmodule Maty.Typechecker.TC do
           ctx,
           env,
           st,
-          {{:., _, [:erlang, :throw]}, _,
-           [{:{}, meta, [:suspend, handler_ast, {_state_var, _, _} = state_ast]}]}
+          {{:., _, [Maty.Runtime, :suspend]}, meta, [handler_ast, {_state_var, _, _} = state_ast]}
         ) do
     thread do
       # TV-MsgHandler
@@ -637,7 +582,7 @@ defmodule Maty.Typechecker.TC do
           ctx,
           env,
           st,
-          {{:., _, [:erlang, :throw]}, meta, [done: {_state_var, _, _} = state_ast]}
+          {{:., _, [Maty.Runtime, :done]}, meta, [{_state_var, _, _} = state_ast]}
         ) do
     thread do
       state_type
@@ -690,8 +635,8 @@ defmodule Maty.Typechecker.TC do
           ctx,
           env,
           st,
-          {{:., _m1, [Maty.DSL, :register]}, meta,
-           [ap_pid_ast, role_ast, handler_name, args_ast, state_ast]}
+          {{:., _m1, [Maty.Runtime, :register]}, meta,
+           [ap_pid_ast, role_ast, handler_name, args_ast, local_state_ast]}
         )
         when is_atom(handler_name) do
     thread do
@@ -766,23 +711,13 @@ defmodule Maty.Typechecker.TC do
 
       # todo: also check session type is not progressing
 
-      state_type <~ tc_expr(ctx, env, st, state_ast)
-      # todo: fix error
-      maty_actor_state_type
-      <~ lift_result(
-        Helpers.check_maty_state_type(state_type),
-        Error.TypeMismatch.invalid_maty_state_type(
-          ctx.module,
-          meta,
-          Error.TypeMismatch.invalid_maty_state_cause(state_type)
-        ),
-        env,
-        st
-      )
+      # todo: check this against the actor's local state type once that is decided
+      _local_state_type <~ tc_expr(ctx, env, st, local_state_ast)
 
       # todo: also check session type is not progressing
 
-      ok({:tuple, [:ok, maty_actor_state_type]}, env, st)
+      # register returns :ok
+      ok(:atom, env, st)
     end
   end
 
@@ -790,8 +725,8 @@ defmodule Maty.Typechecker.TC do
           ctx,
           env,
           _st,
-          {{:., _m1, [Maty.DSL, :register]}, meta,
-           [_ap_pid_ast, _role_ast, handler_ast, _args_ast, _state_ast]}
+          {{:., _m1, [Maty.Runtime, :register]}, meta,
+           [_ap_pid_ast, _role_ast, handler_ast, _args_ast, _local_state_ast]}
         ) do
     # `handler_name` is not an atom
     error(Error.FrameworkUsage.init_handler_not_literal(ctx.module, meta, handler_ast), env)

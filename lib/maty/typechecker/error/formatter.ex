@@ -784,6 +784,7 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render_register_argument(:access_point), do: "1 (access point)"
   defp render_register_argument(:init_handler_args), do: "4 (init handler args)"
+  defp render_register_argument(:initial_local_state), do: "5 (initial local state)"
 
   defp render_handler_names([]), do: "(none)"
 
