@@ -5,17 +5,17 @@ defmodule TwoBuyer.Participants.Buyer1 do
   @st {:quote_handler, ~q/&seller:{quote(number).+buyer2:{share(number).end}}/}
 
   on_start {ap_pid, title} :: {pid(), binary()} do
-    MatyDSL.register(ap_pid, :buyer1, :install, title, %{})
+    Maty.DSL.register(ap_pid, :buyer1, :install, title, %{})
 
     {:ok, %{}}
   end
 
   init_handler :install, title :: binary(), state do
-    MatyDSL.send(:seller, {:title, title})
+    Maty.DSL.send(:seller, {:title, title})
     IO.puts("+seller : title(binary)")
     :timer.sleep(500)
 
-    MatyDSL.suspend(:quote_handler, state)
+    Maty.DSL.suspend(:quote_handler, state)
   end
 
   handler :quote_handler, :seller, {:quote, amount :: number()}, state do
@@ -24,10 +24,10 @@ defmodule TwoBuyer.Participants.Buyer1 do
 
     share_amount = amount / 2
 
-    MatyDSL.send(:buyer2, {:share, share_amount})
+    Maty.DSL.send(:buyer2, {:share, share_amount})
     IO.puts("+buyer2 : share(number)")
     :timer.sleep(500)
 
-    MatyDSL.done(state)
+    Maty.DSL.done(state)
   end
 end

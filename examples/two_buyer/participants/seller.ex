@@ -6,14 +6,14 @@ defmodule TwoBuyer.Participants.Seller do
   @st {:decision_handler, ~q"&buyer2:{address(binary).+buyer2:{date(date).end},quit(nil).end}"}
 
   on_start ap_pid :: pid() do
-    MatyDSL.register(ap_pid, :seller, :install, ap_pid, %{})
+    Maty.DSL.register(ap_pid, :seller, :install, ap_pid, %{})
     {:ok, %{}}
   end
 
   init_handler :install, ap_pid :: pid(), state do
-    MatyDSL.register(ap_pid, :seller, :install, ap_pid, %{})
+    Maty.DSL.register(ap_pid, :seller, :install, ap_pid, %{})
 
-    MatyDSL.suspend(:title_handler, state)
+    Maty.DSL.suspend(:title_handler, state)
   end
 
   handler :title_handler, :buyer1, {:title, title :: binary()}, state do
@@ -21,11 +21,11 @@ defmodule TwoBuyer.Participants.Seller do
     :timer.sleep(500)
 
     amount = lookup_price(title)
-    MatyDSL.send(:buyer1, {:quote, amount})
+    Maty.DSL.send(:buyer1, {:quote, amount})
     IO.puts("+buyer1 : quote(number)")
     :timer.sleep(500)
 
-    MatyDSL.suspend(:decision_handler, state)
+    Maty.DSL.suspend(:decision_handler, state)
   end
 
   handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
@@ -33,18 +33,18 @@ defmodule TwoBuyer.Participants.Seller do
     :timer.sleep(500)
 
     date = shipping_date(addr)
-    MatyDSL.send(:buyer2, {:date, date})
+    Maty.DSL.send(:buyer2, {:date, date})
     IO.puts("+buyer2 : date(date)")
     :timer.sleep(500)
 
-    MatyDSL.done(state)
+    Maty.DSL.done(state)
   end
 
   handler :decision_handler, :buyer2, {:quit, nil}, state do
     IO.puts("&buyer2 : quit()")
     :timer.sleep(500)
 
-    MatyDSL.done(state)
+    Maty.DSL.done(state)
   end
 
   @spec lookup_price(binary()) :: number()

@@ -22,19 +22,20 @@ defmodule Maty.Typechecker.CompileErrorTest do
         @st {:install, ~q/+seller:{title(binary).quote_handler}/}
         @st {:quote_handler, ~q/&seller:{quote(number).+buyer2:{share(number).end}}/}
 
-        on_link {ap_pid, title} :: {pid(), binary()}, initial_state do
-          MatyDSL.register(ap_pid, @role, :install, title, initial_state)
+        on_start {ap_pid, title} :: {pid(), binary()} do
+          Maty.DSL.register(ap_pid, @role, :install, title, %{})
+          {:ok, %{}}
         end
 
         init_handler :install, title :: binary(), state do
-          MatyDSL.send(:buyer2, {:title, title})
-          MatyDSL.suspend(:quote_handler, state)
+          Maty.DSL.send(:buyer2, {:title, title})
+          Maty.DSL.suspend(:quote_handler, state)
         end
 
         handler :quote_handler, :seller, {:quote, amount :: number()}, state do
           share_amount = amount / 2
-          MatyDSL.send(:buyer2, {:share, share_amount})
-          MatyDSL.done(state)
+          Maty.DSL.send(:buyer2, {:share, share_amount})
+          Maty.DSL.done(state)
         end
       end
       """
@@ -52,12 +53,13 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
         @st {:install, ~q/+seller:{title(binary).end}/}
 
-        on_link {ap_pid, title} :: {pid(), binary()}, initial_state do
-          MatyDSL.register(ap_pid, @role, :install, title, initial_state)
+        on_start {ap_pid, title} :: {pid(), binary()} do
+          Maty.DSL.register(ap_pid, @role, :install, title, %{})
+          {:ok, %{}}
         end
 
         handler :no_such_session_type, :seller, {:quote, amount :: number()}, state do
-          MatyDSL.done(state)
+          Maty.DSL.done(state)
         end
       end
       """
@@ -72,12 +74,12 @@ defmodule Maty.Typechecker.CompileErrorTest do
     # `clauses` spliced in as the handler definitions so each test can control what is wrong
     @valid_handlers """
     handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
-      MatyDSL.send(:buyer2, {:date, addr})
-      MatyDSL.done(state)
+      Maty.DSL.send(:buyer2, {:date, addr})
+      Maty.DSL.done(state)
     end
 
     handler :decision_handler, :buyer2, {:quit, nil}, state do
-      MatyDSL.done(state)
+      Maty.DSL.done(state)
     end
     """
 
@@ -107,12 +109,13 @@ defmodule Maty.Typechecker.CompileErrorTest do
         @st {:install, ~q/decision_handler/}
         @st {:decision_handler, ~q/&buyer2:{address(binary).+buyer2:{date(binary).end},quit(nil).end}/}
 
-        on_link ap_pid :: pid(), initial_state do
-          MatyDSL.register(ap_pid, @role, :install, ap_pid, initial_state)
+        on_start ap_pid :: pid() do
+          Maty.DSL.register(ap_pid, @role, :install, ap_pid, %{})
+          {:ok, %{}}
         end
 
         init_handler :install, _ap_pid :: pid(), state do
-          MatyDSL.suspend(:decision_handler, state)
+          Maty.DSL.suspend(:decision_handler, state)
         end
 
         #{body}
@@ -126,8 +129,8 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         seller_src("ClauseAndCoverage", """
         handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
-          MatyDSL.send(:buyer1, {:date, addr})
-          MatyDSL.done(state)
+          Maty.DSL.send(:buyer1, {:date, addr})
+          Maty.DSL.done(state)
         end
         """)
 
@@ -141,13 +144,13 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         seller_src("HandlerClauseFrame", """
         handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
-          MatyDSL.send(:buyer2, {:date, addr})
-          MatyDSL.done(state)
+          Maty.DSL.send(:buyer2, {:date, addr})
+          Maty.DSL.done(state)
         end
 
         handler :decision_handler, :buyer2, {:quit, nil}, state do
-          MatyDSL.send(:buyer2, {:date, "never"})
-          MatyDSL.done(state)
+          Maty.DSL.send(:buyer2, {:date, "never"})
+          Maty.DSL.done(state)
         end
         """)
 
@@ -194,8 +197,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
         seller_src("OnLinkTwice", """
         #{@valid_handlers}
 
-        on_link ap_pid :: pid(), initial_state do
-          MatyDSL.register(ap_pid, @role, :install, ap_pid, initial_state)
+        on_start ap_pid :: pid() do
+          Maty.DSL.register(ap_pid, @role, :install, ap_pid, %{})
+          {:ok, %{}}
         end
         """)
 
@@ -271,7 +275,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         seller_src("InitHandlerClauseFrame", """
         init_handler :install, _other :: binary(), state do
-          MatyDSL.done(state)
+          Maty.DSL.done(state)
         end
 
         #{@valid_handlers}
@@ -287,8 +291,8 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         seller_src("MissingBranchLine", """
         handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
-          MatyDSL.send(:buyer2, {:date, addr})
-          MatyDSL.done(state)
+          Maty.DSL.send(:buyer2, {:date, addr})
+          Maty.DSL.done(state)
         end
         """)
 
@@ -296,34 +300,6 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
       assert error.description =~ "Incomplete Message Handler Implementation"
       assert error.line == line_of(src, "handler :decision_handler")
-    end
-
-    test "an on_link written without a spec reports the missing spec instead of crashing" do
-      # the on_link macro always generates a spec, a hand-written def does not
-      src =
-        """
-        defmodule MatyCompileErrorFixture.OnLinkNoSpec do
-          use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
-
-          @role :seller
-
-          @st {:install, ~q/end/}
-
-          def on_link(ap_pid, initial_state) do
-            MatyDSL.register(ap_pid, @role, :install, ap_pid, initial_state)
-          end
-
-          init_handler :install, _ap_pid :: pid(), state do
-            MatyDSL.done(state)
-          end
-        end
-        """
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Wrong Number of Specs"
-      assert error.description =~ "Got specs: 0"
-      assert error.line == line_of(src, "def on_link")
     end
 
     test "an error in a case branch names the branch and its line" do
@@ -415,7 +391,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         seller_src("RawHandlerNoSpec", """
         @handler :decision_handler
-        def decision_handler(_session_ctx, _role, {:quit, nil}, state), do: MatyDSL.done(state)
+        def decision_handler(_session_ctx, _role, {:quit, nil}, state), do: Maty.DSL.done(state)
         """)
 
       error = compile_error!(src)
@@ -435,12 +411,13 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
         @st {:install, ~q/end/}
 
-        on_link ap_pid :: pid(), initial_state do
-          MatyDSL.register(ap_pid, @role, :install, ap_pid, initial_state)
+        on_start ap_pid :: pid() do
+          Maty.DSL.register(ap_pid, @role, :install, ap_pid, %{})
+          {:ok, %{}}
         end
 
         @init_handler :install
-        def install(_session_ctx, _arg, state), do: MatyDSL.done(state)
+        def install(_session_ctx, _arg, state), do: Maty.DSL.done(state)
       end
       """
 
@@ -505,12 +482,13 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
           @st {:install, ~q/end/}
 
-          on_link ap_pid :: pid(), initial_state do
-            MatyDSL.register(:not_a_pid, @role, :install, ap_pid, initial_state)
+          on_start ap_pid :: pid() do
+            Maty.DSL.register(:not_a_pid, @role, :install, ap_pid, %{})
+            {:ok, %{}}
           end
 
           init_handler :install, _ap_pid :: pid(), state do
-            MatyDSL.done(state)
+            Maty.DSL.done(state)
           end
         end
         """
@@ -520,24 +498,24 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Register Argument Type"
       assert error.description =~ "Argument: 1 (access point)"
       assert error.description =~ "Expected: :pid"
-      assert error.line == line_of(src, "MatyDSL.register(:not_a_pid")
+      assert error.line == line_of(src, "Maty.DSL.register(:not_a_pid")
     end
 
-    test "an on_link that never registers is reported at the on_link clause" do
+    test "an on_start that never registers is reported at the on_start clause" do
       src = """
-      defmodule MatyCompileErrorFixture.OnLinkNoRegister do
+      defmodule MatyCompileErrorFixture.OnStartNoRegister do
         use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
         @role :seller
 
         @st {:install, ~q/end/}
 
-        on_link _ap_pid :: pid(), initial_state do
-          {:ok, initial_state}
+        on_start _ap_pid :: pid() do
+          {:ok, %{}}
         end
 
         init_handler :install, _ap_pid :: pid(), state do
-          MatyDSL.done(state)
+          Maty.DSL.done(state)
         end
       end
       """
@@ -545,7 +523,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       error = compile_error!(src)
 
       assert error.description =~ "Missing Session Registration"
-      assert error.line == line_of(src, "on_link _ap_pid")
+      assert error.line == line_of(src, "on_start _ap_pid")
     end
 
     test "a handler whose role does not match the session type is reported at that clause" do
@@ -553,12 +531,12 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         seller_src("WrongRole", """
         handler :decision_handler, :buyer1, {:address, addr :: binary()}, state do
-          MatyDSL.send(:buyer2, {:date, addr})
-          MatyDSL.done(state)
+          Maty.DSL.send(:buyer2, {:date, addr})
+          Maty.DSL.done(state)
         end
 
         handler :decision_handler, :buyer2, {:quit, nil}, state do
-          MatyDSL.done(state)
+          Maty.DSL.done(state)
         end
         """)
 
@@ -577,12 +555,13 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
         @st {:install, ~q/&buyer2:{quit(nil).end}/}
 
-        on_link ap_pid :: pid(), initial_state do
-          MatyDSL.register(ap_pid, @role, :install, ap_pid, initial_state)
+        on_start ap_pid :: pid() do
+          Maty.DSL.register(ap_pid, @role, :install, ap_pid, %{})
+          {:ok, %{}}
         end
 
         init_handler :install, _ap_pid :: pid(), state do
-          MatyDSL.done(state)
+          Maty.DSL.done(state)
         end
       end
       """
@@ -614,16 +593,16 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         seller_src("FailingClauseCovers", """
         handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
-          MatyDSL.send(:buyer1, {:date, addr})
-          MatyDSL.done(state)
+          Maty.DSL.send(:buyer1, {:date, addr})
+          Maty.DSL.done(state)
         end
 
         handler :decision_handler, :buyer2, {:quit, nil}, state do
-          MatyDSL.done(state)
+          Maty.DSL.done(state)
         end
 
         handler :decision_handler, :buyer2, {:quit, nil}, state do
-          MatyDSL.done(state)
+          Maty.DSL.done(state)
         end
         """)
 
@@ -639,7 +618,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
         #{@valid_handlers}
 
         handler :decision_handler, :buyer2, {:quit, nil}, state do
-          MatyDSL.done(state)
+          Maty.DSL.done(state)
         end
         """)
 
@@ -710,12 +689,13 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
           @st {:install, ~q/end/}
 
-          on_link ap_pid :: pid(), initial_state do
-            MatyDSL.register(ap_pid, "seller", :install, ap_pid, initial_state)
+          on_start ap_pid :: pid() do
+            Maty.DSL.register(ap_pid, "seller", :install, ap_pid, %{})
+            {:ok, %{}}
           end
 
           init_handler :install, _ap_pid :: pid(), state do
-            MatyDSL.done(state)
+            Maty.DSL.done(state)
           end
         end
         """
@@ -734,12 +714,13 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
           @st {:install, ~q/end/}
 
-          on_link ap_pid :: pid(), initial_state do
-            MatyDSL.register(ap_pid, :buyer1, :install, ap_pid, initial_state)
+          on_start ap_pid :: pid() do
+            Maty.DSL.register(ap_pid, :buyer1, :install, ap_pid, %{})
+            {:ok, %{}}
           end
 
           init_handler :install, _ap_pid :: pid(), state do
-            MatyDSL.done(state)
+            Maty.DSL.done(state)
           end
         end
         """
@@ -749,7 +730,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Undeclared Role"
       assert error.description =~ "Got: :buyer1"
       assert error.description =~ "Declared roles: :seller"
-      assert error.line == line_of(src, "MatyDSL.register(")
+      assert error.line == line_of(src, "Maty.DSL.register(")
     end
 
     test "declaring a role that is not in the protocol is reported" do
@@ -760,12 +741,13 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
           @st {:install, ~q/end/}
 
-          on_link ap_pid :: pid(), initial_state do
-            MatyDSL.register(ap_pid, :seller, :install, ap_pid, initial_state)
+          on_start ap_pid :: pid() do
+            Maty.DSL.register(ap_pid, :seller, :install, ap_pid, %{})
+            {:ok, %{}}
           end
 
           init_handler :install, _ap_pid :: pid(), state do
-            MatyDSL.done(state)
+            Maty.DSL.done(state)
           end
         end
         """
@@ -798,7 +780,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
         #{@valid_handlers}
 
         handler :no_such_session_type, :buyer2, {:quit, nil}, state do
-          MatyDSL.done(state)
+          Maty.DSL.done(state)
         end
 
         @spec f(wat()) :: number()
@@ -850,7 +832,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
         init_handlers ||
           """
           init_handler :install, {_ap_pid, _title} :: {pid(), binary()}, state do
-            MatyDSL.suspend(:decision_handler, state)
+            Maty.DSL.suspend(:decision_handler, state)
           end
           """
 
@@ -863,8 +845,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
         @st {:install, ~q/decision_handler/}
         @st {:decision_handler, ~q/&buyer2:{address(binary).+buyer2:{date(binary).end},quit(nil).end}/}
 
-        on_link ap_pid :: pid(), initial_state do
+        on_start ap_pid :: pid() do
           #{register_call}
+          {:ok, %{}}
         end
 
         #{init_handlers}
@@ -876,11 +859,11 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
     @two_clause_init_handler """
     init_handler :install, {_ap_pid, _title} :: {pid(), binary()}, state do
-      MatyDSL.suspend(:decision_handler, state)
+      Maty.DSL.suspend(:decision_handler, state)
     end
 
     init_handler :install, {_ap_pid, _stock, _quantity} :: {pid(), number(), number()}, state do
-      MatyDSL.suspend(:decision_handler, state)
+      Maty.DSL.suspend(:decision_handler, state)
     end
     """
 
@@ -888,7 +871,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         register_src(
           "RegisterBadArgs",
-          "MatyDSL.register(ap_pid, @role, :install, {ap_pid, false}, initial_state)"
+          "Maty.DSL.register(ap_pid, @role, :install, {ap_pid, false}, %{})"
         )
 
       error = compile_error!(src)
@@ -897,14 +880,14 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Argument: 4 (init handler args)"
       assert error.description =~ "Expected: {:tuple, [:pid, :binary]}\n"
       assert error.description =~ "Got: {:tuple, [:pid, :boolean]}"
-      assert error.line == line_of(src, "MatyDSL.register(")
+      assert error.line == line_of(src, "Maty.DSL.register(")
     end
 
     test "args are checked against every clause of a multi-clause init handler" do
       src =
         register_src(
           "RegisterBadArgsTwoClauses",
-          "MatyDSL.register(ap_pid, @role, :install, 1, initial_state)",
+          "Maty.DSL.register(ap_pid, @role, :install, 1, %{})",
           @two_clause_init_handler
         )
 
@@ -921,7 +904,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         register_src(
           "RegisterSecondClause",
-          "MatyDSL.register(ap_pid, @role, :install, {ap_pid, 5, 10}, initial_state)",
+          "Maty.DSL.register(ap_pid, @role, :install, {ap_pid, 5, 10}, %{})",
           @two_clause_init_handler
         )
 
@@ -932,7 +915,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         register_src(
           "RegisterUnknownHandler",
-          ~s|MatyDSL.register(ap_pid, @role, :nope, {ap_pid, "title"}, initial_state)|
+          ~s|Maty.DSL.register(ap_pid, @role, :nope, {ap_pid, "title"}, %{})|
         )
 
       error = compile_error!(src)
@@ -940,14 +923,14 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Unknown Init Handler"
       assert error.description =~ "Got: :nope"
       assert error.description =~ "Init handlers: :install"
-      assert error.line == line_of(src, "MatyDSL.register(")
+      assert error.line == line_of(src, "Maty.DSL.register(")
     end
 
     test "a message handler is not accepted as an init handler" do
       src =
         register_src(
           "RegisterMessageHandler",
-          ~s|MatyDSL.register(ap_pid, @role, :decision_handler, {ap_pid, "title"}, initial_state)|
+          ~s|Maty.DSL.register(ap_pid, @role, :decision_handler, {ap_pid, "title"}, %{})|
         )
 
       error = compile_error!(src)
@@ -960,28 +943,28 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         register_src("RegisterNonLiteralHandler", """
         handler_name = :install
-        MatyDSL.register(ap_pid, @role, handler_name, {ap_pid, "title"}, initial_state)
+        Maty.DSL.register(ap_pid, @role, handler_name, {ap_pid, "title"}, %{})
         """)
 
       error = compile_error!(src)
 
       assert error.description =~ "Init Handler Not a Literal"
       assert error.description =~ "Got: handler_name"
-      assert error.line == line_of(src, "MatyDSL.register(")
+      assert error.line == line_of(src, "Maty.DSL.register(")
     end
 
     test "register with the wrong number of arguments is reported" do
       src =
         register_src(
           "RegisterWrongArity",
-          "MatyDSL.register(ap_pid, @role, :install, initial_state)"
+          "Maty.DSL.register(ap_pid, @role, :install, %{})"
         )
 
       error = compile_error!(src)
 
       assert error.description =~ "Wrong Number of Arguments to register"
       assert error.description =~ "Got: 4"
-      assert error.line == line_of(src, "MatyDSL.register(")
+      assert error.line == line_of(src, "Maty.DSL.register(")
     end
   end
 
@@ -997,18 +980,19 @@ defmodule Maty.Typechecker.CompileErrorTest do
         @st {:install, ~q/title_handler/}
         @st {:title_handler, ~q/&buyer:{title(binary).end}/}
 
-        on_link ap_pid :: pid(), initial_state do
-          MatyDSL.register(ap_pid, @role, :install, nil, initial_state)
+        on_start ap_pid :: pid() do
+          Maty.DSL.register(ap_pid, @role, :install, nil, %{})
+          {:ok, %{}}
         end
 
         init_handler :install, nil, state do
           next_handler = :title_handler
           _ = next_handler
-          MatyDSL.suspend(#{next_handler}, state)
+          Maty.DSL.suspend(#{next_handler}, state)
         end
 
         handler :title_handler, :buyer, {:title, _title :: binary()}, state do
-          MatyDSL.done(state)
+          Maty.DSL.done(state)
         end
       end
       """
@@ -1021,7 +1005,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
       assert error.description =~ "Suspended with Invalid Handler"
       assert error.description =~ "Tried: :install"
-      assert error.line == line_of(src, "MatyDSL.suspend(")
+      assert error.line == line_of(src, "Maty.DSL.suspend(")
     end
 
     test "suspending with a variable is reported" do
@@ -1031,7 +1015,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
       assert error.description =~ "Suspended with Invalid Handler"
       assert error.description =~ "Tried: next_handler"
-      assert error.line == line_of(src, "MatyDSL.suspend(")
+      assert error.line == line_of(src, "Maty.DSL.suspend(")
     end
 
     test "suspending with the message handler the session type names compiles" do

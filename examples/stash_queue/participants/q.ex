@@ -8,7 +8,7 @@ defmodule StashQueue.Participants.Q do
   @st {:p2_handler, ~q/&p:{a(number).end}/}
 
   on_start ap_pid :: pid() do
-    MatyDSL.register(ap_pid, :q, :install, nil, %{})
+    Maty.DSL.register(ap_pid, :q, :install, nil, %{})
     {:ok, %{}}
   end
 
@@ -17,26 +17,26 @@ defmodule StashQueue.Participants.Q do
   # until the expected one showed up, and the reordering would only happen by chance)
   init_handler :install, nil, state do
     :timer.sleep(500)
-    MatyDSL.suspend(:p1_handler, state)
+    Maty.DSL.suspend(:p1_handler, state)
   end
 
   handler :p1_handler, :p, {:a, n :: number()}, state do
     IO.puts("received a=#{n} from P")
-    MatyDSL.suspend(:r1_handler, state)
+    Maty.DSL.suspend(:r1_handler, state)
   end
 
   handler :r1_handler, :r, {:b, n :: number()}, state do
     IO.puts("received b=#{n} from R")
-    MatyDSL.suspend(:r2_handler, state)
+    Maty.DSL.suspend(:r2_handler, state)
   end
 
   handler :r2_handler, :r, {:b, n :: number()}, state do
     IO.puts("received b=#{n} from R")
-    MatyDSL.suspend(:p2_handler, state)
+    Maty.DSL.suspend(:p2_handler, state)
   end
 
   handler :p2_handler, :p, {:a, n :: number()}, state do
     IO.puts("received a=#{n} from P")
-    MatyDSL.done(state)
+    Maty.DSL.done(state)
   end
 end

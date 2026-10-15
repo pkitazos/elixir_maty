@@ -7,12 +7,12 @@ defmodule TwoBuyer.Participants.Buyer2 do
   @st {:date_handler, ~q"&seller:{date(date).end}"}
 
   on_start ap_pid :: pid() do
-    MatyDSL.register(ap_pid, :buyer2, :install, nil, %{})
+    Maty.DSL.register(ap_pid, :buyer2, :install, nil, %{})
     {:ok, %{}}
   end
 
   init_handler :install, nil, state do
-    MatyDSL.suspend(:share_handler, state)
+    Maty.DSL.suspend(:share_handler, state)
   end
 
   handler :share_handler, :buyer1, {:share, amount :: number()}, state do
@@ -20,19 +20,19 @@ defmodule TwoBuyer.Participants.Buyer2 do
     :timer.sleep(500)
 
     if amount > 100 do
-      MatyDSL.send(:seller, {:quit, nil})
+      Maty.DSL.send(:seller, {:quit, nil})
       IO.puts("+seller : quit()")
       :timer.sleep(500)
 
-      MatyDSL.done(state)
+      Maty.DSL.done(state)
     else
       address = get_address()
 
-      MatyDSL.send(:seller, {:address, address})
+      Maty.DSL.send(:seller, {:address, address})
       IO.puts("+seller : address(binary)")
       :timer.sleep(500)
 
-      MatyDSL.suspend(:date_handler, state)
+      Maty.DSL.suspend(:date_handler, state)
     end
   end
 
@@ -40,7 +40,7 @@ defmodule TwoBuyer.Participants.Buyer2 do
     IO.puts("&seller : date(date)")
     :timer.sleep(500)
 
-    MatyDSL.done(state)
+    Maty.DSL.done(state)
   end
 
   @spec get_address() :: binary()
