@@ -479,59 +479,61 @@ defmodule Maty.Typechecker.TC do
     )
   end
 
-  # --- Maty setState (T-Set) ---
-  deftc tc_expr(
-          ctx,
-          env,
-          st,
-          {{:., meta, [Maty.DSL.State, :set]}, _,
-           [{state_var, _, _} = state_ast, _new_state, _session_ctx]}
-        ) do
-    thread do
-      state_type <~ tc_expr(ctx, env, st, state_ast)
+  # todo: figure out what to do with this
+  # # --- Maty setState (T-Set) ---
+  # deftc tc_expr(
+  #         ctx,
+  #         env,
+  #         st,
+  #         {{:., meta, [Maty.Runtime.InternalState, :set]}, _,
+  #          [{state_var, _, _} = state_ast, _new_state, _session_ctx]}
+  #       ) do
+  #   thread do
+  #     state_type <~ tc_expr(ctx, env, st, state_ast)
 
-      maty_actor_state_type
-      <~ lift_result(
-        Helpers.check_maty_state_type(state_type),
-        # todo: fix error stuff later
-        Error.TypeMismatch.invalid_maty_state_type(
-          ctx.module,
-          meta,
-          Error.TypeMismatch.invalid_maty_state_cause(state_type)
-        ),
-        env,
-        st
-      )
+  #     maty_actor_state_type
+  #     <~ lift_result(
+  #       Helpers.check_maty_state_type(state_type),
+  #       # todo: fix error stuff later
+  #       Error.TypeMismatch.invalid_maty_state_type(
+  #         ctx.module,
+  #         meta,
+  #         Error.TypeMismatch.invalid_maty_state_cause(state_type)
+  #       ),
+  #       env,
+  #       st
+  #     )
 
-      ok(maty_actor_state_type, Map.put(env, state_var, maty_actor_state_type), st)
-    end
-  end
+  #     ok(maty_actor_state_type, Map.put(env, state_var, maty_actor_state_type), st)
+  #   end
+  # end
 
-  # --- Maty getState (T-Get) ---
-  deftc tc_expr(
-          ctx,
-          env,
-          st,
-          {{:., meta, [Maty.DSL.State, :get]}, _, [{state_var, _, _} = state_ast, _session_ctx]}
-        ) do
-    thread do
-      state_type <~ tc_expr(ctx, env, st, state_ast)
+  # # --- Maty getState (T-Get) ---
+  # deftc tc_expr(
+  #         ctx,
+  #         env,
+  #         st,
+  #         {{:., meta, [Maty.Runtime.InternalState, :get]}, _,
+  #          [{state_var, _, _} = state_ast, _session_ctx]}
+  #       ) do
+  #   thread do
+  #     state_type <~ tc_expr(ctx, env, st, state_ast)
 
-      maty_actor_state_type
-      <~ lift_result(
-        Helpers.check_maty_state_type(state_type),
-        Error.TypeMismatch.invalid_maty_state_type(
-          ctx.module,
-          meta,
-          Error.TypeMismatch.invalid_maty_state_cause(state_type)
-        ),
-        env,
-        st
-      )
+  #     maty_actor_state_type
+  #     <~ lift_result(
+  #       Helpers.check_maty_state_type(state_type),
+  #       Error.TypeMismatch.invalid_maty_state_type(
+  #         ctx.module,
+  #         meta,
+  #         Error.TypeMismatch.invalid_maty_state_cause(state_type)
+  #       ),
+  #       env,
+  #       st
+  #     )
 
-      ok(:map, Map.put(env, state_var, maty_actor_state_type), st)
-    end
-  end
+  #     ok(:map, Map.put(env, state_var, maty_actor_state_type), st)
+  #   end
+  # end
 
   # --- IO ---
   deftc tc_expr(ctx, var_env, st_pre, {{:., _, [IO, _]}, _, _} = ast) do

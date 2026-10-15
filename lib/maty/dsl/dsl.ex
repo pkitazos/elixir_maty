@@ -1,14 +1,12 @@
 defmodule Maty.DSL do
-  alias Maty.DSL
-  alias Maty.{Envelope, Session, Types}
+  alias Maty.{DSL, Types}
+  alias Maty.Runtime.{Envelope, Session}
 
   defmacro __using__(_opts) do
     quote do
-      import Maty.DSL.Handlers, only: [handler: 5, init_handler: 4, on_link: 3]
+      import Maty.DSL.Handlers, only: [handler: 5, init_handler: 4, on_start: 2]
       require Maty.DSL
       alias Maty.DSL, as: MatyDSL
-      require Maty.DSL.State
-      alias Maty.DSL.State
     end
   end
 

@@ -13,14 +13,14 @@ defmodule Maty.Types do
   # todo: this should be tightened a bit more than `any()`
   @type message :: {atom(), any()}
 
-  @type session :: Maty.Session.t()
+  @type session :: Maty.Runtime.Session.t()
 
   # this is a custom wrapper type
   # a particular handler always needs some session context
   # that is, the actual session, and the role of the actor for the given handler
   @type session_ctx :: {session(), role()}
 
-  @type maty_actor_state :: Maty.DSL.State.t()
+  @type maty_actor_state :: Maty.Runtime.InternalState.t()
 
   @type candidate :: {pid(), init_token()}
   # an access point holds a map of candidate participants
@@ -97,13 +97,12 @@ defmodule Maty.Types do
          %{
            id: T.session_id(),
            handlers: {:map, %{T.role() => {:tuple, [T.handler_label(), T.role()]}}},
-           participants: {:map, %{T.role() => :pid}},
-           # todo: see if I can make this a little nicer..
-           local_state: :any
+           participants: {:map, %{T.role() => :pid}}
          }}
 
     def session_ctx, do: {:tuple, [T.session(), T.role()]}
 
+    # I think this is about to become obsolete!
     def maty_actor_state,
       do:
         {:map,

@@ -4,8 +4,10 @@ defmodule TwoBuyer.Participants.Buyer1 do
   @st {:install, ~q/+seller:{title(binary).quote_handler}/}
   @st {:quote_handler, ~q/&seller:{quote(number).+buyer2:{share(number).end}}/}
 
-  on_link {ap_pid, title} :: {pid(), binary()}, initial_state do
-    MatyDSL.register(ap_pid, :buyer1, :install, title, initial_state)
+  on_start {ap_pid, title} :: {pid(), binary()} do
+    MatyDSL.register(ap_pid, :buyer1, :install, title, %{})
+
+    {:ok, %{}}
   end
 
   init_handler :install, title :: binary(), state do

@@ -7,8 +7,9 @@ defmodule StashQueue.Participants.Q do
   @st {:r2_handler, ~q/&r:{b(number).p2_handler}/}
   @st {:p2_handler, ~q/&p:{a(number).end}/}
 
-  on_link ap_pid :: pid(), initial_state do
-    MatyDSL.register(ap_pid, :q, :install, nil, initial_state)
+  on_start ap_pid :: pid() do
+    MatyDSL.register(ap_pid, :q, :install, nil, %{})
+    {:ok, %{}}
   end
 
   # Q waits until all four messages are in its mailbox before it starts reading it.

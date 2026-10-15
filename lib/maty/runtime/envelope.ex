@@ -1,4 +1,4 @@
-defmodule Maty.Envelope do
+defmodule Maty.Runtime.Envelope do
   @moduledoc """
   A message as sent between Maty actors: it holds the message itself plus the
   session it belongs to and the roles it is addressed to and sent from

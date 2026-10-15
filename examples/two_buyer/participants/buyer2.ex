@@ -6,8 +6,9 @@ defmodule TwoBuyer.Participants.Buyer2 do
        ~q"&buyer1:{share(number).+seller:{address(binary).date_handler, quit(nil).end}}"}
   @st {:date_handler, ~q"&seller:{date(date).end}"}
 
-  on_link ap_pid :: pid(), initial_state do
-    MatyDSL.register(ap_pid, :buyer2, :install, nil, initial_state)
+  on_start ap_pid :: pid() do
+    MatyDSL.register(ap_pid, :buyer2, :install, nil, %{})
+    {:ok, %{}}
   end
 
   init_handler :install, nil, state do
