@@ -142,6 +142,26 @@ defmodule Maty.Typechecker.TC do
     ok({:map_record, %{}}, env, st)
   end
 
+  # Map Record Update %{m | k1: v1, ...}
+  # every key must already be in the record and keep its field's type, so the result has the record's type
+  # (at runtime `|` raises a KeyError for a missing key, so an update can never add a key)
+  deftc tc_expr(ctx, env, st, {:%{}, meta, [{:|, _, [map_ast, updates]}]})
+        when is_list(updates) do
+    # what is the type of this map
+    #
+    # for each update [k: v]
+    #   if k exists in the type of this map then
+    #     if v has the right type then
+    #       proceed
+    #     else
+    #       break and error
+    #   else
+    #     break and error
+    #
+    # if we make it here then all is ok
+    # return type of map
+  end
+
   # Clause for Non-Empty Map %{k1 => v1, ...}
   deftc tc_expr(ctx, env, st, {:%{}, meta, pairs}) when is_list(pairs) do
     pairs
@@ -173,6 +193,16 @@ defmodule Maty.Typechecker.TC do
       end
     end)
     |> map(fn pairs -> {:map_record, Map.new(pairs)} end)
+  end
+
+  # Map Record Field Access m.k
+  # expanded AST: {{:., _, [map_ast, key]}, [no_parens: true, ...], []}
+  # a zero-arity remote call `Mod.fun()` has the same shape, but its left-hand side is always a module atom
+  deftc tc_expr(_ctx, env, _st, {{:., _meta, [map_ast, key]}, _call_meta, []})
+        when not is_atom(map_ast) and is_atom(key) do
+    # todo: `map_ast` must be a map record that has `key`, the result has that field's type
+    # (errors: Error.TypeMismatch.field_access_not_record/3, Error.TypeMismatch.field_access_key_not_found/4)
+    error(Error.internal_error("field access (m.k) is not typechecked yet"), env)
   end
 
   # --- Logical Not Operator (T-Not) ---

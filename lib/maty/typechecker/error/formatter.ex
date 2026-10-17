@@ -329,6 +329,67 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :type_mismatch, kind: :map_update_not_record} = e) do
+    %{got: got} = e.details
+
+    """
+    Type Mismatch Error: Map Update of a Non-Record
+      Expected: a map record
+      Got: #{render_type(got)}
+      --
+      `%{m | k: v}` can only update a map record.
+    """
+  end
+
+  defp render(%Error{category: :type_mismatch, kind: :map_update_key_not_found} = e) do
+    %{key: key, record: record} = e.details
+
+    """
+    Type Mismatch Error: Map Update Key Not Found
+      Key: #{render_type(key)}
+      Record: #{render_type(record)}
+      --
+      `%{m | k: v}` can only update keys the record already has.
+    """
+  end
+
+  defp render(%Error{category: :type_mismatch, kind: :map_update_value_type_mismatch} = e) do
+    %{key: key, expected: expected, got: got} = e.details
+
+    """
+    Type Mismatch Error: Map Update Value Type
+      Key: #{render_type(key)}
+      Expected: #{render_type(expected)}
+      Got: #{render_type(got)}
+      --
+      `%{m | k: v}` must keep the type of the field it updates.
+    """
+  end
+
+  defp render(%Error{category: :type_mismatch, kind: :field_access_not_record} = e) do
+    %{got: got} = e.details
+
+    """
+    Type Mismatch Error: Field Access on a Non-Record
+      Expected: a map record
+      Got: #{render_type(got)}
+      --
+      `m.k` can only access a field of a map record.
+    """
+  end
+
+  defp render(%Error{category: :type_mismatch, kind: :field_access_key_not_found} = e) do
+    %{key: key, record: record} = e.details
+
+    """
+    Type Mismatch Error: Field Access Key Not Found
+      Key: #{render_type(key)}
+      Record: #{render_type(record)}
+      --
+      `m.k` can only access keys the record has.
+    """
+  end
+
   defp render(%Error{category: :type_mismatch, kind: :register_arg_type_mismatch} = e) do
     %{argument: argument, expected: expected, got: got} = e.details
 

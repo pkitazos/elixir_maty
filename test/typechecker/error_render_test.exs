@@ -154,6 +154,29 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          expected: [:binary],
          got: :number
        )},
+      {{Error.TypeMismatch, :map_update_not_record},
+       Error.TypeMismatch.map_update_not_record(@m, @meta, got: :number)},
+      {{Error.TypeMismatch, :map_update_key_not_found},
+       Error.TypeMismatch.map_update_key_not_found(
+         @m,
+         @meta,
+         :missing,
+         {:map_record, %{name: :binary}}
+       )},
+      {{Error.TypeMismatch, :map_update_value_type_mismatch},
+       Error.TypeMismatch.map_update_value_type_mismatch(@m, @meta, :name,
+         expected: :binary,
+         got: :number
+       )},
+      {{Error.TypeMismatch, :field_access_not_record},
+       Error.TypeMismatch.field_access_not_record(@m, @meta, got: :number)},
+      {{Error.TypeMismatch, :field_access_key_not_found},
+       Error.TypeMismatch.field_access_key_not_found(
+         @m,
+         @meta,
+         :missing,
+         {:map_record, %{name: :binary}}
+       )},
 
       # :pattern_matching
       {{Error.PatternMatching, :conflicting_pattern_bindings},

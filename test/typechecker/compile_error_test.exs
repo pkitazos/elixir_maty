@@ -236,6 +236,62 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert [{MatyCompileErrorFixture.MatchPatternHead, _}] = Code.compile_string(src)
     end
 
+    test "a map record update compiles" do
+      src =
+        seller_src("MapUpdate", """
+        #{@valid_handlers}
+
+        @spec rename(%{name: binary(), age: number()}, binary()) :: %{name: binary(), age: number()}
+        def rename(person, name), do: %{person | name: name}
+        """)
+
+      assert [{MatyCompileErrorFixture.MapUpdate, _}] = Code.compile_string(src)
+    end
+
+    test "a map record field access compiles" do
+      src =
+        seller_src("FieldAccess", """
+        #{@valid_handlers}
+
+        @spec name_of(%{name: binary(), age: number()}) :: binary()
+        def name_of(person), do: person.name
+        """)
+
+      assert [{MatyCompileErrorFixture.FieldAccess, _}] = Code.compile_string(src)
+    end
+
+    test "a field access with a key the record does not have is reported" do
+      src =
+        seller_src("FieldAccessMissingKey", """
+        #{@valid_handlers}
+
+        @spec email_of(%{name: binary()}) :: binary()
+        def email_of(person), do: person.email
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Field Access Key Not Found"
+      assert error.description =~ "Key: :email"
+      assert own_line(error) == line_of(src, "def email_of")
+    end
+
+    test "a map record update with a key the record does not have is reported" do
+      src =
+        seller_src("MapUpdateMissingKey", """
+        #{@valid_handlers}
+
+        @spec add_email(%{name: binary()}) :: %{name: binary()}
+        def add_email(person), do: %{person | email: "a@b.c"}
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Map Update Key Not Found"
+      assert error.description =~ "Key: :email"
+      assert own_line(error) == line_of(src, "def add_email")
+    end
+
     test "a spec error is reported on its own, body errors wait until it is fixed" do
       # `g/0` has a body error that must not be reported yet
       src =

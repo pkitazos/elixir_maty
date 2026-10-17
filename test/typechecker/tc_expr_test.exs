@@ -15,6 +15,10 @@ defmodule Maty.Typechecker.TCExprTest do
 
   defp erlang_op(op, lhs, rhs), do: {{:., @meta, [:erlang, op]}, @meta, [lhs, rhs]}
   defp erlang_not(operand), do: {{:., @meta, [:erlang, :not]}, @meta, [operand]}
+  defp map_update(map_ast, updates), do: {:%{}, @meta, [{:|, @meta, [map_ast, updates]}]}
+
+  defp field_access(map_ast, key),
+    do: {{:., @meta, [map_ast, key]}, [no_parens: true] ++ @meta, []}
 
   defp string_concat(lhs, rhs) do
     {:<<>>, @meta,
@@ -225,6 +229,85 @@ defmodule Maty.Typechecker.TCExprTest do
 
       assert {:ok, {:map_record, %{x: :number}}, @st_out, %{}} =
                TC.tc_expr(@ctx, %{}, @st_out, ast)
+    end
+  end
+
+  describe "tc_expr/4 map record field access" do
+    @person {:map_record, %{name: :binary, age: :number}}
+
+    test "accessing a field has the field's type" do
+      ast = field_access(var(:p), :name)
+
+      assert {:ok, :binary, @st_end, %{p: @person}} =
+               TC.tc_expr(@ctx, %{p: @person}, @st_end, ast)
+    end
+
+    test "nested field access" do
+      user = {:map_record, %{address: {:map_record, %{city: :binary}}}}
+      ast = field_access(field_access(var(:u), :address), :city)
+
+      assert {:ok, :binary, @st_end, _env} = TC.tc_expr(@ctx, %{u: user}, @st_end, ast)
+    end
+
+    test "field access preserves session state" do
+      ast = field_access(var(:p), :age)
+
+      assert {:ok, :number, @st_out, _env} = TC.tc_expr(@ctx, %{p: @person}, @st_out, ast)
+    end
+
+    test "accessing a field of a value that is not a map record" do
+      ast = field_access(var(:n), :name)
+
+      assert {:error, %Error{kind: :field_access_not_record}, _env} =
+               TC.tc_expr(@ctx, %{n: :number}, @st_end, ast)
+    end
+
+    test "accessing a key the record does not have" do
+      ast = field_access(var(:p), :email)
+
+      assert {:error, %Error{kind: :field_access_key_not_found, details: %{key: :email}}, _env} =
+               TC.tc_expr(@ctx, %{p: @person}, @st_end, ast)
+    end
+  end
+
+  describe "tc_expr/4 map record update" do
+    @person {:map_record, %{name: :binary, age: :number}}
+
+    test "updating existing keys keeps the record's type" do
+      ast = map_update(var(:p), name: "bob", age: 30)
+
+      assert {:ok, @person, @st_end, %{p: @person}} =
+               TC.tc_expr(@ctx, %{p: @person}, @st_end, ast)
+    end
+
+    test "update preserves session state" do
+      ast = map_update(var(:p), age: 30)
+
+      assert {:ok, @person, @st_out, _env} = TC.tc_expr(@ctx, %{p: @person}, @st_out, ast)
+    end
+
+    test "updating a value that is not a map record" do
+      ast = map_update(var(:n), age: 30)
+
+      assert {:error, %Error{kind: :map_update_not_record}, _env} =
+               TC.tc_expr(@ctx, %{n: :number}, @st_end, ast)
+    end
+
+    test "updating a key the record does not have" do
+      ast = map_update(var(:p), email: "bob@example.com")
+
+      assert {:error, %Error{kind: :map_update_key_not_found, details: %{key: :email}}, _env} =
+               TC.tc_expr(@ctx, %{p: @person}, @st_end, ast)
+    end
+
+    test "updating a key with a value of a different type" do
+      ast = map_update(var(:p), age: "thirty")
+
+      assert {:error,
+              %Error{
+                kind: :map_update_value_type_mismatch,
+                details: %{key: :age, expected: :number, got: :binary}
+              }, _env} = TC.tc_expr(@ctx, %{p: @person}, @st_end, ast)
     end
   end
 

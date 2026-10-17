@@ -122,4 +122,59 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
       details: %{function: function, expected: expected, got: got}
     }
   end
+
+  # A record update `%{m | k: v}` was applied to a value that is not a map record
+  def map_update_not_record(module, meta, got: got) do
+    %Error{
+      category: :type_mismatch,
+      kind: :map_update_not_record,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: got}
+    }
+  end
+
+  # A record update `%{m | k: v}` names a key the record does not have (`|` raises a KeyError at runtime)
+  def map_update_key_not_found(module, meta, key, record_type) do
+    %Error{
+      category: :type_mismatch,
+      kind: :map_update_key_not_found,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{key: key, record: record_type}
+    }
+  end
+
+  # A record update `%{m | k: v}` gives a key a value whose type is not the record's field type
+  def map_update_value_type_mismatch(module, meta, key, expected: expected, got: got) do
+    %Error{
+      category: :type_mismatch,
+      kind: :map_update_value_type_mismatch,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{key: key, expected: expected, got: got}
+    }
+  end
+
+  # A field access `m.k` was applied to a value that is not a map record
+  def field_access_not_record(module, meta, got: got) do
+    %Error{
+      category: :type_mismatch,
+      kind: :field_access_not_record,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: got}
+    }
+  end
+
+  # A field access `m.k` names a key the record does not have (`m.k` raises a KeyError at runtime)
+  def field_access_key_not_found(module, meta, key, record_type) do
+    %Error{
+      category: :type_mismatch,
+      kind: :field_access_key_not_found,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{key: key, record: record_type}
+    }
+  end
 end
