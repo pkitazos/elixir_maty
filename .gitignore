@@ -33,3 +33,4 @@ docs/squiggles/**/*.pdf
 .nix-mix/
 .nix-hex/
 scratch/
+playground/
