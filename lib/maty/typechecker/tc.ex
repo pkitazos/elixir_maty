@@ -1,15 +1,12 @@
 defmodule Maty.Typechecker.TC do
   require Logger
 
-  # if I remove the import the macro blows up
-  import Maty.Typechecker.TC.Thread
-  alias Maty.Typechecker.{Judgment, Bind}
-
+  alias Maty.Check
   import Maty.Check
 
   alias Maty.ST.SBottom
   alias Maty.Types.T, as: Type
-  alias Maty.Typechecker.{Error, Helpers, PatternBinding, TC, Ctx}
+  alias Maty.Typechecker.{Error, Helpers, TC, Ctx}
 
   import Maty.Utils, only: [deftc: 2]
 
@@ -18,8 +15,8 @@ defmodule Maty.Typechecker.TC do
   """
   @type ast :: Macro.t()
 
-  @type var_env :: Judgment.var_env()
-  @type result :: Judgment.result()
+  @type var_env :: Check.var_env()
+  @type result :: Check.result(Type.t())
 
   @doc """
   Typechecks an expression AST node within a given variable environment and
@@ -31,31 +28,27 @@ defmodule Maty.Typechecker.TC do
     - `{:ok, elixir_type, next_session_state, var_env}` on success
     - `{:error, error, var_env}` on failure
   """
-  @spec tc_expr(ctx :: Ctx.t(), var_env :: var_env(), st_pre :: Maty.ST.t(), ast :: ast()) ::
-          result()
+  @spec tc_expr(Ctx.t(), var_env(), Maty.ST.t(), ast()) :: result()
 
-  # --- Revised Value Typing Clauses ---
-
-  # Base Literals (Val-BaseLit adaptation)
-  # These are pure values; they preserve the current session state.
+  # -- Val-BaseLit
   deftc tc_expr(_ctx, env, st, value) when is_boolean(value) do
     {:ok, :boolean, st, env}
   end
 
-  def tc_expr(
-        _ctx,
-        env,
-        st,
-        {:when, _,
-         [
-           {:x, _, Kernel},
-           {{:., _, [:erlang, :orelse]}, _,
-            [
-              {{:., _, [:erlang, :"=:="]}, _, [{:x, _, Kernel}, false]},
-              {{:., _, [:erlang, :"=:="]}, _, [{:x, _, Kernel}, nil]}
-            ]}
-         ]}
-      ) do
+  deftc tc_expr(
+          _ctx,
+          env,
+          st,
+          {:when, _,
+           [
+             {:x, _, Kernel},
+             {{:., _, [:erlang, :orelse]}, _,
+              [
+                {{:., _, [:erlang, :"=:="]}, _, [{:x, _, Kernel}, false]},
+                {{:., _, [:erlang, :"=:="]}, _, [{:x, _, Kernel}, nil]}
+              ]}
+           ]}
+        ) do
     {:ok, :boolean, st, env}
   end
 
@@ -275,12 +268,7 @@ defmodule Maty.Typechecker.TC do
   # Other bitstring syntax (sizes, integer segments, ...) is not supported
   deftc tc_expr(ctx, env, st, {:<<>>, meta, segments}) when is_list(segments) do
     check env: env, st: st do
-      _segment_types <-
-        chain(segments, fn segment ->
-          fn env, st -> tc_string_segment(ctx, env, st, meta, segment) end
-          # todo: make the tc_string_segment helper `check` compliant
-        end)
-
+      _ <- chain(segments, &tc_string_segment(ctx, meta, &1))
       ok(:binary)
     end
   end
@@ -347,8 +335,7 @@ defmodule Maty.Typechecker.TC do
 
   # Computation Typing
 
-  # --- Let Expression / Match Operator (T-Let) ---
-  # Represents `pattern = expr1`
+  # -- T-Let
   deftc tc_expr(ctx, env, st, {:=, _meta, [pat_ast, expr_ast]}) do
     check env: env, st: st do
       expr_type <- tc(ctx, expr_ast)
@@ -369,24 +356,20 @@ defmodule Maty.Typechecker.TC do
         fan_out(Enum.with_index(clauses_list, 1), fn
           {{:->, branch_meta, [[pat_ast], expr_ast]}, index} ->
             check do
-              _ <- match_pattern(ctx, pat_ast, scrutinee_type)
+              # a literal pattern has no meta of its own, so its errors are reported at the branch
+              _ <- match_pattern(%{ctx | meta: branch_meta}, pat_ast, scrutinee_type)
               tc(ctx, expr_ast)
             end
-            # not sure about this actually
             |> with_frame({:case_branch, index, Keyword.take(branch_meta, [:line, :column])})
         end)
 
-      expect {:ok, {branch_type, joined_st}} = Helpers.join_branch_results(branch_results),
-        else:
-          Error.TypeMismatch.case_branches_incompatible(
-            ctx.module,
-            meta,
-            []
-            # error_branches
-            # ^ handling this needs some brainstorming I reckon
-          )
+      case Helpers.join_branch_results(branch_results) do
+        {:error, failed} ->
+          fail(Error.TypeMismatch.case_branches_incompatible(ctx.module, meta, failed))
 
-      ok(branch_type, st: joined_st)
+        {:ok, {branch_type, joined_st}} ->
+          ok(branch_type, st: joined_st)
+      end
     end
   end
 
@@ -410,13 +393,13 @@ defmodule Maty.Typechecker.TC do
           )
         end
 
-      recipient_type <- value(ctx, recipient_ast, meta)
+      _recipient_type <- value(ctx, recipient_ast, meta)
 
-      expect {:ok, recipient} = Helpers.ast_to_literal(recipient_ast),
-        # todo: some error about roles not being literal atoms
-        else: nil
+      # roles must be literal atoms, choosing a branch of the session type is static
+      expect is_atom(recipient_ast),
+        else: Error.FrameworkUsage.role_not_literal(ctx.module, meta, recipient_ast)
 
-      expect recipient == expected_role,
+      expect recipient_ast == expected_role,
         else:
           Error.ProtocolViolation.incorrect_target_participant(
             ctx.module,
@@ -427,11 +410,14 @@ defmodule Maty.Typechecker.TC do
           )
 
       # Check message structure {label, payload_expr}
-      expect {literal_label, payload_expr_ast} =
-               Helpers.check_message_structure(ctx, meta, message_ast),
-             # todo: some error here as well?
-             # or can I just use `<-` directly on this helper? nah probably not
-             else: nil
+      # the message must be a literal 2-tuple with a literal atom label, for the same reason as the role
+      # (calls, variables and n-tuples are all 3-tuples in the AST, so only a literal 2-tuple matches)
+      expect {literal_label, payload_expr_ast} = message_ast,
+        else: Error.TypeMismatch.send_message_not_tuple(ctx.module, meta, got: message_ast)
+
+      # the label of a message, must be an atom
+      expect is_atom(literal_label),
+        else: Error.TypeMismatch.send_message_not_tuple(ctx.module, meta, got: message_ast)
 
       # Typecheck payload expression
       actual_payload_type <- value(ctx, payload_expr_ast, meta)
@@ -522,7 +508,7 @@ defmodule Maty.Typechecker.TC do
           ctx,
           env,
           st,
-          {{:., _, [Maty.Runtime, :suspend]}, meta, [handler_ast, {_state_var, _, _} = state_ast]}
+          {{:., _, [Maty.Runtime, :suspend]}, meta, [handler_ast, state_ast]}
         ) do
     check env: env, st: st do
       # TV-MsgHandler
@@ -721,9 +707,8 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # --- Variable Lookup (TV-Var) ---
-  # Looking up a variable is session pure
-  # todo: idk if I even need `lookup_var` tbh, this is pretty clear
+  # -- TV-Var
+  # x : A ∈ Γ
   deftc tc_expr(ctx, env, st, {var_name, meta, context})
         when is_atom(var_name) and (is_nil(context) or is_list(context)) do
     case Map.fetch(env, var_name) do
@@ -735,7 +720,8 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # Atom literals (handler names included)
+  # -- Val-BaseLit (I gotta do something about these names..)
+  # Atom literals
   deftc tc_expr(_ctx, env, st, value) when is_atom(value) and not is_nil(value) do
     {:ok, :atom, st, env}
   end
@@ -746,12 +732,10 @@ defmodule Maty.Typechecker.TC do
   # an interpolated value: `String.Chars.to_string(x) :: binary`
   defp tc_string_segment(
          ctx,
-         env,
-         st,
          meta,
          {:"::", seg_meta, [{{:., _, [String.Chars, :to_string]}, _, [val_ast]}, {:binary, _, _}]}
        ) do
-    check env: env, st: st do
+    check do
       val_type <- tc(ctx, val_ast)
 
       expect val_type in @interpolatable_types,
@@ -769,8 +753,8 @@ defmodule Maty.Typechecker.TC do
   end
 
   # a literal or concatenated operand: `x :: binary`
-  defp tc_string_segment(ctx, env, st, meta, {:"::", seg_meta, [val_ast, {:binary, _, _}]}) do
-    check env: env, st: st do
+  defp tc_string_segment(ctx, meta, {:"::", seg_meta, [val_ast, {:binary, _, _}]}) do
+    check do
       val_type <- tc(ctx, val_ast)
 
       expect val_type == :binary,
@@ -787,8 +771,8 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  defp tc_string_segment(ctx, env, _st, meta, _segment) do
-    {:error, Error.FrameworkUsage.unsupported_bitstring(ctx.module, meta), env}
+  defp tc_string_segment(ctx, meta, _segment) do
+    fail(Error.FrameworkUsage.unsupported_bitstring(ctx.module, meta))
   end
 
   # segments of literal parts carry no column of their own, fall back to the whole string

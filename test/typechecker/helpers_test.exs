@@ -1,7 +1,7 @@
 defmodule Maty.Typechecker.HelpersTest do
   use ExUnit.Case
 
-  alias Maty.Typechecker.{Helpers, Ctx}
+  alias Maty.Typechecker.Helpers
   alias Maty.ST.SBottom
   alias Maty.Types.T, as: Type
 
@@ -9,7 +9,6 @@ defmodule Maty.Typechecker.HelpersTest do
   @module TestModule
   @st_end %ST.SEnd{}
   @st_out ST.output_one(:server, :msg, :binary, @st_end)
-  @ctx %Ctx{module: @module, meta: @meta, roles: []}
 
   # --- unify_list_types/1 ---
 
@@ -284,26 +283,6 @@ defmodule Maty.Typechecker.HelpersTest do
     test "incompatible in both type and session reports both pairs" do
       assert {:error, [t1: :number, t2: :binary, q1: @st_end, q2: @st_out]} =
                Helpers.join_branch_results([{:number, @st_end}, {:binary, @st_out}])
-    end
-  end
-
-  # --- check_message_structure/3 ---
-
-  describe "check_message_structure/3" do
-    test "valid tagged tuple" do
-      payload_ast = {:x, @meta, nil}
-
-      assert {:ok, {:ping, ^payload_ast}} =
-               Helpers.check_message_structure(@ctx, @meta, {:ping, payload_ast})
-    end
-
-    test "non-tuple message returns error" do
-      assert {:error, msg} = Helpers.check_message_structure(@ctx, @meta, 42)
-
-      assert %Maty.Typechecker.Error{
-               category: :type_mismatch,
-               kind: :send_message_not_tuple
-             } = msg
     end
   end
 

@@ -3,7 +3,6 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
 
   alias Maty.Typechecker.Error
   alias Maty.Typechecker.Error.Formatter
-  alias Maty.Typechecker.TC.Bind
 
   @st_end %ST.SEnd{}
   @st_in ST.input_one(:buyer1, :title, :binary, @st_end)
@@ -29,41 +28,6 @@ defmodule Maty.Typechecker.ErrorFormatterTest do
       assert rendered =~ "    via process_title/2 (line 40)\n"
       assert rendered =~ "    in clause #1 of title_handler/4"
       assert rendered =~ ~r/Session Type: .*\n  Trace:/s
-    end
-  end
-
-  describe "Bind.with_frame/2" do
-    test "adds a frame to a structured error (3-tuple shape)" do
-      error = %Error{category: :protocol_violation, kind: :incorrect_recipient_participant}
-      frame = {:call, {:foo, 2}, [line: 7]}
-
-      assert {:error, %Error{trace: [^frame]}, %{}} =
-               Bind.with_frame({:error, error, %{}}, frame)
-    end
-
-    test "adds a frame to a structured error (2-tuple shape)" do
-      error = %Error{category: :protocol_violation, kind: :incorrect_recipient_participant}
-      frame = {:clause, {:foo, 4}, 2}
-
-      assert {:error, %Error{trace: [^frame]}} = Bind.with_frame({:error, error}, frame)
-    end
-
-    test "appends frames so the trace reads innermost-first" do
-      error = %Error{
-        category: :protocol_violation,
-        kind: :incorrect_recipient_participant,
-        trace: [{:call, {:inner, 1}, []}]
-      }
-
-      outer = {:clause, {:outer, 4}, 1}
-
-      assert {:error, %Error{trace: [{:call, {:inner, 1}, []}, ^outer]}} =
-               Bind.with_frame({:error, error}, outer)
-    end
-
-    test "passes successes through unchanged" do
-      ok = Bind.ok(:number, %{}, @st_end)
-      assert ^ok = Bind.with_frame(ok, {:clause, {:f, 1}, 0})
     end
   end
 end

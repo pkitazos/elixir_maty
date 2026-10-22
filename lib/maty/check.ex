@@ -70,17 +70,6 @@ defmodule Maty.Check do
     end
   end
 
-  # x : A ∈ Γ
-  @spec lookup_var(atom(), Error.t()) :: t(Maty.Types.T.t())
-  def lookup_var(name, error) do
-    fn env, st ->
-      case Map.fetch(env, name) do
-        {:ok, type} -> {:ok, type, st, env}
-        :error -> {:error, error, env}
-      end
-    end
-  end
-
   @spec st_preserving(Maty.Typechecker.Ctx.t(), t(a), keyword()) :: t(a) when a: var
   def st_preserving(ctx, check, meta) do
     fn env, st_pre ->

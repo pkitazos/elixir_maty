@@ -1,15 +1,15 @@
 defmodule Maty.Typechecker.PatternBinding do
   require Logger
   alias Maty.Types.T, as: Type
-  alias Maty.Typechecker.{Ctx, Error, Helpers, Judgment}
+  alias Maty.Typechecker.{Ctx, Error, Helpers}
+
   import Maty.Utils, only: [deftc: 2]
 
   @typedoc """
   Represents Elixir AST nodes that can be typechecked.
   """
   @type ast :: Macro.t()
-
-  @type var_env :: Judgment.var_env()
+  @type var_env :: Maty.Check.var_env()
 
   # move
   @doc """

@@ -89,14 +89,18 @@ defmodule Maty.Types do
             | :atom
             # todo: consider supporting singleton atoms (breaks everything below)
             | :binary
+            # todo: make it explicit what string operations are supported
             | :boolean
             | :date
+            # todo: drop support for dates
             | nil
             | :number
             | :no_return
             # ^ this is a special value
             | :pid
             | :ref
+            # todo: check to what degree I can actually work with PIDs and REFs
+            # and make the allowed ops explicit somewhere
             | {:tuple, [t()]}
             | {:list, t()}
             | {:map_record, %{atom() => t()}}

@@ -74,7 +74,7 @@ All this to say, there are lots of bits in here that need to be tidied up, throw
     - a check `:ok | {:error, e}`
     - a normal result `{:ok, val} | {:error, e}`
 
-  - [ ] `Maty.Typechecker.Judgment`
+  - [x] `Maty.Typechecker.Judgment`
     Okay, but needs to be merged into the new `Check` monad
   - [ ] `Maty.Typechecker.PatternBinding`
     Idk about this one, feels a bit underbaked
@@ -84,11 +84,11 @@ All this to say, there are lots of bits in here that need to be tidied up, throw
 
   - [ ] `Maty.Typechecker.TC`
     Okay for the most part, obviously it's incomplete (map support is only half-done) and the new `Check` monad isn't used. It should hopefully make the rules nicer to read
-    - [ ] `Maty.Typechecker.TC.Bind`
+    - [x] `Maty.Typechecker.TC.Bind`
       This was a good first idea I think, but my execution wasn't great. Needs to be merged into the new `Check` monad also
     - [ ] `Maty.Typechecker.TC.IO`
       I don't like this, but it's just for demo purposes
-    - [ ] `Maty.Typechecker.TC.Thread`
+    - [x] `Maty.Typechecker.TC.Thread`
       Needs to be merged into `Check` monad
     - [ ] `Maty.Typechecker.TC.Timer`
       Also just for demo purposes - consider unchecked block

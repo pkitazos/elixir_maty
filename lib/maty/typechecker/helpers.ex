@@ -183,16 +183,6 @@ defmodule Maty.Typechecker.Helpers do
     end)
   end
 
-  def check_message_structure(_ctx, _meta, {label_atom, payload_expr_ast})
-      when is_atom(label_atom) do
-    {:ok, {label_atom, payload_expr_ast}}
-  end
-
-  def check_message_structure(ctx, meta, other_ast) do
-    error = Error.TypeMismatch.send_message_not_tuple(ctx.module, meta, got: other_ast)
-    {:error, error}
-  end
-
   def find_matching_branch(branches, {label, payload_type}) do
     branches
     |> Enum.map(fn %ST.SBranch{label: l, payload: p} = branch ->

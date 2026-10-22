@@ -428,8 +428,9 @@ defmodule Maty.Typechecker do
 
   # tags a clause's error with the clause it came from, so errors from different clauses
   # of the same function can be identified. single-clause functions needs no such context
-  defp with_clause_frame(result, func_id, index, total_clauses) when total_clauses > 1,
-    do: TC.Bind.with_frame(result, {:clause, func_id, index})
+  defp with_clause_frame({:error, %Error{} = e}, func_id, index, total_clauses)
+       when total_clauses > 1,
+       do: {:error, %{e | trace: e.trace ++ [{:clause, func_id, index}]}}
 
   defp with_clause_frame(result, _func_id, _index, _total_clauses), do: result
 
