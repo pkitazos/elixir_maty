@@ -60,6 +60,17 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
+  # `&&` / `||`, which treat any value as a boolean; `and` / `or` are supported instead
+  def unsupported_truthy_operator(module, meta, op) do
+    %Error{
+      category: :framework_usage,
+      kind: :unsupported_truthy_operator,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{op: op}
+    }
+  end
+
   def missing_session_registration(module, meta) do
     %Error{
       category: :framework_usage,

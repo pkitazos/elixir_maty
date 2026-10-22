@@ -752,6 +752,18 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :framework_usage, kind: :unsupported_truthy_operator} = e) do
+    %{op: op} = e.details
+
+    """
+    Framework Usage Violation: Unsupported Operator
+      Operator: #{op}
+      --
+      `&&` and `||` treat nil and false as false and return one of their operands.
+      Use `and` / `or`, which take and return booleans.
+    """
+  end
+
   defp render(%Error{category: :framework_usage, kind: :no_native_send}) do
     """
     Framework Usage Violation: Attempted Native Communication

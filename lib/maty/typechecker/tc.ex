@@ -23,14 +23,14 @@ defmodule Maty.Typechecker.TC do
   # so here we just name the large nodes so the clause heads stay readable
   # since a macro in a pattern expands to that pattern
 
-  # `:erlang.op(args)`, what Kernel operators expand to (`not x`, `a + b`, `a <= b`, ...)
+  # `not x`, `a + b`, `a <= b`, ...: `:erlang.op(args)`
   defmacrop erlang(op, meta, args) do
     quote do
       {{:., unquote(meta), [:erlang, unquote(op)]}, _, unquote(args)}
     end
   end
 
-  # `Maty.Runtime.fun(args)`, what the DSL's `send`, `suspend`, `done` and `register` expand to
+  # `send`, `suspend`, `done`, `register`: `Maty.Runtime.fun(args)`
   defmacrop maty_runtime(fun, meta, args) do
     quote do
       {{:., _, [Maty.Runtime, unquote(fun)]}, unquote(meta), unquote(args)}
@@ -41,7 +41,7 @@ defmodule Maty.Typechecker.TC do
   # mapped back so `op_type_rel` and the errors see what the user wrote
   @source_ops %{"=<": :<=, "/=": :!=}
 
-  # the falsy check that `||`, `&&`, `!` and `if` expand to: `x when x === false or x === nil`
+  # `||`, `&&`, `!`, `if`: `x when x === false or x === nil`
   defmacrop falsy_guard do
     quote do
       {:when, _,
@@ -52,6 +52,38 @@ defmodule Maty.Typechecker.TC do
            erlang(:"=:=", _, [{:x, _, Kernel}, nil])
          ])
        ]}
+    end
+  end
+
+  # `a and b`: `case a do false -> false; true -> b end`
+  defmacrop boolean_op(:and, meta, lhs, rhs) do
+    quote do
+      {:case, unquote(meta),
+       [unquote(lhs), [do: [{:->, _, [[false], false]}, {:->, _, [[true], unquote(rhs)]} | _]]]}
+    end
+  end
+
+  # `a or b`: `case a do false -> b; true -> true end`
+  defmacrop boolean_op(:or, meta, lhs, rhs) do
+    quote do
+      {:case, unquote(meta),
+       [unquote(lhs), [do: [{:->, _, [[false], unquote(rhs)]}, {:->, _, [[true], true]} | _]]]}
+    end
+  end
+
+  # `a && b`: `case a do x when <falsy x> -> x; _ -> b end`
+  defmacrop truthy_op(:&&, meta) do
+    quote do
+      {:case, unquote(meta),
+       [_, [do: [{:->, _, [[falsy_guard()], {:x, _, Kernel}]}, {:->, _, [[{:_, _, _}], _]}]]]}
+    end
+  end
+
+  # `a || b`: `case a do x when <falsy x> -> b; x -> x end`
+  defmacrop truthy_op(:||, meta) do
+    quote do
+      {:case, unquote(meta),
+       [_, [do: [{:->, _, [[falsy_guard()], _]}, {:->, _, [[{:x, _, Kernel}], {:x, _, Kernel}]}]]]}
     end
   end
 
@@ -277,24 +309,22 @@ defmodule Maty.Typechecker.TC do
   end
 
   # Handles Boolean Ops: and, or
-  deftc tc_expr(ctx, env, st, {op, meta, [lhs_ast, rhs_ast]})
-        when op in [:and, :or] do
-    check env: env, st: st do
-      lhs_type <- tc(ctx, lhs_ast)
-      rhs_type <- tc(ctx, rhs_ast)
+  # matched in the `case` they expand to (see `boolean_op/4`)
+  deftc tc_expr(ctx, env, st, boolean_op(:and, meta, lhs_ast, rhs_ast)) do
+    tc_boolean_op(ctx, env, st, :and, meta, lhs_ast, rhs_ast)
+  end
 
-      expect {:ok, res_type} = Helpers.op_type_rel(op, lhs_type, rhs_type),
-        else:
-          Error.TypeMismatch.logical_operator_type_mismatch(
-            ctx.module,
-            meta,
-            op,
-            lhs_type,
-            rhs_type
-          )
+  deftc tc_expr(ctx, env, st, boolean_op(:or, meta, lhs_ast, rhs_ast)) do
+    tc_boolean_op(ctx, env, st, :or, meta, lhs_ast, rhs_ast)
+  end
 
-      ok(res_type)
-    end
+  # rejected cause they're annoying to type
+  deftc tc_expr(ctx, env, _st, truthy_op(:&&, meta)) do
+    {:error, Error.FrameworkUsage.unsupported_truthy_operator(ctx.module, meta, :&&), env}
+  end
+
+  deftc tc_expr(ctx, env, _st, truthy_op(:||, meta)) do
+    {:error, Error.FrameworkUsage.unsupported_truthy_operator(ctx.module, meta, :||), env}
   end
 
   # --- Raw Communication Checks ---
@@ -749,6 +779,25 @@ defmodule Maty.Typechecker.TC do
   # segments of literal parts carry no column of their own, fall back to the whole string
   defp segment_meta(seg_meta, meta) do
     if Keyword.has_key?(seg_meta, :line), do: seg_meta, else: meta
+  end
+
+  defp tc_boolean_op(ctx, env, st, op, meta, lhs_ast, rhs_ast) do
+    check env: env, st: st do
+      lhs_type <- tc(ctx, lhs_ast)
+      rhs_type <- tc(ctx, rhs_ast)
+
+      expect {:ok, res_type} = Helpers.op_type_rel(op, lhs_type, rhs_type),
+        else:
+          Error.TypeMismatch.logical_operator_type_mismatch(
+            ctx.module,
+            meta,
+            op,
+            lhs_type,
+            rhs_type
+          )
+
+      ok(res_type)
+    end
   end
 
   # Processes a list of expressions sequentially using tc_expr.

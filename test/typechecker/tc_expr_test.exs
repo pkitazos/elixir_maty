@@ -406,34 +406,6 @@ defmodule Maty.Typechecker.TCExprTest do
     end
   end
 
-  describe "tc_expr/4 boolean operators" do
-    test "and with booleans" do
-      assert {:ok, :boolean, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, {:and, @meta, [true, false]})
-    end
-
-    test "or with booleans" do
-      assert {:ok, :boolean, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, {:or, @meta, [true, false]})
-    end
-
-    test "and with variables" do
-      env = %{a: :boolean, b: :boolean}
-
-      assert {:ok, :boolean, @st_end, ^env} =
-               TC.tc_expr(@ctx, env, @st_end, {:and, @meta, [var(:a), var(:b)]})
-    end
-
-    test "boolean op type error: number and boolean" do
-      env = %{x: :number, y: :boolean}
-
-      assert {:error, msg, _env} =
-               TC.tc_expr(@ctx, env, @st_end, {:and, @meta, [var(:x), var(:y)]})
-
-      assert %Error{category: :type_mismatch, kind: :logical_operator_type_mismatch} = msg
-    end
-  end
-
   describe "tc_expr/4 not operator" do
     test "not boolean" do
       assert {:ok, :boolean, @st_end, %{}} =

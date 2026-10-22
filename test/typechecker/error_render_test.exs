@@ -248,6 +248,8 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          @meta,
          {{:., [], [String, :length]}, [], ["a"]}
        )},
+      {{Error.FrameworkUsage, :unsupported_truthy_operator},
+       Error.FrameworkUsage.unsupported_truthy_operator(@m, @meta, :&&)},
       {{Error.FrameworkUsage, :unsupported_pattern},
        Error.FrameworkUsage.unsupported_pattern(@m, @meta, {:when, [], [{:n, [], nil}, true]})},
       {{Error.FrameworkUsage, :missing_session_registration},

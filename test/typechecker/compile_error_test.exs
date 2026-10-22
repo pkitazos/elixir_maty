@@ -346,6 +346,51 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Operator: <="
     end
 
+    test "and / or compile, whether or not Elixir can tell the left operand is a boolean" do
+      # `a and b` keeps a `:badbool` branch, `x > 1 and b` does not
+      src =
+        seller_src("BooleanOps", """
+        #{@valid_handlers}
+
+        @spec g(boolean(), boolean()) :: boolean()
+        def g(a, b), do: (a and b) or a
+
+        @spec h(number(), boolean()) :: boolean()
+        def h(x, b), do: x > 1 and b
+        """)
+
+      assert [{MatyCompileErrorFixture.BooleanOps, _}] = Code.compile_string(src)
+    end
+
+    test "and with a non-boolean operand is reported" do
+      src =
+        seller_src("BooleanOpMismatch", """
+        #{@valid_handlers}
+
+        @spec g(boolean(), number()) :: boolean()
+        def g(a, n), do: a and n
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Logical Operator Type Error"
+    end
+
+    test "&& is reported as unsupported, pointing at and / or" do
+      src =
+        seller_src("TruthyOp", """
+        #{@valid_handlers}
+
+        @spec g(boolean(), boolean()) :: boolean()
+        def g(a, b), do: a && b
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Unsupported Operator"
+      assert error.description =~ "Operator: &&"
+    end
+
     test "an expression no rule covers is reported instead of crashing" do
       src =
         seller_src("UnsupportedExpression", """
