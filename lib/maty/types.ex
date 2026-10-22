@@ -85,20 +85,21 @@ defmodule Maty.Types do
     """
     @type t ::
             :any
+            # ^ this is a special value
             | :atom
+            # todo: consider supporting singleton atoms (breaks everything below)
             | :binary
             | :boolean
             | :date
             | nil
             | :number
             | :no_return
+            # ^ this is a special value
             | :pid
             | :ref
             | {:tuple, [t()]}
             | {:list, t()}
             | {:map_record, %{atom() => t()}}
-            # todo: eventually eliminate bare :map
-            | :map
 
     def session_id, do: :ref
     def init_token, do: :ref
