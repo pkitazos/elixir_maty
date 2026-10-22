@@ -253,23 +253,6 @@ defmodule Maty.Typechecker.HelpersTest do
     end
   end
 
-  # --- check_st_unchanged/3 ---
-
-  describe "check_st_unchanged/3" do
-    test "same state returns :ok" do
-      assert :ok = Helpers.check_st_unchanged(@st_end, @st_end, @meta)
-    end
-
-    test "changed state returns error" do
-      assert {:error, msg} = Helpers.check_st_unchanged(@st_end, @st_out, @meta)
-
-      assert %Maty.Typechecker.Error{
-               category: :protocol_violation,
-               kind: :case_scrutinee_altered_state
-             } = msg
-    end
-  end
-
   # --- join_branch_results/1 ---
 
   describe "join_branch_results/1" do

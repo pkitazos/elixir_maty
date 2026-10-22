@@ -164,13 +164,13 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  # todo: deprecate
-  defp render(%Error{category: :protocol_violation, kind: :case_scrutinee_altered_state} = e) do
+  defp render(%Error{category: :protocol_violation, kind: :value_altered_session_state} = e) do
     %{from: from, to: to} = e.details
 
     """
-    Protocol Violation: Case Scrutinee Altered Session State
-      The scrutinee of a case expression must not perform any session actions.
+    Protocol Violation: Expression Altered Session State
+      This expression is used as a value (e.g. a case scrutinee or a message payload),
+      so it must not perform session actions.
       Before: #{Maty.ST.repr(from)}
       After: #{Maty.ST.repr(to)}
     """

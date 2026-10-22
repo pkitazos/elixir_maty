@@ -157,15 +157,6 @@ defmodule Maty.Typechecker.Helpers do
   # todo: any other join rules? (e.g., joining identical choices) - unlikely needed for now.
   def join_session_types(_st1, _st2), do: :error
 
-  def check_st_unchanged(st_pre, st_post, meta) do
-    if st_pre == st_post do
-      :ok
-    else
-      {:error,
-       Error.ProtocolViolation.case_scrutinee_altered_state(meta, from: st_pre, to: st_post)}
-    end
-  end
-
   def join_branch_results([]) do
     {:ok, {:no_return, %SBottom{reason: :nothing}}}
   end

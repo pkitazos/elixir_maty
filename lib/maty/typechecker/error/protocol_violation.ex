@@ -182,18 +182,14 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     }
   end
 
-  # Fired by Helpers.check_st_unchanged/3 when the scrutinee of a `case` (or any
-  # expression required to be pure) advances the session type. `from`/`to` are
-  # the session types before and after, carried so the Formatter can repr them.
-  #
-  # todo: deprecate - I think it's actually kinda weird that I don't let all
-  # expressions happen in all contexts. I guess it doesn't really make too much
-  # sense to try and pattern match on a send result, since it always returns :ok
-  # but that's the user's problem
-  def case_scrutinee_altered_state(meta, from: from, to: to) do
+  # Fired by Check.st_preserving/3 when an expression in a value position (a case scrutinee,
+  # a send recipient or payload, the state given to suspend/done) advances the session type.
+  # `from`/`to` are the session types before and after, carried so the Formatter can repr them.
+  def value_altered_session_state(module, meta, from: from, to: to) do
     %Error{
       category: :protocol_violation,
-      kind: :case_scrutinee_altered_state,
+      kind: :value_altered_session_state,
+      module: module,
       meta: Keyword.take(meta, [:line, :column]),
       details: %{from: from, to: to}
     }
