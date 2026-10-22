@@ -7,10 +7,9 @@ defmodule Maty.Typechecker.Helpers do
 
   # Helper to unify list element types (simple version)
   # Returns `{:ok, unified_type}` or `:error`
-  def unify_list_types([]) do
-    # Type of empty list element is any/nil
-    {:ok, :any}
-  end
+  # todo: figure out how to handle this
+  def unify_list_types(l) when not is_list(l), do: :error
+  def unify_list_types([]), do: {:ok, :any}
 
   def unify_list_types([type | rest]) do
     if Enum.all?(rest, &(&1 == type)) do
@@ -20,19 +19,26 @@ defmodule Maty.Typechecker.Helpers do
     end
   end
 
-  def unify_list_types(type) when not is_list(type), do: :error
+  @base_types [
+    :atom,
+    nil,
+    :boolean,
+    :number,
+    :binary,
+    :date,
+    :pid,
+    :ref
+  ]
 
-  # Helper to check if a type is a valid base type for map keys (Formal C)
-  def is_base_type?(:atom), do: true
-  def is_base_type?(nil), do: true
-  def is_base_type?(:boolean), do: true
-  def is_base_type?(:number), do: true
-  def is_base_type?(:binary), do: true
-  def is_base_type?(:date), do: true
-  def is_base_type?(:pid), do: true
-  def is_base_type?(:ref), do: true
-  # Add other base types if necessary (e.g., from Maty.Types)
-  def is_base_type?(_other), do: false
+  @doc """
+  b in base_types
+  """
+  def is_base_type?(type), do: type in @base_types
+
+  @arith_ops [:+, :-, :*, :/]
+  @ord_ops [:<, :>, :<=, :>=]
+  @log_ops [:and, :or]
+  @eq_ops [:==, :!=]
 
   @doc """
   Checks if the types of operands are valid for the given binary operator
@@ -40,32 +46,26 @@ defmodule Maty.Typechecker.Helpers do
 
   Returns `{:ok, result_type}` or `:error`.
   """
-  @spec op_type_rel(op :: atom(), type_a :: Type.t(), type_b :: Type.t()) ::
-          {:ok, Type.t()} | :error
-  def op_type_rel(op, a, b) when op in [:+, :-, :*, :/] do
-    if a == :number and b == :number, do: {:ok, :number}, else: :error
-  end
+  @spec op_type_rel(atom(), a, a) :: {:ok, a} | :error when a: Type.t()
+  def op_type_rel(op, :number, :number) when op in @arith_ops, do: {:ok, :number}
+  def op_type_rel(op, _, _) when op in @arith_ops, do: :error
 
-  def op_type_rel(:<>, a, b) do
-    if a == :binary and b == :binary, do: {:ok, :binary}, else: :error
-  end
+  def op_type_rel(op, :number, :number) when op in @ord_ops, do: {:ok, :boolean}
+  def op_type_rel(op, _, _) when op in @ord_ops, do: :error
 
-  def op_type_rel(op, a, b) when op in [:and, :or] do
-    if a == :boolean and b == :boolean, do: {:ok, :boolean}, else: :error
-  end
+  def op_type_rel(op, :boolean, :boolean) when op in @log_ops, do: {:ok, :boolean}
+  def op_type_rel(op, _, _) when op in @log_ops, do: :error
 
-  def op_type_rel(op, a, b) when op in [:<, :>, :<=, :>=] do
-    if a == :number and b == :number, do: {:ok, :boolean}, else: :error
-  end
+  def op_type_rel(op, a, b) when op in @eq_ops and a == b, do: {:ok, :boolean}
+  def op_type_rel(op, _, _) when op in @eq_ops, do: :error
 
-  def op_type_rel(op, a, b) when op in [:==, :!=] do
-    # Formal rule requires A = B.
-    # Simple equality check sufficient for base types.
-    if a == b, do: {:ok, :boolean}, else: :error
-  end
+  def op_type_rel(:<>, :binary, :binary), do: {:ok, :binary}
+  def op_type_rel(:<>, _, _), do: :error
 
   # Catch-all for any operators not defined above
   def op_type_rel(_op, _a, _b), do: :error
+
+  # pattern binding helpers
 
   @doc """
   Merges two maps of new variable bindings, checking for conflicting keys.
@@ -108,31 +108,31 @@ defmodule Maty.Typechecker.Helpers do
   def extract_meta_from_ast({_var, _meta, _context}), do: []
   def extract_meta_from_ast(_), do: []
 
+  # end of pattern binding helpers
+
   @doc """
   Joins two types according to the lattice rules (T ⊔ T = T, ⊥ ⊔ T = T).
   Uses :no_return to represent the bottom type ⊥_T.
   Returns the joined type or :error if they cannot be joined.
   """
-  @spec join_types(type1 :: Type.t(), type2 :: Type.t()) :: Type.t() | :error
-  def join_types(:no_return, type2), do: type2
-  def join_types(type1, :no_return), do: type1
-  def join_types(type1, type2) when type1 == type2, do: type1
+  @spec join_types(Type.t(), Type.t()) :: Type.t() | :error
+  def join_types(:no_return, rhs), do: rhs
+  def join_types(lhs, :no_return), do: lhs
+  def join_types(lhs, rhs) when lhs == rhs, do: lhs
   # todo: potentially add rules for compatible types? (e.g., integer/number -> number)
   # For now, require exact match or bottom.
-  def join_types(_type1, _type2), do: :error
+  def join_types(_lhs, _rhs), do: :error
 
   @doc """
   Joins two session types according to the lattice rules (Q ⊔ Q = Q, ⊥ ⊔ Q = Q).
   Uses %SBottom{} to represent the bottom type ⊥_S.
   Returns the joined type or :error if they cannot be joined.
   """
-  @spec join_session_types(st1 :: ST.t() | atom, st2 :: ST.t() | atom) :: ST.t() | :error
-  def join_session_types(%SBottom{}, st2), do: st2
-  def join_session_types(st1, %SBottom{}), do: st1
-  # Use structural comparison for session types
-  def join_session_types(st1, st2) when st1 == st2, do: st1
-  # todo: any other join rules? (e.g., joining identical choices) - unlikely needed for now.
-  def join_session_types(_st1, _st2), do: :error
+  @spec join_session_types(ST.t() | atom, ST.t() | atom) :: ST.t() | :error
+  def join_session_types(%SBottom{}, rhs), do: rhs
+  def join_session_types(lhs, %SBottom{}), do: lhs
+  def join_session_types(lhs, rhs) when lhs == rhs, do: lhs
+  def join_session_types(_lhs, _rhs), do: :error
 
   def join_branch_results([]) do
     {:ok, {:no_return, %SBottom{reason: :nothing}}}
@@ -160,35 +160,12 @@ defmodule Maty.Typechecker.Helpers do
     end)
   end
 
-  def find_matching_branch(branches, {label, payload_type}) do
-    branches
-    |> Enum.map(fn %ST.SBranch{label: l, payload: p} = branch ->
-      cond do
-        l == label and p == payload_type -> {:ok, branch}
-        l != label -> {:error, :label_mismatch}
-        true -> {:error, :payload_mismatch}
-      end
-    end)
-    |> then(fn bs -> Enum.find(bs, bs, &match?({:ok, _}, &1)) end)
-    |> case do
-      {:ok, matched_branch} -> {:ok, matched_branch}
-      [error | _] -> error
+  def try_get_matching_branch(branches, label, payload_type) do
+    case Enum.find(branches, &(&1.label == label)) do
+      %ST.SBranch{payload: ^payload_type} = b -> {:ok, b}
+      %ST.SBranch{} = b -> {:error, :payload_mismatch, b}
+      nil -> {:error, :label_mismatch}
     end
-
-    # if Enum.any?(bs, &match?({:ok, _}, &1)) do
-    #   Enum.find()
-    # end
-
-    # Enum.find(
-    #   branches,
-    #   fn %ST.SBranch{label: l, payload: p} ->
-    #     l == label and p == payload_type
-    #   end
-    # )
-    # |> case do
-    #   nil -> {:error, :payload_mismatch}
-    #   matched_branch -> {:ok, matched_branch}
-    # end
   end
 
   @doc """
@@ -213,7 +190,6 @@ defmodule Maty.Typechecker.Helpers do
   end
 
   @spec contains_register_call?(Macro.t()) :: boolean()
-
   def contains_register_call?(ast) do
     {_, found} =
       Macro.prewalk(ast, false, fn

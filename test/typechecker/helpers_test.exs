@@ -253,34 +253,6 @@ defmodule Maty.Typechecker.HelpersTest do
     end
   end
 
-  # --- find_matching_branch/2 ---
-
-  describe "find_matching_branch/2" do
-    setup do
-      branch_ping = %ST.SBranch{label: :ping, payload: :number, continue_as: @st_end}
-      branch_pong = %ST.SBranch{label: :pong, payload: :binary, continue_as: @st_end}
-      %{branches: [branch_ping, branch_pong], branch_ping: branch_ping, branch_pong: branch_pong}
-    end
-
-    test "matching label and payload", %{branches: branches, branch_ping: branch_ping} do
-      assert {:ok, ^branch_ping} = Helpers.find_matching_branch(branches, {:ping, :number})
-    end
-
-    test "label mismatch", %{branches: branches} do
-      assert {:error, :label_mismatch} =
-               Helpers.find_matching_branch(branches, {:unknown, :number})
-    end
-
-    test "payload mismatch", %{branches: branches} do
-      assert {:error, :payload_mismatch} =
-               Helpers.find_matching_branch(branches, {:ping, :binary})
-    end
-
-    test "matches second branch", %{branches: branches, branch_pong: branch_pong} do
-      assert {:ok, ^branch_pong} = Helpers.find_matching_branch(branches, {:pong, :binary})
-    end
-  end
-
   # --- contains_register_call?/1 ---
 
   describe "contains_register_call?/1" do

@@ -1104,4 +1104,55 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert [{MatyCompileErrorFixture.SuspendMessageHandler, _}] = Code.compile_string(src)
     end
   end
+
+  # the label picks the branch, so a wrong payload on a label that isn't the first branch's
+  # is a payload error, not an unknown label
+  describe "branch lookup" do
+    test "sending a wrong payload on the second label reports the payload" do
+      src = """
+      defmodule MatyCompileErrorFixture.SendSecondLabelPayload do
+        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:buyer1]
+
+        @role :buyer1
+
+        @st {:install, ~q/+seller:{title(binary).end,quit(nil).end}/}
+
+        on_start {ap_pid, title} :: {pid(), binary()} do
+          Maty.DSL.register(ap_pid, @role, :install, title, %{})
+          %{}
+        end
+
+        init_handler :install, title :: binary(), state do
+          Maty.DSL.send(:seller, {:quit, title})
+          Maty.DSL.done(state)
+        end
+      end
+      """
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Incorrect Payload Type"
+      refute error.description =~ "Incorrect Message Label"
+      assert own_line(error) == line_of(src, "Maty.DSL.send(")
+    end
+
+    test "handling a wrong payload on the second label reports the payload" do
+      src =
+        seller_src("HandleSecondLabelPayload", """
+        handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
+          Maty.DSL.send(:buyer2, {:date, addr})
+          Maty.DSL.done(state)
+        end
+
+        handler :decision_handler, :buyer2, {:quit, _n :: number()}, state do
+          Maty.DSL.done(state)
+        end
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Incorrect Incoming Payload Type"
+      refute error.description =~ "Incorrect Incoming Message Label"
+    end
+  end
 end

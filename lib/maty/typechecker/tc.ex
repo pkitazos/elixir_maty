@@ -163,6 +163,7 @@ defmodule Maty.Typechecker.TC do
               )
 
           ok()
+          # ^ why is my editor complaining about this
         end
       end)
 
@@ -410,65 +411,32 @@ defmodule Maty.Typechecker.TC do
       # Typecheck payload expression
       actual_payload_type <- value(ctx, payload_expr_ast, meta)
 
-      # Find matching branch for the label
-      # todo: this sucks actually
-      matched_branch <-
-        case Helpers.find_matching_branch(branches, {literal_label, actual_payload_type}) do
-          {:ok, branch} ->
-            ok(branch)
+      case Helpers.try_get_matching_branch(branches, literal_label, actual_payload_type) do
+        {:ok, branch} ->
+          ok(:atom, st: branch.continue_as)
 
-          {:error, :label_mismatch} ->
-            branch_options = Enum.map(branches, fn b -> b.label end)
-
-            fail(
-              Error.ProtocolViolation.incorrect_message_label(
-                ctx.module,
-                meta,
-                st_pre,
-                got: literal_label,
-                expected: branch_options
-              )
+        {:error, :label_mismatch} ->
+          fail(
+            Error.ProtocolViolation.incorrect_message_label(
+              ctx.module,
+              meta,
+              st_pre,
+              got: literal_label,
+              expected: Enum.map(branches, & &1.label)
             )
-
-          {:error, :payload_mismatch} ->
-            case Enum.find(branches, fn b -> b.label == literal_label end) do
-              nil ->
-                branch_options = Enum.map(branches, fn b -> b.label end)
-
-                fail(
-                  Error.ProtocolViolation.incorrect_message_label(
-                    ctx.module,
-                    meta,
-                    st_pre,
-                    got: literal_label,
-                    expected: branch_options
-                  )
-                )
-
-              other ->
-                fail(
-                  Error.ProtocolViolation.incorrect_payload_type(
-                    ctx.module,
-                    meta,
-                    st_pre,
-                    got: actual_payload_type,
-                    expected: other.payload
-                  )
-                )
-            end
-        end
-
-      expect actual_payload_type == matched_branch.payload,
-        else:
-          Error.ProtocolViolation.incorrect_payload_type(
-            ctx.module,
-            meta,
-            st_pre,
-            got: actual_payload_type,
-            expected: matched_branch.payload
           )
 
-      ok(:atom, st: matched_branch.continue_as)
+        {:error, :payload_mismatch, branch} ->
+          fail(
+            Error.ProtocolViolation.incorrect_payload_type(
+              ctx.module,
+              meta,
+              st_pre,
+              got: actual_payload_type,
+              expected: branch.payload
+            )
+          )
+      end
     end
   end
 

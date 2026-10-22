@@ -278,7 +278,7 @@ defmodule Maty.Typechecker.TC.WF do
   end
 
   defp match_handler_branch(ctx, handler_label, st, branches, label, payload_type) do
-    case Helpers.find_matching_branch(branches, {label, payload_type}) do
+    case Helpers.try_get_matching_branch(branches, label, payload_type) do
       {:ok, branch} ->
         {:ok, branch}
 
@@ -293,30 +293,16 @@ defmodule Maty.Typechecker.TC.WF do
            expected: Enum.map(branches, & &1.label)
          )}
 
-      {:error, :payload_mismatch} ->
-        expected_branch = Enum.find(branches, fn b -> b.label == label end)
-
-        if expected_branch do
-          {:error,
-           Error.ProtocolViolation.incorrect_incoming_payload_type(
-             ctx.module,
-             ctx.meta,
-             handler_label,
-             st,
-             got: payload_type,
-             expected: expected_branch.payload
-           )}
-        else
-          {:error,
-           Error.ProtocolViolation.incorrect_incoming_message_label(
-             ctx.module,
-             ctx.meta,
-             handler_label,
-             st,
-             got: label,
-             expected: Enum.map(branches, & &1.label)
-           )}
-        end
+      {:error, :payload_mismatch, branch} ->
+        {:error,
+         Error.ProtocolViolation.incorrect_incoming_payload_type(
+           ctx.module,
+           ctx.meta,
+           handler_label,
+           st,
+           got: payload_type,
+           expected: branch.payload
+         )}
     end
   end
 
