@@ -634,7 +634,9 @@ defmodule Maty.Typechecker.TC do
       expect signatures != [],
         else: Error.FunctionCall.function_not_exist(ctx.module, meta, func_id)
 
-      arg_types <- chain(arg_asts, &tc(ctx, &1))
+      arg_types <-
+        chain(arg_asts, &tc(ctx, &1))
+        |> with_frame({:call, func_id, Keyword.take(meta, [:line, :column])})
 
       # todo: this accepts the call if the arguments fit *any* clause's spec, but at runtime the
       # first clause whose *pattern* matches is the one that runs. With overlapping patterns and
