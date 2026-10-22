@@ -5,6 +5,8 @@ defmodule Maty.Typechecker.PatternBinding do
 
   import Maty.Utils, only: [deftc: 2]
 
+  # todo: potentially use check monad
+
   @typedoc """
   Represents Elixir AST nodes that can be typechecked.
   """
@@ -315,10 +317,11 @@ defmodule Maty.Typechecker.PatternBinding do
           pairs,
           initial_acc,
           fn {key_ast, p_ast}, {:ok, acc_bindings, current_env} ->
-            with {:ok, literal_key} when is_atom(literal_key) <- Helpers.ast_to_literal(key_ast),
+            # a variable key (`^k`) or call is a 3-tuple in the AST, so only a literal atom passes `is_atom`
+            with {:literal_key, true} <- {:literal_key, is_atom(key_ast)},
                  # check if key exists in expected type map and get expected value type
                  {:key, {:ok, p_expected_type}, _} <-
-                   {:key, Map.fetch(expected_type_map, literal_key), literal_key},
+                   {:key, Map.fetch(expected_type_map, key_ast), key_ast},
                  {:ok, new_bindings, updated_env} <-
                    tc_pattern(ctx, p_ast, p_expected_type, current_env),
                  # check disjointedness and merge
@@ -332,13 +335,7 @@ defmodule Maty.Typechecker.PatternBinding do
                    ) do
               {:cont, {:ok, merged_bindings, updated_env}}
             else
-              :error ->
-                {:halt,
-                 {:error,
-                  Error.PatternMatching.pattern_map_key_not_atom(ctx.module, meta, key_ast),
-                  current_env}}
-
-              {:ok, _non_atom_key} ->
+              {:literal_key, false} ->
                 {:halt,
                  {:error,
                   Error.PatternMatching.pattern_map_key_not_atom(ctx.module, meta, key_ast),

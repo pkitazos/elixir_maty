@@ -107,39 +107,6 @@ defmodule Maty.Typechecker.HelpersTest do
     end
   end
 
-  # --- ast_to_literal/1 ---
-
-  describe "ast_to_literal/1" do
-    test "variable AST extracts atom name" do
-      assert {:ok, :my_var} = Helpers.ast_to_literal({:my_var, [line: 1], nil})
-    end
-
-    test "number literal" do
-      assert {:ok, 42} = Helpers.ast_to_literal(42)
-    end
-
-    test "binary literal" do
-      assert {:ok, "hello"} = Helpers.ast_to_literal("hello")
-    end
-
-    test "boolean literal" do
-      assert {:ok, true} = Helpers.ast_to_literal(true)
-      assert {:ok, false} = Helpers.ast_to_literal(false)
-    end
-
-    test "nil literal" do
-      assert {:ok, nil} = Helpers.ast_to_literal(nil)
-    end
-
-    test "bare atom literal" do
-      assert {:ok, :ok} = Helpers.ast_to_literal(:ok)
-    end
-
-    test "complex AST returns error" do
-      assert :error = Helpers.ast_to_literal([1, 2])
-    end
-  end
-
   # --- check_and_merge_bindings/5 ---
 
   describe "check_and_merge_bindings/5" do
@@ -311,30 +278,6 @@ defmodule Maty.Typechecker.HelpersTest do
 
     test "matches second branch", %{branches: branches, branch_pong: branch_pong} do
       assert {:ok, ^branch_pong} = Helpers.find_matching_branch(branches, {:pong, :binary})
-    end
-  end
-
-  # --- check_maty_state_type/1 ---
-
-  describe "check_maty_state_type/1" do
-    test "valid maty_actor_state type" do
-      state_type = Type.maty_actor_state()
-      assert {:ok, ^state_type} = Helpers.check_maty_state_type(state_type)
-    end
-
-    test "non-state type returns error" do
-      assert :error = Helpers.check_maty_state_type(:number)
-    end
-
-    test "state type with extra keys returns error" do
-      {:map_record, fields} = Type.maty_actor_state()
-      state_type = {:map_record, Map.put(fields, :extra, :any)}
-      assert :error = Helpers.check_maty_state_type(state_type)
-    end
-
-    test "map with the right keys but wrong shape returns error" do
-      assert :error =
-               Helpers.check_maty_state_type({:map_record, %{sessions: :any, callbacks: :any}})
     end
   end
 

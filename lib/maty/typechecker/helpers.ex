@@ -68,29 +68,6 @@ defmodule Maty.Typechecker.Helpers do
   def op_type_rel(_op, _a, _b), do: :error
 
   @doc """
-  Attempts to convert simple AST nodes representing literals into their
-  actual literal values. Used primarily for map keys.
-
-  Returns the literal value on success, or :error_complex_key for nodes
-  that don't represent a simple literal.
-  """
-  @spec ast_to_literal(ast :: Macro.t()) :: {:ok, term()} | :error
-  # Atom literal: AST is typically {atom_value, meta, context_atom_or_nil}
-  def ast_to_literal({atom_value, _meta, _context}) when is_atom(atom_value) do
-    {:ok, atom_value}
-  end
-
-  # Other literals (numbers, binaries, booleans, nil) often appear directly in AST
-  def ast_to_literal(literal) when is_number(literal), do: {:ok, literal}
-  def ast_to_literal(literal) when is_binary(literal), do: {:ok, literal}
-  def ast_to_literal(literal) when is_boolean(literal), do: {:ok, literal}
-  def ast_to_literal(nil), do: {:ok, nil}
-  def ast_to_literal(literal) when is_atom(literal), do: {:ok, literal}
-
-  # If the AST node doesn't match a simple literal form
-  def ast_to_literal(_other_ast), do: :error
-
-  @doc """
   Merges two maps of new variable bindings, checking for conflicting keys.
   If successful, returns the merged new bindings and the fully updated env.
   """
@@ -212,17 +189,6 @@ defmodule Maty.Typechecker.Helpers do
     #   nil -> {:error, :payload_mismatch}
     #   matched_branch -> {:ok, matched_branch}
     # end
-  end
-
-  # Checks if a type is compatible with maty_actor_state
-  def check_maty_state_type(state_type) do
-    expected = Type.maty_actor_state()
-
-    if state_type == expected do
-      {:ok, expected}
-    else
-      :error
-    end
   end
 
   @doc """

@@ -458,19 +458,8 @@ defmodule Maty.Typechecker.Error.Formatter do
     Pattern Matching Error: Complex Map Key
       Key expression: #{inspect(key_ast)}
       --
-      Map patterns require literal atom keys. Complex expressions are not allowed as map keys.
-    """
-  end
-
-  defp render(%Error{category: :pattern_matching, kind: :invalid_map_key_type} = e) do
-    %{got: got, expected: expected} = e.details
-
-    """
-    Pattern Matching Error: Invalid Map Key Type
-      Expected key type: #{render_type(expected)}
-      Got key type: #{render_type(got)}
-      --
-      Map pattern keys must be atoms.
+      Map keys must be literal atoms (in construction, update and patterns),
+      so a record's fields are known statically. Variables, calls and other expressions are not allowed.
     """
   end
 

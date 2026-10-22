@@ -143,17 +143,12 @@ defmodule Maty.Typechecker.TC do
 
       chain(updates, fn {key_ast, val_ast} ->
         check do
-          key_type <- tc(ctx, key_ast)
-
-          expect key_type == :atom,
-            else:
-              Error.PatternMatching.invalid_map_key_type(ctx.module, meta,
-                expected: :atom,
-                got: key_type
-              )
-
-          expect {:ok, key} = Helpers.ast_to_literal(key_ast),
+          # keys must be literal atoms, a record's fields are known statically
+          # (a variable or call key is a 3-tuple in the AST, so only a literal atom passes `is_atom`)
+          expect is_atom(key_ast),
             else: Error.PatternMatching.complex_map_key(ctx.module, meta, key_ast)
+
+          key = key_ast
 
           expect {:ok, field_type} = Map.fetch(fields, key),
             else: Error.TypeMismatch.map_update_key_not_found(ctx.module, meta, key, map_type)
@@ -181,21 +176,14 @@ defmodule Maty.Typechecker.TC do
       fields <-
         chain(pairs, fn {key_ast, val_ast} ->
           check do
-            key_type <- tc(ctx, key_ast)
-
-            expect key_type == :atom,
-              else:
-                Error.PatternMatching.invalid_map_key_type(ctx.module, meta,
-                  expected: :atom,
-                  got: key_type
-                )
-
-            expect {:ok, key} = Helpers.ast_to_literal(key_ast),
+            # keys must be literal atoms, a record's fields are known statically
+            # (a variable or call key is a 3-tuple in the AST, so only a literal atom passes `is_atom`)
+            expect is_atom(key_ast),
               else: Error.PatternMatching.complex_map_key(ctx.module, meta, key_ast)
 
             val_type <- tc(ctx, val_ast)
 
-            ok({key, val_type})
+            ok({key_ast, val_type})
           end
         end)
 

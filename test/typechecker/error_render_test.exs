@@ -191,8 +191,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.PatternMatching.tuple_arity_mismatch(@m, @meta, pattern_arity: 2, expected: 3)},
       {{Error.PatternMatching, :complex_map_key},
        Error.PatternMatching.complex_map_key(@m, @meta, {:foo, [], [1]})},
-      {{Error.PatternMatching, :invalid_map_key_type},
-       Error.PatternMatching.invalid_map_key_type(@m, @meta, expected: :atom, got: :number)},
       {{Error.PatternMatching, :pattern_map_key_not_found},
        Error.PatternMatching.pattern_map_key_not_found(@m, @meta, :name)},
       {{Error.PatternMatching, :pattern_map_key_not_atom},

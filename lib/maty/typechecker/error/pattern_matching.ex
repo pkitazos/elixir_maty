@@ -42,16 +42,6 @@ defmodule Maty.Typechecker.Error.PatternMatching do
     }
   end
 
-  def invalid_map_key_type(module, meta, expected: expected, got: got) do
-    %Error{
-      category: :pattern_matching,
-      kind: :invalid_map_key_type,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{expected: expected, got: got}
-    }
-  end
-
   def pattern_map_key_not_found(module, meta, missing_key) do
     %Error{
       category: :pattern_matching,
