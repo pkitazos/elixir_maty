@@ -30,6 +30,9 @@ defmodule Maty.Check do
   @spec ok(a, st: Maty.ST.t()) :: t(a) when a: var
   def ok(value, st: next_st), do: fn env, _st -> {:ok, value, next_st, env} end
 
+  @spec ok() :: t(nil)
+  def ok, do: fn env, st -> {:ok, nil, st, env} end
+
   # Left
   @spec fail(Error.t()) :: t(none())
   def fail(error), do: fn env, _st -> {:error, error, env} end
@@ -50,11 +53,11 @@ defmodule Maty.Check do
   # todo: see if I can drop the meta param
   # Ψ; Δ; Γ ⊢ v : A
   @spec value(Maty.Typechecker.Ctx.t(), Macro.t(), keyword()) :: t(Maty.Types.T.t())
-  def value(ctx, v, meta), do: st_preserving(ctx, computation(ctx, v), meta)
+  def value(ctx, v, meta), do: st_preserving(ctx, tc(ctx, v), meta)
 
   # Ψ; Δ; Γ | Q₁ |> e : T <| Q₂
-  @spec computation(Maty.Typechecker.Ctx.t(), Macro.t()) :: t(Maty.Types.T.t())
-  def computation(ctx, e), do: fn env, st -> TC.tc_expr(ctx, env, st, e) end
+  @spec tc(Maty.Typechecker.Ctx.t(), Macro.t()) :: t(Maty.Types.T.t())
+  def tc(ctx, e), do: fn env, st -> TC.tc_expr(ctx, env, st, e) end
 
   # ⊢ p : a ⇒ Γ'
   @spec match_pattern(Maty.Typechecker.Ctx.t(), Macro.t(), Maty.Types.T.t()) :: t(nil)
