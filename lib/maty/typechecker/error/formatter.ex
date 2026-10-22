@@ -177,6 +177,19 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   # --- :type_mismatch
 
+  defp render(%Error{category: :type_mismatch, kind: :arithmetic_operator_requires_number} = e) do
+    %{operator: operator, operand_type: operand_type} = e.details
+
+    """
+    Type Mismatch Error: Arithmetic Operator Type Error
+      Operator: #{render_operator(operator)}
+      Expected operand type: :number
+      Got operand type: #{render_type(operand_type)}
+      --
+      Arithmetic operators require number operands.
+    """
+  end
+
   defp render(%Error{category: :type_mismatch, kind: :logical_operator_requires_boolean} = e) do
     %{operator: operator, operand_type: operand_type} = e.details
 

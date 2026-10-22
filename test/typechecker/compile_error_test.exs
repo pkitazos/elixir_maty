@@ -391,6 +391,30 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Operator: &&"
     end
 
+    test "unary minus compiles on a number and is reported on anything else" do
+      ok_src =
+        seller_src("UnaryMinus", """
+        #{@valid_handlers}
+
+        @spec g(number()) :: number()
+        def g(x), do: -x
+        """)
+
+      assert [{MatyCompileErrorFixture.UnaryMinus, _}] = Code.compile_string(ok_src)
+
+      bad_src =
+        seller_src("UnaryMinusMismatch", """
+        #{@valid_handlers}
+
+        @spec g(binary()) :: number()
+        def g(s), do: -s
+        """)
+
+      error = compile_error!(bad_src)
+
+      assert error.description =~ "Arithmetic Operator Type Error"
+    end
+
     test "an expression no rule covers is reported instead of crashing" do
       src =
         seller_src("UnsupportedExpression", """

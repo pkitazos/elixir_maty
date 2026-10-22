@@ -112,6 +112,8 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        )},
 
       # :type_mismatch
+      {{Error.TypeMismatch, :arithmetic_operator_requires_number},
+       Error.TypeMismatch.arithmetic_operator_requires_number(@m, @meta, :-, :binary)},
       {{Error.TypeMismatch, :logical_operator_requires_boolean},
        Error.TypeMismatch.logical_operator_requires_boolean(@m, @meta, :not, :number)},
       {{Error.TypeMismatch, :return_type_mismatch},

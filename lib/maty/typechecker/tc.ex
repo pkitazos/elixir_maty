@@ -2,6 +2,7 @@ defmodule Maty.Typechecker.TC do
   require Logger
 
   alias Maty.ST.SBottom
+  alias Maty.Types
   alias Maty.Typechecker.{Error, Helpers, TC, Ctx}
 
   import Maty.Check
@@ -178,7 +179,6 @@ defmodule Maty.Typechecker.TC do
       chain(updates, fn {key_ast, val_ast} ->
         check do
           # keys must be literal atoms, a record's fields are known statically
-          # (a variable or call key is a 3-tuple in the AST, so only a literal atom passes `is_atom`)
           expect is_atom(key_ast),
             else: Error.PatternMatching.complex_map_key(ctx.module, meta, key_ast)
 
@@ -211,7 +211,6 @@ defmodule Maty.Typechecker.TC do
         chain(pairs, fn {key_ast, val_ast} ->
           check do
             # keys must be literal atoms, a record's fields are known statically
-            # (a variable or call key is a 3-tuple in the AST, so only a literal atom passes `is_atom`)
             expect is_atom(key_ast),
               else: Error.PatternMatching.complex_map_key(ctx.module, meta, key_ast)
 
@@ -258,6 +257,24 @@ defmodule Maty.Typechecker.TC do
           )
 
       ok(:boolean)
+    end
+  end
+
+  # Unary minus `-x`
+  deftc tc_expr(ctx, env, st, erlang(:-, meta, [operand_ast])) do
+    check env: env, st: st do
+      operand_type <- tc(ctx, operand_ast)
+
+      expect operand_type == :number,
+        else:
+          Error.TypeMismatch.arithmetic_operator_requires_number(
+            ctx.module,
+            meta,
+            :-,
+            operand_type
+          )
+
+      ok(:number)
     end
   end
 
@@ -392,9 +409,7 @@ defmodule Maty.Typechecker.TC do
           maty_runtime(:send_session_message, meta, [_, recipient_ast, message_ast])
         ) do
     check env: env, st: st_pre do
-      # Check message structure {label, payload_expr}
-      # the message must be a literal 2-tuple with a literal atom label, for the same reason as the role
-      # (calls, variables and n-tuples are all 3-tuples in the AST, so only a literal 2-tuple matches)
+      # the message must be a literal 2-tuple
       expect {literal_label, payload_expr_ast} = message_ast,
         else: Error.TypeMismatch.send_message_not_tuple(ctx.module, meta, got: message_ast)
 
@@ -402,10 +417,9 @@ defmodule Maty.Typechecker.TC do
       expect is_atom(literal_label),
         else: Error.TypeMismatch.send_message_not_tuple(ctx.module, meta, got: message_ast)
 
-      # Typecheck payload expression
       actual_payload_type <- tc(ctx, payload_expr_ast)
 
-      # roles must be literal atoms, choosing a branch of the session type is static
+      # roles must be literal atoms
       expect is_atom(recipient_ast),
         else: Error.FrameworkUsage.role_not_literal(ctx.module, meta, recipient_ast)
 
@@ -429,6 +443,7 @@ defmodule Maty.Typechecker.TC do
             expected: expected_role
           )
 
+      # choosing a branch of the session type is static
       case Helpers.try_get_matching_branch(branches, literal_label, actual_payload_type) do
         {:ok, branch} ->
           ok(:atom, st: branch.continue_as)

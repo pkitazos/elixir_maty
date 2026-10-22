@@ -11,6 +11,17 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
     }
   end
 
+  # unary minus `-x` on a non-number
+  def arithmetic_operator_requires_number(module, meta, operator, operand_type) do
+    %Error{
+      category: :type_mismatch,
+      kind: :arithmetic_operator_requires_number,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{operator: operator, operand_type: operand_type}
+    }
+  end
+
   def return_type_mismatch(module, meta, expected: expected, got: got) do
     %Error{
       category: :type_mismatch,
