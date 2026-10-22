@@ -164,18 +164,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :protocol_violation, kind: :value_altered_session_state} = e) do
-    %{from: from, to: to} = e.details
-
-    """
-    Protocol Violation: Expression Altered Session State
-      This expression is used as a value (e.g. a case scrutinee or a message payload),
-      so it must not perform session actions.
-      Before: #{Maty.ST.repr(from)}
-      After: #{Maty.ST.repr(to)}
-    """
-  end
-
   defp render(%Error{category: :protocol_violation, kind: :handler_body_wrong_termination} = e) do
     %{got_return: got_return} = e.details
 

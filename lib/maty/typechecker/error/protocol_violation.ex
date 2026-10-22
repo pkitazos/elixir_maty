@@ -182,19 +182,6 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     }
   end
 
-  # Fired by Check.st_preserving/3 when an expression in a value position (a case scrutinee,
-  # a send recipient or payload, the state given to suspend/done) advances the session type.
-  # `from`/`to` are the session types before and after, carried so the Formatter can repr them.
-  def value_altered_session_state(module, meta, from: from, to: to) do
-    %Error{
-      category: :protocol_violation,
-      kind: :value_altered_session_state,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{from: from, to: to}
-    }
-  end
-
   # Fired when a message-handler body finishes without terminating the session (it should reduce to ⊥ via suspend/done)
   # - `got_return` is the body's value type
   # - `st` carries the residual session type that was left unconsumed

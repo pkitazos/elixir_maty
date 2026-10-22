@@ -103,8 +103,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        )},
       {{Error.ProtocolViolation, :suspend_invalid_handler_type},
        Error.ProtocolViolation.suspend_invalid_handler_type(@m, @meta, [got: :number], @st_out)},
-      {{Error.ProtocolViolation, :value_altered_session_state},
-       Error.ProtocolViolation.value_altered_session_state(@m, @meta, from: @st_out, to: @st_end)},
       {{Error.ProtocolViolation, :handler_body_wrong_termination},
        Error.ProtocolViolation.handler_body_wrong_termination(
          @meta,

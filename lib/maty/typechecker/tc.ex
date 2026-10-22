@@ -372,32 +372,6 @@ defmodule Maty.Typechecker.TC do
            [_session_ctx, recipient_ast, message_ast]}
         ) do
     check env: env, st: st_pre do
-      expect_st %ST.SOut{to: expected_role, branches: branches},
-        else: fn st ->
-          Error.ProtocolViolation.incorrect_action(
-            ctx.module,
-            meta,
-            [got: {:send, [recipient_ast, message_ast]}],
-            st
-          )
-        end
-
-      _recipient_type <- value(ctx, recipient_ast, meta)
-
-      # roles must be literal atoms, choosing a branch of the session type is static
-      expect is_atom(recipient_ast),
-        else: Error.FrameworkUsage.role_not_literal(ctx.module, meta, recipient_ast)
-
-      expect recipient_ast == expected_role,
-        else:
-          Error.ProtocolViolation.incorrect_target_participant(
-            ctx.module,
-            meta,
-            st_pre,
-            got: recipient_ast,
-            expected: expected_role
-          )
-
       # Check message structure {label, payload_expr}
       # the message must be a literal 2-tuple with a literal atom label, for the same reason as the role
       # (calls, variables and n-tuples are all 3-tuples in the AST, so only a literal 2-tuple matches)
@@ -409,7 +383,31 @@ defmodule Maty.Typechecker.TC do
         else: Error.TypeMismatch.send_message_not_tuple(ctx.module, meta, got: message_ast)
 
       # Typecheck payload expression
-      actual_payload_type <- value(ctx, payload_expr_ast, meta)
+      actual_payload_type <- tc(ctx, payload_expr_ast)
+
+      # roles must be literal atoms, choosing a branch of the session type is static
+      expect is_atom(recipient_ast),
+        else: Error.FrameworkUsage.role_not_literal(ctx.module, meta, recipient_ast)
+
+      expect_st %ST.SOut{to: expected_role, branches: branches} = q,
+        else: fn st ->
+          Error.ProtocolViolation.incorrect_action(
+            ctx.module,
+            meta,
+            [got: {:send, [recipient_ast, message_ast]}],
+            st
+          )
+        end
+
+      expect recipient_ast == expected_role,
+        else:
+          Error.ProtocolViolation.incorrect_target_participant(
+            ctx.module,
+            meta,
+            q,
+            got: recipient_ast,
+            expected: expected_role
+          )
 
       case Helpers.try_get_matching_branch(branches, literal_label, actual_payload_type) do
         {:ok, branch} ->
@@ -420,7 +418,7 @@ defmodule Maty.Typechecker.TC do
             Error.ProtocolViolation.incorrect_message_label(
               ctx.module,
               meta,
-              st_pre,
+              q,
               got: literal_label,
               expected: Enum.map(branches, & &1.label)
             )
@@ -431,7 +429,7 @@ defmodule Maty.Typechecker.TC do
             Error.ProtocolViolation.incorrect_payload_type(
               ctx.module,
               meta,
-              st_pre,
+              q,
               got: actual_payload_type,
               expected: branch.payload
             )
@@ -451,11 +449,6 @@ defmodule Maty.Typechecker.TC do
   deftc tc_expr(ctx, var_env, st_pre, {{:., _, [:timer, _]}, _, _} = ast) do
     TC.Timer.tc_expr(ctx, var_env, st_pre, ast)
   end
-
-  # So, what if..
-  # rather than enforcing that nothing can update the session type while typechecking a suspend or send or whatever,
-  # what if we typecheck normally, allowing any expression to progress the ST, up until we've typechecked every sub-expression
-  # and only right before we only have the send/suspend/whatever to "check" onlt then do we error if the st is not in the right state
 
   # --- Maty Suspend Operation (T-Suspend) ---
   # Matches throw({:suspend, handler, state}) from Maty.DSL.suspend/2
@@ -478,7 +471,7 @@ defmodule Maty.Typechecker.TC do
             st
           )
 
-      state_type <- value(ctx, state_ast, meta)
+      state_type <- tc(ctx, state_ast)
 
       expect state_type == Type.maty_actor_state(),
         else:
@@ -488,7 +481,7 @@ defmodule Maty.Typechecker.TC do
             Error.TypeMismatch.invalid_maty_state_cause(state_type)
           )
 
-      expect_st %ST.SName{handler: expected_handler},
+      expect_st %ST.SName{handler: expected_handler} = q,
         else: fn st ->
           Error.ProtocolViolation.incorrect_action(
             ctx.module,
@@ -503,7 +496,7 @@ defmodule Maty.Typechecker.TC do
           Error.ProtocolViolation.incorrect_handler_suspension(
             ctx.module,
             meta,
-            st,
+            q,
             got: handler_ast,
             expected: expected_handler
           )
@@ -523,7 +516,7 @@ defmodule Maty.Typechecker.TC do
           {{:., _, [Maty.Runtime, :done]}, meta, [state_ast]}
         ) do
     check env: env, st: st do
-      state_type <- value(ctx, state_ast, meta)
+      state_type <- tc(ctx, state_ast)
 
       expect state_type == Type.maty_actor_state(),
         else:
@@ -557,7 +550,7 @@ defmodule Maty.Typechecker.TC do
         )
         when is_atom(handler_name) do
     check env: env, st: st do
-      pid_type <- value(ctx, ap_pid_ast, meta)
+      pid_type <- tc(ctx, ap_pid_ast)
 
       expect pid_type == :pid,
         else:

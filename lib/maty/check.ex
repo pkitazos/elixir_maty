@@ -50,11 +50,6 @@ defmodule Maty.Check do
 
   # -- typing judgements + friends
 
-  # todo: see if I can drop the meta param
-  # Ψ; Δ; Γ ⊢ v : A
-  @spec value(Maty.Typechecker.Ctx.t(), Macro.t(), keyword()) :: t(Maty.Types.T.t())
-  def value(ctx, v, meta), do: st_preserving(ctx, tc(ctx, v), meta)
-
   # Ψ; Δ; Γ | Q₁ |> e : T <| Q₂
   @spec tc(Maty.Typechecker.Ctx.t(), Macro.t()) :: t(Maty.Types.T.t())
   def tc(ctx, e), do: fn env, st -> TC.tc_expr(ctx, env, st, e) end
@@ -70,31 +65,19 @@ defmodule Maty.Check do
     end
   end
 
-  @spec st_preserving(Maty.Typechecker.Ctx.t(), t(a), keyword()) :: t(a) when a: var
-  def st_preserving(ctx, check, meta) do
-    fn env, st_pre ->
-      case apply_check(check, env, st_pre) do
-        {:ok, _value, ^st_pre, _env} = ok ->
-          ok
-
-        {:ok, _value, st_post, env} ->
-          {:error,
-           Error.ProtocolViolation.value_altered_session_state(ctx.module, meta,
-             from: st_pre,
-             to: st_post
-           ), env}
-
-        {:error, _, _} = err ->
-          err
-      end
-    end
-  end
-
-  # todo: can this not just be inlined?
-  def __current_st__, do: fn env, st -> {:ok, st, st, env} end
+  # `get` from the State monad: the current Q as the step's value
+  def __get_st__, do: fn env, st -> {:ok, st, st, env} end
 
   # -- multiple expressions
 
+  # Threads Q through `items` left to right, so typechecking sibling subexpressions (call args, tuple/list/map
+  # elements, operands) with `chain` assumes they are evaluated left to right.
+  #
+  # Apparently Erlang does not promise this: https://www.erlang.org/doc/system/expressions.html)
+  #
+  # This only matters when two or more siblings communicate, e.g. `{send(:a, ...), send(:b, ...)}`.
+  # If that ever breaks, then we allow at most one sibling to change Q or require let-bind lifting
+  #
   # mapM / traverse
   @spec chain([a], (a -> t(b))) :: t([b]) when a: var, b: var
   def chain(items, fun) do
@@ -310,7 +293,7 @@ defmodule Maty.Check do
   # expect_st PAT, else: fn q -> err_fun(q) end
   defp build([{:expect_st, _, [pat, [else: error_fun]]} | rest]) do
     quote do
-      Maty.Check.bind(Maty.Check.__current_st__(), fn st ->
+      Maty.Check.bind(Maty.Check.__get_st__(), fn st ->
         case st do
           unquote(pat) -> unquote(build(rest))
           _ -> Maty.Check.fail(unquote(error_fun).(st))
