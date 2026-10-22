@@ -18,6 +18,43 @@ defmodule Maty.Typechecker.TC do
   @type var_env :: Check.var_env()
   @type result :: Check.result(Type.t())
 
+  # -- AST shapes
+  # The typechecker sees expanded AST some relatively short forms expand to very large nodes
+  # so here we just name the large nodes so the clause heads stay readable
+  # since a macro in a pattern expands to that pattern
+
+  # `:erlang.op(args)`, what Kernel operators expand to (`not x`, `a + b`, `a <= b`, ...)
+  defmacrop erlang(op, meta, args) do
+    quote do
+      {{:., unquote(meta), [:erlang, unquote(op)]}, _, unquote(args)}
+    end
+  end
+
+  # `Maty.Runtime.fun(args)`, what the DSL's `send`, `suspend`, `done` and `register` expand to
+  defmacrop maty_runtime(fun, meta, args) do
+    quote do
+      {{:., _, [Maty.Runtime, unquote(fun)]}, unquote(meta), unquote(args)}
+    end
+  end
+
+  # the comparison operators whose Erlang name differs from the source one (`a <= b` expands to `:erlang.=<`),
+  # mapped back so `op_type_rel` and the errors see what the user wrote
+  @source_ops %{"=<": :<=, "/=": :!=}
+
+  # the falsy check that `||`, `&&`, `!` and `if` expand to: `x when x === false or x === nil`
+  defmacrop falsy_guard do
+    quote do
+      {:when, _,
+       [
+         {:x, _, Kernel},
+         erlang(:orelse, _, [
+           erlang(:"=:=", _, [{:x, _, Kernel}, false]),
+           erlang(:"=:=", _, [{:x, _, Kernel}, nil])
+         ])
+       ]}
+    end
+  end
+
   @doc """
   Typechecks an expression AST node within a given variable environment and
   session state pre-condition.
@@ -35,20 +72,7 @@ defmodule Maty.Typechecker.TC do
     {:ok, :boolean, st, env}
   end
 
-  deftc tc_expr(
-          _ctx,
-          env,
-          st,
-          {:when, _,
-           [
-             {:x, _, Kernel},
-             {{:., _, [:erlang, :orelse]}, _,
-              [
-                {{:., _, [:erlang, :"=:="]}, _, [{:x, _, Kernel}, false]},
-                {{:., _, [:erlang, :"=:="]}, _, [{:x, _, Kernel}, nil]}
-              ]}
-           ]}
-        ) do
+  deftc tc_expr(_ctx, env, st, falsy_guard()) do
     {:ok, :boolean, st, env}
   end
 
@@ -74,18 +98,6 @@ defmodule Maty.Typechecker.TC do
 
   deftc tc_expr(_ctx, env, st, {:%, _, [Date, {:%{}, _, _}]}) do
     {:ok, :date, st, env}
-  end
-
-  deftc tc_expr(_ctx, env, st, {{:., _, [{:__aliases__, _, [:Date]}, :t]}, _, []}) do
-    {:ok, :date, st, env}
-  end
-
-  deftc tc_expr(_ctx, env, st, {:no_return, _meta, []}) do
-    {:ok, :no_return, st, env}
-  end
-
-  deftc tc_expr(_ctx, env, st, {:any, _meta, []}) do
-    {:ok, :any, st, env}
   end
 
   # List Construction [v1, v2, ...] (Val-Cons / Val-EmptyList adaptation)
@@ -212,7 +224,7 @@ defmodule Maty.Typechecker.TC do
 
   # --- Logical Not Operator (T-Not) ---
 
-  deftc tc_expr(ctx, env, st, {{:., meta, [:erlang, :not]}, _, [operand_ast]}) do
+  deftc tc_expr(ctx, env, st, erlang(:not, meta, [operand_ast])) do
     check env: env, st: st do
       res_type <- tc(ctx, operand_ast)
 
@@ -232,8 +244,10 @@ defmodule Maty.Typechecker.TC do
   # --- Binary Operators (T-Op) ---
 
   # Handles Arithmetic and Comparison Ops: +, -, *, /, <, >, <=, >=, ==, !=
-  deftc tc_expr(ctx, env, st, {{:., meta, [:erlang, op]}, _, [lhs_ast, rhs_ast]})
-        when op in [:+, :-, :*, :/, :<, :>, :<=, :>=, :==, :!=] do
+  deftc tc_expr(ctx, env, st, erlang(erlang_op, meta, [lhs_ast, rhs_ast]))
+        when erlang_op in [:+, :-, :*, :/, :<, :>, :"=<", :>=, :==, :"/="] do
+    op = Map.get(@source_ops, erlang_op, erlang_op)
+
     check env: env, st: st do
       lhs_type <- tc(ctx, lhs_ast)
       rhs_type <- tc(ctx, rhs_ast)
@@ -291,14 +305,8 @@ defmodule Maty.Typechecker.TC do
   end
 
   # Disallow raw 'send' (Kernel.send/2 or :erlang.send/2)
-  deftc tc_expr(ctx, env, _st, {{:., meta, [:erlang, :send]}, _, args})
+  deftc tc_expr(ctx, env, _st, erlang(:send, meta, args))
         when length(args) in [2, 3] do
-    {:error, Error.FrameworkUsage.no_native_send(ctx.module, meta), env}
-  end
-
-  # Check for Kernel.send/2
-  deftc tc_expr(ctx, env, _st, {{:., meta, [:Kernel, :send]}, _, args})
-        when length(args) == 2 do
     {:error, Error.FrameworkUsage.no_native_send(ctx.module, meta), env}
   end
 
@@ -368,8 +376,7 @@ defmodule Maty.Typechecker.TC do
           ctx,
           env,
           st_pre,
-          {{:., meta, [Maty.Runtime, :send_session_message]}, _,
-           [_session_ctx, recipient_ast, message_ast]}
+          maty_runtime(:send_session_message, meta, [_, recipient_ast, message_ast])
         ) do
     check env: env, st: st_pre do
       # Check message structure {label, payload_expr}
@@ -457,7 +464,7 @@ defmodule Maty.Typechecker.TC do
           ctx,
           env,
           st,
-          {{:., _, [Maty.Runtime, :suspend]}, meta, [handler_ast, state_ast]}
+          maty_runtime(:suspend, meta, [handler_ast, state_ast])
         ) do
     check env: env, st: st do
       # TV-MsgHandler
@@ -513,7 +520,7 @@ defmodule Maty.Typechecker.TC do
           ctx,
           env,
           st,
-          {{:., _, [Maty.Runtime, :done]}, meta, [state_ast]}
+          maty_runtime(:done, meta, [state_ast])
         ) do
     check env: env, st: st do
       state_type <- tc(ctx, state_ast)
@@ -545,8 +552,13 @@ defmodule Maty.Typechecker.TC do
           ctx,
           env,
           st,
-          {{:., _m1, [Maty.Runtime, :register]}, meta,
-           [ap_pid_ast, role_ast, handler_name, args_ast, local_state_ast]}
+          maty_runtime(:register, meta, [
+            ap_pid_ast,
+            role_ast,
+            handler_name,
+            args_ast,
+            local_state_ast
+          ])
         )
         when is_atom(handler_name) do
     check env: env, st: st do
@@ -603,8 +615,7 @@ defmodule Maty.Typechecker.TC do
           ctx,
           env,
           _st,
-          {{:., _m1, [Maty.Runtime, :register]}, meta,
-           [_ap_pid_ast, _role_ast, handler_ast, _args_ast, _local_state_ast]}
+          maty_runtime(:register, meta, [_, _, handler_ast, _, _])
         ) do
     # `handler_name` is not an atom
     {:error, Error.FrameworkUsage.init_handler_not_literal(ctx.module, meta, handler_ast), env}

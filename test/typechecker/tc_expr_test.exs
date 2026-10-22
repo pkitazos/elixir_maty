@@ -369,7 +369,7 @@ defmodule Maty.Typechecker.TCExprTest do
 
     test "less than or equal" do
       assert {:ok, :boolean, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:<=, 1, 2))
+               TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:"=<", 1, 2))
     end
 
     test "greater than or equal" do
@@ -384,7 +384,7 @@ defmodule Maty.Typechecker.TCExprTest do
 
     test "inequality" do
       assert {:ok, :boolean, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:!=, 1, 2))
+               TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:"/=", 1, 2))
     end
 
     test "comparison type error: number < binary" do

@@ -330,6 +330,22 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert length(String.split(error.description, "Return Type Mismatch")) == 3
     end
 
+    test "a comparison operator whose Erlang name differs is reported under its source name" do
+      # `a <= b` expands to `:erlang.=<`
+      src =
+        seller_src("SourceOperator", """
+        #{@valid_handlers}
+
+        @spec g() :: boolean()
+        def g(), do: 1 <= "a"
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Binary Operator"
+      assert error.description =~ "Operator: <="
+    end
+
     test "an error inside a call carries a call frame, and the CompileError line is its own line" do
       src =
         seller_src("CallFrame", """
