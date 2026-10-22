@@ -77,13 +77,54 @@ defmodule Maty.Utils do
   # Wrapper around `def` that injects a `stack_trace()` call at the top of each clause.
   # When MATY_DEBUG=1, logs the module, function, arity, and line number.
   # When debug is off, `stack_trace()` compiles to `:ok` and is optimized away.
+  #
+  # It also hands the clause's result to `ensure_run!/3` before returning it
+  # For a clause written as
+  #
+  #     deftc tc_expr(ctx, env, st, ast) do
+  #       ...body...
+  #     end
+  #
+  # the generated code is
+  #
+  #     def tc_expr(ctx, env, st, ast) do
+  #       Maty.Utils.stack_trace()
+  #       result = ...body...
+  #       Maty.Utils.ensure_run!(result, __MODULE__, __ENV__.function)
+  #     end
   defmacro deftc(call, do: body) do
     quote do
       def unquote(call) do
-        # use fully qualified name, because when the macro is expanded `stack_trace` may not be in scope
         Maty.Utils.stack_trace()
-        unquote(body)
+        result = unquote(body)
+        Maty.Utils.ensure_run!(result, __MODULE__, __ENV__.function)
       end
     end
   end
+
+  # Catches a typechecking clause that returns a check it never ran.
+  #
+  # A `check do ... end` block does not typecheck anything by itself: it only *builds* a check,
+  # which is a function `fn env, st -> result end` waiting to be given the starting env and
+  # session type. Nothing happens until that function is called.
+  # A `check env: env, st: st do ... end` block builds the check, and then runs it with `env` and `st`
+  #
+  # So a clause that uses `check do` at the top level, and forgets the `env:`/`st:`, (which has happened to me)
+  # just returns that check function instead of a result.
+  # Nothing would fail at that point: the function would travel up to wherever it was called from and only blow up there,
+  # when it's matched against `{:ok, type, st, env}`, which gives a hard to reas error
+  # (and also away from the clause that actually has the mistake)
+  #
+  # Every typechecking result is a tuple (`{:ok, ...}` or `{:error, ...}`), never a function, so
+  # getting a 2-arity function back here can only mean an unrun check, and we stop right away
+  # with an error that names the clause that forgot to run its check.
+  @doc false
+  def ensure_run!(check, module, {name, arity}) when is_function(check, 2) do
+    raise ArgumentError,
+          "#{inspect(module)}.#{name}/#{arity} returned a check that was never run. " <>
+            "A `check do ... end` block only builds the check; run it from the clause's " <>
+            "starting state with `check env: env, st: st do ... end`"
+  end
+
+  def ensure_run!(result, _module, _function), do: result
 end
