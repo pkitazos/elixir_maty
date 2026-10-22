@@ -1,13 +1,10 @@
 defmodule Maty.Typechecker.TC do
   require Logger
 
-  alias Maty.Check
-  import Maty.Check
-
   alias Maty.ST.SBottom
-  alias Maty.Types.T, as: Type
   alias Maty.Typechecker.{Error, Helpers, TC, Ctx}
 
+  import Maty.Check
   import Maty.Utils, only: [deftc: 2]
 
   @typedoc """
@@ -15,8 +12,7 @@ defmodule Maty.Typechecker.TC do
   """
   @type ast :: Macro.t()
 
-  @type var_env :: Check.var_env()
-  @type result :: Check.result(Type.t())
+  @type result :: Maty.Check.result(Types.T.t())
 
   # -- AST shapes
   # The typechecker sees expanded AST some relatively short forms expand to very large nodes
@@ -97,7 +93,7 @@ defmodule Maty.Typechecker.TC do
     - `{:ok, elixir_type, next_session_state, var_env}` on success
     - `{:error, error, var_env}` on failure
   """
-  @spec tc_expr(Ctx.t(), var_env(), Maty.ST.t(), ast()) :: result()
+  @spec tc_expr(Ctx.t(), Check.var_env(), Maty.ST.t(), ast()) :: result()
 
   # -- Val-BaseLit
   deftc tc_expr(_ctx, env, st, value) when is_boolean(value) do
@@ -120,24 +116,18 @@ defmodule Maty.Typechecker.TC do
     {:ok, :number, st, env}
   end
 
-  deftc tc_expr(_ctx, env, st, value) when is_pid(value) do
-    {:ok, :pid, st, env}
-  end
-
-  deftc tc_expr(_ctx, env, st, value) when is_reference(value) do
-    {:ok, :ref, st, env}
-  end
-
   deftc tc_expr(_ctx, env, st, {:%, _, [Date, {:%{}, _, _}]}) do
     {:ok, :date, st, env}
   end
 
-  # List Construction [v1, v2, ...] (Val-Cons / Val-EmptyList adaptation)
-  # Enforces homogeneity. Preserves session state.
+  # -- Val-EmptyList
   deftc tc_expr(_ctx, env, st, []) do
     {:ok, {:list, :any}, st, env}
   end
 
+  # -- Val-Cons
+  # List Construction [v1, v2, ...]
+  # Enforces homogeneity. Preserves session state.
   deftc tc_expr(ctx, env, st, items) when is_list(items) do
     check env: env, st: st do
       list_types <- chain(items, &tc(ctx, &1))
@@ -149,14 +139,14 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # Empty Tuple (Val-EmptyTuple adaptation)
-  # Preserves session state.
+  # -- Val-EmptyTuple
+  # Empty Tuple Construction
   deftc tc_expr(_ctx, env, st, {:{}, _, []}) do
     {:ok, {:tuple, []}, st, env}
   end
 
-  # --- 2-Tuple Value Construction ---
-  # Handles literal 2-tuples {v1, v2} explicitly, distinct from n-tuples {:{}, _, [...]} in the AST
+  # -- Val-Tuple
+  # 2-Tuple Value Construction
   deftc tc_expr(ctx, env, st, {lhs_ast, rhs_ast}) do
     check env: env, st: st do
       lhs_type <- tc(ctx, lhs_ast)
@@ -165,8 +155,8 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # n-Tuple Construction {v1, v2, ...} (Val-Tuple adaptation)
-  # Preserves session state.
+  # -- Val-Tuple
+  # n-Tuple Construction {v1, v2, ...}
   deftc tc_expr(ctx, var_env, st_pre, {:{}, _, items}) when is_list(items) do
     check env: var_env, st: st_pre do
       types <- chain(items, &tc(ctx, &1))
@@ -207,7 +197,6 @@ defmodule Maty.Typechecker.TC do
               )
 
           ok()
-          # ^ why is my editor complaining about this
         end
       end)
 
@@ -254,8 +243,7 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # --- Logical Not Operator (T-Not) ---
-
+  # -- T-Not
   deftc tc_expr(ctx, env, st, erlang(:not, meta, [operand_ast])) do
     check env: env, st: st do
       res_type <- tc(ctx, operand_ast)
@@ -273,9 +261,7 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # --- Binary Operators (T-Op) ---
-
-  # Handles Arithmetic and Comparison Ops: +, -, *, /, <, >, <=, >=, ==, !=
+  # -- T-Op
   deftc tc_expr(ctx, env, st, erlang(erlang_op, meta, [lhs_ast, rhs_ast]))
         when erlang_op in [:+, :-, :*, :/, :<, :>, :"=<", :>=, :==, :"/="] do
     op = Map.get(@source_ops, erlang_op, erlang_op)
@@ -298,7 +284,7 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # --- Strings: Concatenation and Interpolation ---
+  # Strings: Concatenation and Interpolation
   # after expansion both `"a" <> b <> "c"` and `"a=#{n}"` are a single `<<>>` with one `segment :: binary` per part
   # Other bitstring syntax (sizes, integer segments, ...) is not supported
   deftc tc_expr(ctx, env, st, {:<<>>, meta, segments}) when is_list(segments) do
@@ -327,7 +313,7 @@ defmodule Maty.Typechecker.TC do
     {:error, Error.FrameworkUsage.unsupported_truthy_operator(ctx.module, meta, :||), env}
   end
 
-  # --- Raw Communication Checks ---
+  # Raw Communication Checks
 
   # Disallow raw 'receive'
   deftc tc_expr(ctx, env, _st, {:receive, meta, _}) do
@@ -340,7 +326,7 @@ defmodule Maty.Typechecker.TC do
     {:error, Error.FrameworkUsage.no_native_send(ctx.module, meta), env}
   end
 
-  # --- Anonymous Functions and Captures ---
+  # Anonymous Functions and Captures
   # not supported: would require either type annotations (which do not exist in the language in any capacity)
   # or type inference (which was not really the point of this project)
   # Reject them explicitly so they do not fall through to T-App
@@ -355,7 +341,7 @@ defmodule Maty.Typechecker.TC do
     {:error, Error.FrameworkUsage.unsupported_anonymous_function(ctx.module, meta), env}
   end
 
-  # --- Block Scope ---
+  # Block Scope
   deftc tc_expr(ctx, var_env, st_pre, {:__block__, _, body_asts}) when is_list(body_asts) do
     tc_expr_list(ctx, var_env, st_pre, body_asts)
   end
@@ -371,13 +357,11 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # --- Case Expression (T-Case) ---
+  # -- T-Case
   # todo: revisit this
   deftc tc_expr(ctx, env, st, {:case, meta, [scrutinee_ast, [do: clauses_list]]}) do
     check env: env, st: st do
       scrutinee_type <- tc(ctx, scrutinee_ast)
-      # idk if I even _should_ check that the scrutinee didn't change the type of the session type
-      # it feels like such an arbitrary restriction
 
       branch_results <-
         fan_out(Enum.with_index(clauses_list, 1), fn
@@ -400,8 +384,7 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # --- Maty Send Operation (T-Send) ---
-  # Matches call to Maty.DSL.internal_send/3 which the send/2 macro expands to
+  # -- T-Send
   deftc tc_expr(
           ctx,
           env,
@@ -475,21 +458,17 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # I really do not like these 2
+  # Demo only (I really do not like these)
 
-  # --- IO ---
   deftc tc_expr(ctx, var_env, st_pre, {{:., _, [IO, _]}, _, _} = ast) do
     TC.IO.tc_expr(ctx, var_env, st_pre, ast)
   end
 
-  # --- :timer ---
   deftc tc_expr(ctx, var_env, st_pre, {{:., _, [:timer, _]}, _, _} = ast) do
     TC.Timer.tc_expr(ctx, var_env, st_pre, ast)
   end
 
-  # --- Maty Suspend Operation (T-Suspend) ---
-  # Matches throw({:suspend, handler, state}) from Maty.DSL.suspend/2
-  # todo: update doc comment
+  # -- T-Suspend
   deftc tc_expr(
           ctx,
           env,
@@ -510,7 +489,7 @@ defmodule Maty.Typechecker.TC do
 
       state_type <- tc(ctx, state_ast)
 
-      expect state_type == Type.maty_actor_state(),
+      expect state_type == Types.T.maty_actor_state(),
         else:
           Error.TypeMismatch.invalid_maty_state_type(
             ctx.module,
@@ -542,10 +521,7 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # --- Maty Done Operation (T-Done) ---
-  # Matches throw({:done, state}) from Maty.DSL.done/1
-  # AST: {:throw, meta, [{:done, state_ast}]}
-
+  # -- T-Done
   deftc tc_expr(
           ctx,
           env,
@@ -555,7 +531,7 @@ defmodule Maty.Typechecker.TC do
     check env: env, st: st do
       state_type <- tc(ctx, state_ast)
 
-      expect state_type == Type.maty_actor_state(),
+      expect state_type == Types.T.maty_actor_state(),
         else:
           Error.TypeMismatch.invalid_maty_state_type(
             ctx.module,
@@ -577,7 +553,7 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # --- Maty Register Operation (T-Register) ---
+  # -- T-Register
   deftc tc_expr(
           ctx,
           env,
@@ -647,7 +623,6 @@ defmodule Maty.Typechecker.TC do
           _st,
           maty_runtime(:register, meta, [_, _, handler_ast, _, _])
         ) do
-    # `handler_name` is not an atom
     {:error, Error.FrameworkUsage.init_handler_not_literal(ctx.module, meta, handler_ast), env}
   end
 
@@ -658,11 +633,12 @@ defmodule Maty.Typechecker.TC do
           {{:., _m1, [Maty.DSL, :register]}, meta, args}
         ) do
     # function is called with the wrong number of args
+    # todo: maybe not necessary?
     {:error, Error.FrameworkUsage.register_wrong_arity(ctx.module, meta, length(args)), env}
   end
 
-  # --- Function Application (T-App) ---
-  # Handles local function calls: f(arg1, arg2, ...)
+  # -- T-App
+  # todo: how could I handle remote calls?
   deftc tc_expr(ctx, env, st, {func_name, meta, arg_asts})
         when is_atom(func_name) and is_list(arg_asts) and meta != [] and
                func_name not in [:=, :%, :{}, :|, :<<>>] do
@@ -803,7 +779,7 @@ defmodule Maty.Typechecker.TC do
   # Processes a list of expressions sequentially using tc_expr.
   # Returns the result of the *last* expression in the list.
   # the only reason this isn't inlined is because it's used in a bunch of places in the wf module
-  @spec tc_expr_list(Ctx.t(), var_env(), Maty.ST.t(), [ast()]) :: result()
+  @spec tc_expr_list(Ctx.t(), Check.var_env(), Maty.ST.t(), [ast()]) :: result()
   def tc_expr_list(ctx, var_env, st_pre, ast_list) do
     check env: var_env, st: st_pre do
       types <- chain(ast_list, &tc(ctx, &1))
