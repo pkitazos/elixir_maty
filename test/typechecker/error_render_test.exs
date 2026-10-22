@@ -242,6 +242,14 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FrameworkUsage.unsupported_anonymous_function(@m, @meta)},
       {{Error.FrameworkUsage, :unsupported_bitstring},
        Error.FrameworkUsage.unsupported_bitstring(@m, @meta)},
+      {{Error.FrameworkUsage, :unsupported_expression},
+       Error.FrameworkUsage.unsupported_expression(
+         @m,
+         @meta,
+         {{:., [], [String, :length]}, [], ["a"]}
+       )},
+      {{Error.FrameworkUsage, :unsupported_pattern},
+       Error.FrameworkUsage.unsupported_pattern(@m, @meta, {:when, [], [{:n, [], nil}, true]})},
       {{Error.FrameworkUsage, :missing_session_registration},
        Error.FrameworkUsage.missing_session_registration(@m, @meta)},
       {{Error.FrameworkUsage, :on_link_altered_session_state},

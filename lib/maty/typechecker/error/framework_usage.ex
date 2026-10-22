@@ -38,6 +38,28 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
+  # an expression that no typing rule covers (an unknown remote call, an operator without a rule, ...)
+  def unsupported_expression(module, meta, ast) do
+    %Error{
+      category: :framework_usage,
+      kind: :unsupported_expression,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{ast: ast}
+    }
+  end
+
+  # a pattern that no pattern rule covers (e.g. a case clause with a guard)
+  def unsupported_pattern(module, meta, ast) do
+    %Error{
+      category: :framework_usage,
+      kind: :unsupported_pattern,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{ast: ast}
+    }
+  end
+
   def missing_session_registration(module, meta) do
     %Error{
       category: :framework_usage,

@@ -375,6 +375,13 @@ defmodule Maty.Typechecker.PatternBinding do
     end
   end
 
+  # Catch-all: any pattern no rule above covers (e.g. a guard) is reported
+  deftc tc_pattern(ctx, pattern_ast, _expected_type, var_env) do
+    meta = Helpers.extract_meta_from_ast(pattern_ast)
+    meta = if Keyword.has_key?(meta, :line), do: meta, else: ctx.meta
+    {:error, Error.FrameworkUsage.unsupported_pattern(ctx.module, meta, pattern_ast), var_env}
+  end
+
   # Maps a literal pattern value to its base Maty type.
   defp literal_type(nil), do: nil
   defp literal_type(v) when is_boolean(v), do: :boolean

@@ -346,6 +346,41 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Operator: <="
     end
 
+    test "an expression no rule covers is reported instead of crashing" do
+      src =
+        seller_src("UnsupportedExpression", """
+        #{@valid_handlers}
+
+        @spec g(binary()) :: number()
+        def g(s), do: String.length(s)
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Unsupported Expression"
+      assert error.description =~ "String.length(s)"
+      assert own_line(error) == line_of(src, "def g(s)")
+    end
+
+    test "a case clause with a guard is reported instead of crashing" do
+      src =
+        seller_src("UnsupportedGuard", """
+        #{@valid_handlers}
+
+        @spec g(number()) :: atom()
+        def g(x) do
+          case x do
+            n when n > 0 -> :pos
+            _ -> :other
+          end
+        end
+        """)
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Unsupported Pattern"
+    end
+
     test "an error inside a call carries a call frame, and the CompileError line is its own line" do
       src =
         seller_src("CallFrame", """

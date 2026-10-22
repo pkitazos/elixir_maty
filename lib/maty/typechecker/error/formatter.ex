@@ -730,6 +730,28 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :framework_usage, kind: :unsupported_expression} = e) do
+    %{ast: ast} = e.details
+
+    """
+    Framework Usage Violation: Unsupported Expression
+      Expression: #{Macro.to_string(ast)}
+      --
+      Maty does not typecheck this kind of expression.
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :unsupported_pattern} = e) do
+    %{ast: ast} = e.details
+
+    """
+    Framework Usage Violation: Unsupported Pattern
+      Pattern: #{Macro.to_string(ast)}
+      --
+      Maty does not typecheck this kind of pattern (guards are not supported).
+    """
+  end
+
   defp render(%Error{category: :framework_usage, kind: :no_native_send}) do
     """
     Framework Usage Violation: Attempted Native Communication

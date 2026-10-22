@@ -671,8 +671,10 @@ defmodule Maty.Typechecker.TC do
 
   # -- TV-Var
   # x : A ∈ Γ
-  deftc tc_expr(ctx, env, st, {var_name, meta, context})
-        when is_atom(var_name) and (is_nil(context) or is_list(context)) do
+  # a variable's context is `nil`
+  # variables introduced by some macro would have an atom context, currently Γ is keyed by name only,
+  # so looking those up could pick up the user's variable of the same name so they are left to the catch-all below
+  deftc tc_expr(ctx, env, st, {var_name, meta, nil}) when is_atom(var_name) do
     case Map.fetch(env, var_name) do
       {:ok, type} ->
         {:ok, type, st, env}
@@ -686,6 +688,13 @@ defmodule Maty.Typechecker.TC do
   # Atom literals
   deftc tc_expr(_ctx, env, st, value) when is_atom(value) and not is_nil(value) do
     {:ok, :atom, st, env}
+  end
+
+  # Catch-all: anything no rule above covers is reported
+  deftc tc_expr(ctx, env, _st, ast) do
+    meta = Helpers.extract_meta_from_ast(ast)
+    meta = if Keyword.has_key?(meta, :line), do: meta, else: ctx.meta
+    {:error, Error.FrameworkUsage.unsupported_expression(ctx.module, meta, ast), env}
   end
 
   # types that String.Chars implements
