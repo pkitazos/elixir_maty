@@ -16,7 +16,7 @@ defmodule Maty.Runtime do
     loop(module, InternalState.new(global_s), [])
   end
 
-  @spec loop(module(), InternalState.t(), list(Envelope.t())) :: no_return()
+  @spec loop(module(), InternalState.t(), [Envelope.t()]) :: no_return()
   defp loop(module, s, stash) do
     traverse_stash(module, s, stash, [])
   end
@@ -24,7 +24,7 @@ defmodule Maty.Runtime do
   # Since processing a message progresses the session (via suspend or done)
   # we must then loop back to the start of the stash as messages which previously were unprocessable, may now be processable.
   # This is the common case: a message is stashed because its sender wasn't expected yet and becomes processable once the session moves on.
-  @spec traverse_stash(module(), InternalState.t(), list(Envelope.t()), list(Envelope.t())) ::
+  @spec traverse_stash(module(), InternalState.t(), [Envelope.t()], [Envelope.t()]) ::
           no_return()
   defp traverse_stash(module, s, [envelope | rest], skipped) do
     if can_process?(s, envelope) do
@@ -45,7 +45,7 @@ defmodule Maty.Runtime do
   # we move on to processing messages from our mailbox. A similar process is done here.
   # We inspect which session and to which role this message was addressed and check whether the suspended handler can process this message.
   # If it can, we process the message and loop back to the start, otherwise we stash this message and then loop back to the start.
-  @spec receive_next(module(), InternalState.t(), list(Envelope.t())) :: no_return()
+  @spec receive_next(module(), InternalState.t(), [Envelope.t()]) :: no_return()
   defp receive_next(module, s, stash) do
     receive do
       {:maty_message, %Envelope{} = envelope} ->
@@ -112,8 +112,7 @@ defmodule Maty.Runtime do
     {%{
        role: role,
        init_handler: init_handler,
-       args: args,
-       local: initial_session_role_state
+       args: args
      }, initial_s} = pop_in(s.pending_registrations[init_token])
 
     # it's possible that at this stage the actor has already initiated the session with a different role
@@ -121,10 +120,12 @@ defmodule Maty.Runtime do
     updated_s = ensure_session(initial_s, session_id, participants)
     session = updated_s.sessions[session_id]
 
+    # todo: the init handler should start with no local state (only `global`) and set it itself,
+    # `nil` is a placeholder until the typechecker has the rule for that
     result =
       apply(module, init_handler, [
         args,
-        %{global: updated_s.global_actor_state, local: initial_session_role_state},
+        %{global: updated_s.global_actor_state, local: nil},
         {session, role}
       ])
 
@@ -190,16 +191,15 @@ defmodule Maty.Runtime do
   end
 
   @doc false
-  @spec register(pid(), Types.role(), Types.handler_label(), term(), Types.local_state()) :: :ok
-  def register(ap_pid, role, handler, args, initial_session_role_state) do
+  @spec register(pid(), Types.role(), Types.handler_label(), term()) :: :ok
+  def register(ap_pid, role, handler, args) do
     Kernel.send(
       self(),
       {:maty_register, ap_pid,
        %{
          role: role,
          init_handler: handler,
-         args: args,
-         local: initial_session_role_state
+         args: args
        }}
     )
 

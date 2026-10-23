@@ -133,19 +133,17 @@ defmodule Maty.DSL do
     - `role`: The role this actor will play in the session (atom).
     - `handler`: The name of the `init_handler` to be called when the session starts, as a literal atom
     - `args`: The single value passed to the `init_handler` (use a tuple for several values, and `nil` for none).
-    - `state`: The current actor state (`maty_actor_state`).
 
   ## Returns
     - `{:ok, updated_state}`.
   """
-  defmacro register(ap_pid, role, handler, args, initial_session_role_state) do
+  defmacro register(ap_pid, role, handler, args) do
     quote do
       Runtime.register(
         unquote(ap_pid),
         unquote(role),
         unquote(handler),
-        unquote(args),
-        unquote(initial_session_role_state)
+        unquote(args)
       )
     end
   end

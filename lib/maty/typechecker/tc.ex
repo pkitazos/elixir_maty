@@ -577,8 +577,7 @@ defmodule Maty.Typechecker.TC do
             ap_pid_ast,
             role_ast,
             handler_name,
-            args_ast,
-            local_state_ast
+            args_ast
           ])
         )
         when is_atom(handler_name) do
@@ -625,9 +624,6 @@ defmodule Maty.Typechecker.TC do
             got: args_type
           )
 
-      # todo: come back once register API is settled
-      _local_state_type <- tc(ctx, local_state_ast)
-
       ok(:atom)
     end
   end
@@ -636,7 +632,7 @@ defmodule Maty.Typechecker.TC do
           ctx,
           env,
           _st,
-          maty_runtime(:register, meta, [_, _, handler_ast, _, _])
+          maty_runtime(:register, meta, [_, _, handler_ast, _])
         ) do
     {:error, Error.FrameworkUsage.init_handler_not_literal(ctx.module, meta, handler_ast), env}
   end

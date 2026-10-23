@@ -32,8 +32,7 @@ defmodule Maty.Types do
   @type registration_info :: %{
           role: role(),
           init_handler: handler_label(),
-          args: term(),
-          local: local_state()
+          args: term()
         }
 
   @type address_book :: %{role() => pid()}

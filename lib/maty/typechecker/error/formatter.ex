@@ -400,7 +400,7 @@ defmodule Maty.Typechecker.Error.Formatter do
       Expected: #{render_register_expected(argument, expected)}
       Got: #{render_type(got)}
       --
-      MatyDSL.register/5 was called with an argument of the wrong type.
+      MatyDSL.register/4 was called with an argument of the wrong type.
     """
   end
 
@@ -669,7 +669,7 @@ defmodule Maty.Typechecker.Error.Formatter do
       Got: #{render_type(got)}
       Init handlers: #{render_handler_names(known)}
       --
-      MatyDSL.register/5 must be given the name of an init handler defined in this module.
+      MatyDSL.register/4 must be given the name of an init handler defined in this module.
     """
   end
 
@@ -692,7 +692,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     Framework Usage Violation: Role Not a Literal
       Got: #{Macro.to_string(got)}
       --
-      MatyDSL.register/5 must be given the role as a literal atom, e.g. :seller.
+      MatyDSL.register/4 must be given the role as a literal atom, e.g. :seller.
     """
   end
 
@@ -704,7 +704,7 @@ defmodule Maty.Typechecker.Error.Formatter do
       Got: #{inspect(got)}
       Declared roles: #{Enum.map_join(known, ", ", &inspect/1)}
       --
-      MatyDSL.register/5 must be given a role declared in this module's use Maty.Actor.
+      MatyDSL.register/4 must be given a role declared in this module's use Maty.Actor.
     """
   end
 
@@ -715,7 +715,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     Framework Usage Violation: Init Handler Not a Literal
       Got: #{Macro.to_string(got)}
       --
-      MatyDSL.register/5 must be given the init handler as a literal atom, e.g. :install.
+      MatyDSL.register/4 must be given the init handler as a literal atom, e.g. :install.
     """
   end
 
@@ -724,7 +724,7 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Framework Usage Violation: Wrong Number of Arguments to register
-      Expected: 5 (access point, role, init handler, init handler args, state)
+      Expected: 4 (access point, role, init handler, init handler args)
       Got: #{got}
     """
   end
@@ -869,7 +869,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render_register_argument(:access_point), do: "1 (access point)"
   defp render_register_argument(:init_handler_args), do: "4 (init handler args)"
-  defp render_register_argument(:initial_local_state), do: "5 (initial local state)"
 
   defp render_handler_names([]), do: "(none)"
 
