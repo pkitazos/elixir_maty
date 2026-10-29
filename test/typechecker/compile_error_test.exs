@@ -17,6 +17,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
       defmodule MatyCompileErrorFixture.BadTarget do
         use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:buyer1]
 
+        global_state %{}
+        local_state :buyer1, %{}
+
         @role :buyer1
 
         @st {:install, ~q/+seller:{title(binary).quote_handler}/}
@@ -48,6 +51,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src = """
       defmodule MatyCompileErrorFixture.MissingHandler do
         use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:buyer1]
+
+        global_state %{}
+        local_state :buyer1, %{}
 
         @role :buyer1
 
@@ -103,6 +109,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
       """
       defmodule MatyCompileErrorFixture.#{module_name} do
         use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
+
+        global_state %{}
+        local_state :seller, %{}
 
         @role :seller
 
@@ -208,8 +217,8 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "[maty] 1 type error in"
       assert error.description =~ "Wrong Number of Clauses"
       # the first on_link clause, not the line of the module
-      assert own_line(error) == 9
-      assert error.line == 9
+      assert own_line(error) == 12
+      assert error.line == 12
     end
 
     test "a function with map record types in its spec compiles" do
@@ -607,6 +616,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
       defmodule MatyCompileErrorFixture.RawInitNoSpec do
         use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
+        global_state %{}
+        local_state :seller, %{}
+
         @role :seller
 
         @st {:install, ~q/end/}
@@ -678,6 +690,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
         defmodule MatyCompileErrorFixture.RegisterBadAp do
           use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
+          global_state %{}
+          local_state :seller, %{}
+
           @role :seller
 
           @st {:install, ~q/end/}
@@ -705,6 +720,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src = """
       defmodule MatyCompileErrorFixture.OnStartNoRegister do
         use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
+
+        global_state %{}
+        local_state :seller, %{}
 
         @role :seller
 
@@ -750,6 +768,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src = """
       defmodule MatyCompileErrorFixture.InitStartsWithReceive do
         use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
+
+        global_state %{}
+        local_state :seller, %{}
 
         @role :seller
 
@@ -885,6 +906,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
         defmodule MatyCompileErrorFixture.RegisterBadRole do
           use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
+          global_state %{}
+          local_state :seller, %{}
+
           @role :seller
 
           @st {:install, ~q/end/}
@@ -912,6 +936,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
         defmodule MatyCompileErrorFixture.RegisterUndeclaredRole do
           use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
+          global_state %{}
+          local_state :seller, %{}
+
           @st {:install, ~q/end/}
 
           on_start ap_pid :: pid() do
@@ -938,6 +965,10 @@ defmodule Maty.Typechecker.CompileErrorTest do
         """
         defmodule MatyCompileErrorFixture.UnknownProtocolRole do
           use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller, :auditor]
+
+          global_state %{}
+          local_state :seller, %{}
+          local_state :auditor, %{}
 
           @st {:install, ~q/end/}
 
@@ -1039,6 +1070,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
       """
       defmodule MatyCompileErrorFixture.#{module_name} do
         use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
+
+        global_state %{}
+        local_state :seller, %{}
 
         @role :seller
 
@@ -1175,6 +1209,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
       defmodule MatyCompileErrorFixture.#{module_name} do
         use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
+        global_state %{}
+        local_state :seller, %{}
+
         @role :seller
 
         @st {:install, ~q/title_handler/}
@@ -1232,6 +1269,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src = """
       defmodule MatyCompileErrorFixture.SendSecondLabelPayload do
         use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:buyer1]
+
+        global_state %{}
+        local_state :buyer1, %{}
 
         @role :buyer1
 

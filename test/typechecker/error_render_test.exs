@@ -219,6 +219,14 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          {:wat, [], []},
          @cause
        )},
+      {{Error.TypeSpecification, :state_type_not_well_typed},
+       Error.TypeSpecification.state_type_not_well_typed(
+         @m,
+         @meta,
+         {:local, :seller},
+         {:wat, [], []},
+         @cause
+       )},
       {{Error.TypeSpecification, :spec_args_parse_error_at},
        Error.TypeSpecification.spec_args_parse_error_at(
          @m,
@@ -272,10 +280,18 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FrameworkUsage.role_not_literal(@m, @meta, {:role, [], nil})},
       {{Error.FrameworkUsage, :undeclared_role},
        Error.FrameworkUsage.undeclared_role(@m, @meta, :buyer1, [:seller])},
+      {{Error.FrameworkUsage, :missing_global_state},
+       Error.FrameworkUsage.missing_global_state(@m, @meta)},
+      {{Error.FrameworkUsage, :missing_local_states},
+       Error.FrameworkUsage.missing_local_states(@m, @meta, [:seller])},
+      {{Error.FrameworkUsage, :duplicate_state_declaration},
+       Error.FrameworkUsage.duplicate_state_declaration(@m, @meta, :global)},
+      {{Error.FrameworkUsage, :local_state_undeclared_role},
+       Error.FrameworkUsage.local_state_undeclared_role(@m, @meta, :buyer1, [:seller])},
       {{Error.FrameworkUsage, :init_handler_not_literal},
        Error.FrameworkUsage.init_handler_not_literal(@m, @meta, {:handler, [], nil})},
       {{Error.FrameworkUsage, :register_wrong_arity},
-       Error.FrameworkUsage.register_wrong_arity(@m, @meta, 4)},
+       Error.FrameworkUsage.register_wrong_arity(@m, @meta, 3)},
 
       # :name_resolution
       {{Error.NameResolution, :variable_not_exist},

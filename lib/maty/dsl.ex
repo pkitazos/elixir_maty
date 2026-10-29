@@ -4,7 +4,9 @@ defmodule Maty.DSL do
   defmacro __using__(_opts) do
     quote do
       require Maty.DSL
-      import Maty.DSL, only: [on_start: 2, init_handler: 4, handler: 5]
+
+      import Maty.DSL,
+        only: [global_state: 1, local_state: 2, on_start: 2, init_handler: 4, handler: 5]
     end
   end
 
@@ -14,6 +16,18 @@ defmodule Maty.DSL do
   These macros simplify the process of writing session-typed actors by providing
   a more declarative syntax for handlers and communication operations.
   """
+
+  defmacro global_state(type_ast) do
+    quote do
+      @global_state_type {unquote(Macro.escape(type_ast)), unquote(__CALLER__.line)}
+    end
+  end
+
+  defmacro local_state(role, type_ast) do
+    quote do
+      @local_state_type {unquote(role), unquote(Macro.escape(type_ast)), unquote(__CALLER__.line)}
+    end
+  end
 
   defmacro on_start(pattern, do: body) do
     {clean_pattern, type_spec} = DSL.Pattern.process_init_pattern(pattern)

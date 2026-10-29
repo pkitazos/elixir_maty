@@ -66,10 +66,17 @@ defmodule Maty.Typechecker do
       Logger.debug(format_function_signatures(env.module))
     end
 
+    {state_types, state_errors} =
+      case Preprocessor.process_state_declarations(env) do
+        {:ok, state_types} -> {state_types, []}
+        # state errors carry no function id, so they are tagged with nil to match the other error sources.
+        {:error, errors} -> {nil, Enum.map(errors, &{nil, &1})}
+      end
+
     errors =
       Module.get_attribute(env.module, :spec_errors) ++
         Module.get_attribute(env.module, :handler_errors) ++
-        unknown_role_errors(env)
+        unknown_role_errors(env) ++ state_errors
 
     # we fail here, before the bodies are checked in `handle_after_compile`, on purpose:
     # a spec or handler annotation that did not validate leaves psi and delta incomplete,
@@ -77,6 +84,8 @@ defmodule Maty.Typechecker do
     if errors != [] do
       raise_type_errors!(env, errors)
     end
+
+    Module.put_attribute(env.module, :state_types, state_types)
   end
 
   # every role an actor declares in `use Maty.Actor` must be a role of its protocol

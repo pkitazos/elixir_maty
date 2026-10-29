@@ -122,6 +122,51 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
+  # the actor has no `global_state` declaration
+  def missing_global_state(module, meta) do
+    %Error{
+      category: :framework_usage,
+      kind: :missing_global_state,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column])
+    }
+  end
+
+  # some roles the actor plays have no `local_state` declaration
+  def missing_local_states(module, meta, roles) do
+    %Error{
+      category: :framework_usage,
+      kind: :missing_local_states,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{roles: roles}
+    }
+  end
+
+  # a second `global_state`, or a second `local_state` for the same role
+  # `state` is `:global` or `{:local, role}`
+  # todo: make this accept all duplicates as a param rather than making a new error for every duplication
+  def duplicate_state_declaration(module, meta, state) do
+    %Error{
+      category: :framework_usage,
+      kind: :duplicate_state_declaration,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{state: state}
+    }
+  end
+
+  # `local_state` was given a role not in this module's `use Maty.Actor`
+  def local_state_undeclared_role(module, meta, role, declared_roles) do
+    %Error{
+      category: :framework_usage,
+      kind: :local_state_undeclared_role,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: role, known: declared_roles}
+    }
+  end
+
   # register was given an expression for the role, not a literal atom
   def role_not_literal(module, meta, got_ast) do
     %Error{

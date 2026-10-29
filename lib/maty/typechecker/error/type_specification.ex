@@ -19,6 +19,18 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
     }
   end
 
+  # the type given to `global_state` / `local_state` does not parse
+  # `state` is `:global` or `{:local, role}`
+  def state_type_not_well_typed(module, meta, state, type_ast, %Error.Cause{} = cause) do
+    %Error{
+      category: :type_specification,
+      kind: :state_type_not_well_typed,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{state: state, type_ast: type_ast, cause: cause}
+    }
+  end
+
   def spec_args_parse_error_at(
         module,
         meta,

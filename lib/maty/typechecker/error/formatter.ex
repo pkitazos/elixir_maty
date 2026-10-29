@@ -612,6 +612,23 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :type_specification, kind: :state_type_not_well_typed} = e) do
+    %{state: state, type_ast: type_ast, cause: cause} = e.details
+    {title, opts, message} = render_cause(cause)
+
+    """
+    Type Specification Error: Invalid State Type
+      Declaration: #{render_state_declaration(state)}
+      Type: #{Macro.to_string(type_ast)}
+      Parse error: #{title}
+      #{opts}
+      --
+      The state type is invalid.
+
+      Details: #{message}
+    """
+  end
+
   defp render(%Error{category: :type_specification, kind: :no_spec_for_function}) do
     """
     Type Specification Error: Missing Function Spec
@@ -693,6 +710,48 @@ defmodule Maty.Typechecker.Error.Formatter do
       Got: #{Macro.to_string(got)}
       --
       MatyDSL.register/4 must be given the role as a literal atom, e.g. :seller.
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :missing_global_state}) do
+    """
+    Framework Usage Violation: Missing Global State
+      --
+      Maty.Actor must declare its global state type with global_state, e.g. global_state %{}.
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :missing_local_states} = e) do
+    %{roles: roles} = e.details
+
+    """
+    Framework Usage Violation: Missing Local State
+      Roles: #{Enum.map_join(roles, ", ", &inspect/1)}
+      --
+      Maty.Actor must declare a local state type with local_state for every role it plays, e.g. local_state #{inspect(hd(roles))}, %{}.
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :duplicate_state_declaration} = e) do
+    %{state: state} = e.details
+
+    """
+    Framework Usage Violation: Duplicate State Declaration
+      Declaration: #{render_state_declaration(state)}
+      --
+      Maty.Actor must declare its global state once, and the local state of each role once.
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :local_state_undeclared_role} = e) do
+    %{got: got, known: known} = e.details
+
+    """
+    Framework Usage Violation: Undeclared Role
+      Got: #{inspect(got)}
+      Declared roles: #{Enum.map_join(known, ", ", &inspect/1)}
+      --
+      local_state must be given a role declared in this module's use Maty.Actor.
     """
   end
 
@@ -866,6 +925,9 @@ defmodule Maty.Typechecker.Error.Formatter do
     do: "one of: " <> Enum.map_join(types, ", ", &render_type/1)
 
   defp render_register_expected(_argument, expected), do: render_expected(expected)
+
+  defp render_state_declaration(:global), do: "global_state"
+  defp render_state_declaration({:local, role}), do: "local_state #{inspect(role)}"
 
   defp render_register_argument(:access_point), do: "1 (access point)"
   defp render_register_argument(:init_handler_args), do: "4 (init handler args)"
