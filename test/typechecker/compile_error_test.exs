@@ -30,12 +30,12 @@ defmodule Maty.Typechecker.CompileErrorTest do
           %{}
         end
 
-        init_handler :install, title :: binary(), state do
+        defhandler install(title :: binary(), state) do
           Maty.DSL.send(:buyer2, {:title, title})
           Maty.DSL.suspend(:quote_handler, state)
         end
 
-        handler :quote_handler, :seller, {:quote, amount :: number()}, state do
+        defhandler quote_handler(:seller, {:quote, amount :: number()}, state) do
           share_amount = amount / 2
           Maty.DSL.send(:buyer2, {:share, share_amount})
           Maty.DSL.done(state)
@@ -64,7 +64,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
           %{}
         end
 
-        handler :no_such_session_type, :seller, {:quote, amount :: number()}, state do
+        defhandler no_such_session_type(:seller, {:quote, amount :: number()}, state) do
           Maty.DSL.done(state)
         end
       end
@@ -79,12 +79,12 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
     # `clauses` spliced in as the handler definitions so each test can control what is wrong
     @valid_handlers """
-    handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
+    defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
       Maty.DSL.send(:buyer2, {:date, addr})
       Maty.DSL.done(state)
     end
 
-    handler :decision_handler, :buyer2, {:quit, nil}, state do
+    defhandler decision_handler(:buyer2, {:quit, nil}, state) do
       Maty.DSL.done(state)
     end
     """
@@ -123,7 +123,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
           %{}
         end
 
-        init_handler :install, _ap_pid :: pid(), state do
+        defhandler install(_ap_pid :: pid(), state) do
           Maty.DSL.suspend(:decision_handler, state)
         end
 
@@ -137,7 +137,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       # and so is the error inside the clause that was provided
       src =
         seller_src("ClauseAndCoverage", """
-        handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
+        defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
           Maty.DSL.send(:buyer1, {:date, addr})
           Maty.DSL.done(state)
         end
@@ -152,12 +152,12 @@ defmodule Maty.Typechecker.CompileErrorTest do
     test "an error in one clause of a multi-clause handler names that clause" do
       src =
         seller_src("HandlerClauseFrame", """
-        handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
+        defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
           Maty.DSL.send(:buyer2, {:date, addr})
           Maty.DSL.done(state)
         end
 
-        handler :decision_handler, :buyer2, {:quit, nil}, state do
+        defhandler decision_handler(:buyer2, {:quit, nil}, state) do
           Maty.DSL.send(:buyer2, {:date, "never"})
           Maty.DSL.done(state)
         end
@@ -483,7 +483,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       # the init handler :install from seller_src is clause #1, this is clause #2
       src =
         seller_src("InitHandlerClauseFrame", """
-        init_handler :install, _other :: binary(), state do
+        defhandler install(_other :: binary(), state) do
           Maty.DSL.done(state)
         end
 
@@ -499,7 +499,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
     test "a handler missing a branch is reported at the handler definition" do
       src =
         seller_src("MissingBranchLine", """
-        handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
+        defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
           Maty.DSL.send(:buyer2, {:date, addr})
           Maty.DSL.done(state)
         end
@@ -508,7 +508,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       error = compile_error!(src)
 
       assert error.description =~ "Incomplete Message Handler Implementation"
-      assert error.line == line_of(src, "handler :decision_handler")
+      assert error.line == line_of(src, "defhandler decision_handler(")
     end
 
     test "an error in a case branch names the branch and its line" do
@@ -702,7 +702,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
             %{}
           end
 
-          init_handler :install, _ap_pid :: pid(), state do
+          defhandler install(_ap_pid :: pid(), state) do
             Maty.DSL.done(state)
           end
         end
@@ -732,7 +732,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
           %{}
         end
 
-        init_handler :install, _ap_pid :: pid(), state do
+        defhandler install(_ap_pid :: pid(), state) do
           Maty.DSL.done(state)
         end
       end
@@ -748,12 +748,12 @@ defmodule Maty.Typechecker.CompileErrorTest do
       # both branches are implemented, so this is the only error
       src =
         seller_src("WrongRole", """
-        handler :decision_handler, :buyer1, {:address, addr :: binary()}, state do
+        defhandler decision_handler(:buyer1, {:address, addr :: binary()}, state) do
           Maty.DSL.send(:buyer2, {:date, addr})
           Maty.DSL.done(state)
         end
 
-        handler :decision_handler, :buyer2, {:quit, nil}, state do
+        defhandler decision_handler(:buyer2, {:quit, nil}, state) do
           Maty.DSL.done(state)
         end
         """)
@@ -761,7 +761,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       error = compile_error!(src)
 
       assert error.description =~ "Incorrect Incoming Participant"
-      assert error.line == line_of(src, "handler :decision_handler, :buyer1")
+      assert error.line == line_of(src, "defhandler decision_handler(:buyer1")
     end
 
     test "an init handler whose session type starts with a receive is reported at that clause" do
@@ -781,7 +781,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
           %{}
         end
 
-        init_handler :install, _ap_pid :: pid(), state do
+        defhandler install(_ap_pid :: pid(), state) do
           Maty.DSL.done(state)
         end
       end
@@ -790,7 +790,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       error = compile_error!(src)
 
       assert error.description =~ "Init Handler Starts With a Receive"
-      assert error.line == line_of(src, "init_handler :install")
+      assert error.line == line_of(src, "defhandler install(")
     end
 
     test "a function without a spec is reported at its first clause" do
@@ -813,16 +813,16 @@ defmodule Maty.Typechecker.CompileErrorTest do
       # fine here, it only makes the clause count differ from the branch count)
       src =
         seller_src("FailingClauseCovers", """
-        handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
+        defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
           Maty.DSL.send(:buyer1, {:date, addr})
           Maty.DSL.done(state)
         end
 
-        handler :decision_handler, :buyer2, {:quit, nil}, state do
+        defhandler decision_handler(:buyer2, {:quit, nil}, state) do
           Maty.DSL.done(state)
         end
 
-        handler :decision_handler, :buyer2, {:quit, nil}, state do
+        defhandler decision_handler(:buyer2, {:quit, nil}, state) do
           Maty.DSL.done(state)
         end
         """)
@@ -838,7 +838,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
         seller_src("MoreClausesThanBranches", """
         #{@valid_handlers}
 
-        handler :decision_handler, :buyer2, {:quit, nil}, state do
+        defhandler decision_handler(:buyer2, {:quit, nil}, state) do
           Maty.DSL.done(state)
         end
         """)
@@ -918,7 +918,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
             %{}
           end
 
-          init_handler :install, _ap_pid :: pid(), state do
+          defhandler install(_ap_pid :: pid(), state) do
             Maty.DSL.done(state)
           end
         end
@@ -946,7 +946,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
             %{}
           end
 
-          init_handler :install, _ap_pid :: pid(), state do
+          defhandler install(_ap_pid :: pid(), state) do
             Maty.DSL.done(state)
           end
         end
@@ -977,7 +977,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
             %{}
           end
 
-          init_handler :install, _ap_pid :: pid(), state do
+          defhandler install(_ap_pid :: pid(), state) do
             Maty.DSL.done(state)
           end
         end
@@ -1010,7 +1010,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
         seller_src("SpecAndAnnotationErrors", """
         #{@valid_handlers}
 
-        handler :no_such_session_type, :buyer2, {:quit, nil}, state do
+        defhandler no_such_session_type(:buyer2, {:quit, nil}, state) do
           Maty.DSL.done(state)
         end
 
@@ -1062,7 +1062,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       init_handlers =
         init_handlers ||
           """
-          init_handler :install, {_ap_pid, _title} :: {pid(), binary()}, state do
+          defhandler install({_ap_pid, _title} :: {pid(), binary()}, state) do
             Maty.DSL.suspend(:decision_handler, state)
           end
           """
@@ -1092,11 +1092,11 @@ defmodule Maty.Typechecker.CompileErrorTest do
     end
 
     @two_clause_init_handler """
-    init_handler :install, {_ap_pid, _title} :: {pid(), binary()}, state do
+    defhandler install({_ap_pid, _title} :: {pid(), binary()}, state) do
       Maty.DSL.suspend(:decision_handler, state)
     end
 
-    init_handler :install, {_ap_pid, _stock, _quantity} :: {pid(), number(), number()}, state do
+    defhandler install({_ap_pid, _stock, _quantity} :: {pid(), number(), number()}, state) do
       Maty.DSL.suspend(:decision_handler, state)
     end
     """
@@ -1222,13 +1222,13 @@ defmodule Maty.Typechecker.CompileErrorTest do
           %{}
         end
 
-        init_handler :install, nil, state do
+        defhandler install(nil, state) do
           next_handler = :title_handler
           _ = next_handler
           Maty.DSL.suspend(#{next_handler}, state)
         end
 
-        handler :title_handler, :buyer, {:title, _title :: binary()}, state do
+        defhandler title_handler(:buyer, {:title, _title :: binary()}, state) do
           Maty.DSL.done(state)
         end
       end
@@ -1282,7 +1282,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
           %{}
         end
 
-        init_handler :install, title :: binary(), state do
+        defhandler install(title :: binary(), state) do
           Maty.DSL.send(:seller, {:quit, title})
           Maty.DSL.done(state)
         end
@@ -1299,12 +1299,12 @@ defmodule Maty.Typechecker.CompileErrorTest do
     test "handling a wrong payload on the second label reports the payload" do
       src =
         seller_src("HandleSecondLabelPayload", """
-        handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
+        defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
           Maty.DSL.send(:buyer2, {:date, addr})
           Maty.DSL.done(state)
         end
 
-        handler :decision_handler, :buyer2, {:quit, _n :: number()}, state do
+        defhandler decision_handler(:buyer2, {:quit, _n :: number()}, state) do
           Maty.DSL.done(state)
         end
         """)

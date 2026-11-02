@@ -5,40 +5,41 @@ defmodule Maty.HandlerExpansionTest.Handlers do
   @type maty_actor_state :: any()
 
   # Simple annotated variable
-  handler :simple_handler, :seller, {:quote, amount :: number()}, state do
+  defhandler simple_handler(:seller, {:quote, amount :: number()}, state) do
     Maty.DSL.done({:received, amount, state})
   end
 
   # 2-tuple payload
-  handler :tuple_handler, :sender, {:pair, {first :: number(), second :: binary()}}, state do
+  defhandler tuple_handler(:sender, {:pair, {first :: number(), second :: binary()}}, state) do
     Maty.DSL.done({first, second, state})
   end
 
   # 3-tuple payload
-  handler :ntuple_handler,
-          :sender,
-          {:data, {a :: number(), b :: binary(), c :: boolean()}},
-          state do
+  defhandler ntuple_handler(
+               :sender,
+               {:data, {a :: number(), b :: binary(), c :: boolean()}},
+               state
+             ) do
     Maty.DSL.done({a, b, c, state})
   end
 
   # List payload
-  handler :list_handler, :sender, {:items, items :: list(binary())}, state do
+  defhandler list_handler(:sender, {:items, items :: list(binary())}, state) do
     Maty.DSL.done({items, state})
   end
 
   # Atom literal payload
-  handler :atom_handler, :sender, {:command, :start}, state do
+  defhandler atom_handler(:sender, {:command, :start}, state) do
     Maty.DSL.done({:started, state})
   end
 
   # Number literal payload
-  handler :number_handler, :sender, {:value, 42}, state do
+  defhandler number_handler(:sender, {:value, 42}, state) do
     Maty.DSL.done({:matched, state})
   end
 
   # Suspend instead of done
-  handler :suspend_handler, :worker, {:task, data :: binary()}, state do
+  defhandler suspend_handler(:worker, {:task, data :: binary()}, state) do
     Maty.DSL.suspend(:next_handler, {data, state})
   end
 end
@@ -175,7 +176,7 @@ defmodule Maty.HandlerExpansionTest do
     test "expansion produces def, spec, and __handler_expects__" do
       ast =
         quote do
-          handler(:my_handler, :role_a, {:msg, data :: binary()}, state) do
+          defhandler my_handler(:role_a, {:msg, data :: binary()}, state) do
             Maty.DSL.done(state)
           end
         end
