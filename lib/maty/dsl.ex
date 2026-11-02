@@ -57,13 +57,9 @@ defmodule Maty.DSL do
       def unquote(handler_name)(
             unquote(clean_pattern),
             unquote(state_var),
-            session_ctx
+            var!(session_ctx, Maty.DSL)
           ) do
         try do
-          var!(session_ctx) = session_ctx
-
-          # use the session_ctx variable so the LSP won't yell at me
-          _ = var!(session_ctx)
           unquote(body)
         catch
           {:maty_suspend, next_handler, new_state} -> {:suspend, next_handler, new_state}
@@ -105,13 +101,9 @@ defmodule Maty.DSL do
                 unquote(role),
                 unquote(clean_pattern),
                 unquote(state_var),
-                session_ctx
+                var!(session_ctx, Maty.DSL)
               ) do
             try do
-              var!(session_ctx) = session_ctx
-
-              # use the session_ctx variable so the LSP won't yell at me
-              _ = var!(session_ctx)
               unquote(body)
             catch
               {:maty_suspend, next_handler, new_state} -> {:suspend, next_handler, new_state}
@@ -164,7 +156,11 @@ defmodule Maty.DSL do
 
   defmacro send(recipient, message) do
     quote do
-      Runtime.send_session_message(var!(session_ctx), unquote(recipient), unquote(message))
+      Runtime.send_session_message(
+        var!(session_ctx, Maty.DSL),
+        unquote(recipient),
+        unquote(message)
+      )
     end
   end
 

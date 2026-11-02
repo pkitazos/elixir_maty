@@ -349,7 +349,7 @@ defmodule Maty.Typechecker.TC.WF do
 
   defp extract_body({:__block__, _, block}), do: block
 
-  defp extract_body({:try, _, [[do: {:__block__, _, [_, _, body_block]}, catch: _]]}),
+  defp extract_body({:try, _, [[do: body_block, catch: _]]}),
     do: extract_body(body_block)
 
   defp extract_body(expr) when not is_list(expr), do: [expr]
