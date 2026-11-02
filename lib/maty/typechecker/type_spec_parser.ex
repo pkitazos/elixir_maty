@@ -18,7 +18,7 @@ defmodule Maty.Typechecker.TypeSpecParser do
       Maty.Types.payload_types()
       |> Enum.map(&{&1, &1})
       |> Enum.into(%{})
-      |> Map.merge(Maty.Types.map())
+      |> Map.merge(Maty.Types.__map__())
       |> Map.put(:no_return, :no_return)
       |> Map.put(:any, :any)
       |> Map.put(:map, :map)

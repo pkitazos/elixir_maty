@@ -43,7 +43,7 @@ defmodule Maty.Types do
   @type access_point_state :: %{role() => :queue.queue(candidate())}
 
   # this maps our type names to their actual structural type
-  def map do
+  def __map__ do
     %{
       session_id: T.session_id(),
       init_token: T.init_token(),
@@ -61,11 +61,12 @@ defmodule Maty.Types do
     :atom,
     :binary,
     :boolean,
-    :date,
     :number,
+    nil,
+    # maybe not these actually
+    :date,
     :pid,
-    :ref,
-    nil
+    :ref
   ]
 
   @doc """
