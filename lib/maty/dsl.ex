@@ -6,7 +6,14 @@ defmodule Maty.DSL do
       require Maty.DSL
 
       import Maty.DSL,
-        only: [global_state: 1, local_state: 2, on_start: 2, init_handler: 4, handler: 5]
+        only: [
+          global_state: 1,
+          local_state: 2,
+          on_start: 2,
+          init_handler: 4,
+          handler: 5,
+          defhandler: 2
+        ]
     end
   end
 
@@ -43,6 +50,41 @@ defmodule Maty.DSL do
   end
 
   defmacro init_handler(handler_name, pattern, state_var, do: body) do
+    init_handler_def(handler_name, pattern, state_var, body)
+  end
+
+  defmacro handler(
+             handler_name,
+             role,
+             pattern,
+             state_var,
+             do: body
+           ) do
+    message_handler_def(handler_name, role, pattern, state_var, body)
+  end
+
+  # the handler kind is decided by its arity: `name(args, state)` is an init handler
+  # and `name(role, message, state)` is a message handler
+  defmacro defhandler(head, do: body) do
+    case head do
+      {:when, _, _} ->
+        # todo: make into ElixrMaty errors
+        raise ArgumentError, "Guards are not supported on defhandler"
+
+      {handler_name, _, [pattern, state_var]} when is_atom(handler_name) ->
+        init_handler_def(handler_name, pattern, state_var, body)
+
+      {handler_name, _, [role, pattern, state_var]} when is_atom(handler_name) ->
+        message_handler_def(handler_name, role, pattern, state_var, body)
+
+      _ ->
+        # todo: make into ElixrMaty errors
+        raise ArgumentError,
+              "Expected defhandler name(args, state) or defhandler name(role, message, state)"
+    end
+  end
+
+  defp init_handler_def(handler_name, pattern, state_var, body) do
     {clean_pattern, type_spec} = DSL.Pattern.process_init_pattern(pattern)
 
     quote do
@@ -69,13 +111,7 @@ defmodule Maty.DSL do
     end
   end
 
-  defmacro handler(
-             handler_name,
-             role,
-             pattern,
-             state_var,
-             do: body
-           ) do
+  defp message_handler_def(handler_name, role, pattern, state_var, body) do
     # first verify we have a proper tagged tuple pattern
     # the pattern should be a 2-tuple with an atom tag as the first element
     case pattern do
