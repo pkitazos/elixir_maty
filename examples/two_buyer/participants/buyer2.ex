@@ -1,21 +1,24 @@
 defmodule TwoBuyer.Participants.Buyer2 do
   use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:buyer2]
 
+  global_state %{}
+  local_state :buyer2, %{}
+
   @st {:install, ~q"share_handler"}
   @st {:share_handler,
        ~q"&buyer1:{share(number).+seller:{address(binary).date_handler, quit(nil).end}}"}
   @st {:date_handler, ~q"&seller:{date(date).end}"}
 
   on_start ap_pid :: pid() do
-    Maty.DSL.register(ap_pid, :buyer2, :install, nil, %{})
+    Maty.DSL.register(ap_pid, :buyer2, :install, nil)
     %{}
   end
 
-  init_handler :install, nil, state do
+  defhandler install(nil, state) do
     Maty.DSL.suspend(:share_handler, state)
   end
 
-  handler :share_handler, :buyer1, {:share, amount :: number()}, state do
+  defhandler share_handler(:buyer1, {:share, amount :: number()}, state) do
     IO.puts("&buyer1 : share(number)")
     :timer.sleep(500)
 
@@ -36,7 +39,7 @@ defmodule TwoBuyer.Participants.Buyer2 do
     end
   end
 
-  handler :date_handler, :seller, {:date, _date :: Date.t()}, state do
+  defhandler date_handler(:seller, {:date, _date :: Date.t()}, state) do
     IO.puts("&seller : date(date)")
     :timer.sleep(500)
 

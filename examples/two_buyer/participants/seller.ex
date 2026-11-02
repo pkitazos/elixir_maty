@@ -1,22 +1,25 @@
 defmodule TwoBuyer.Participants.Seller do
   use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
+  global_state %{}
+  local_state :seller, %{}
+
   @st {:install, ~q"title_handler"}
   @st {:title_handler, ~q"&buyer1:{title(binary).+buyer1:{quote(number).decision_handler}}"}
   @st {:decision_handler, ~q"&buyer2:{address(binary).+buyer2:{date(date).end},quit(nil).end}"}
 
   on_start ap_pid :: pid() do
-    Maty.DSL.register(ap_pid, :seller, :install, ap_pid, %{})
+    Maty.DSL.register(ap_pid, :seller, :install, ap_pid)
     %{}
   end
 
-  init_handler :install, ap_pid :: pid(), state do
-    Maty.DSL.register(ap_pid, :seller, :install, ap_pid, %{})
+  defhandler install(ap_pid :: pid(), state) do
+    Maty.DSL.register(ap_pid, :seller, :install, ap_pid)
 
     Maty.DSL.suspend(:title_handler, state)
   end
 
-  handler :title_handler, :buyer1, {:title, title :: binary()}, state do
+  defhandler title_handler(:buyer1, {:title, title :: binary()}, state) do
     IO.puts("&buyer1 : title(binary)")
     :timer.sleep(500)
 
@@ -28,7 +31,7 @@ defmodule TwoBuyer.Participants.Seller do
     Maty.DSL.suspend(:decision_handler, state)
   end
 
-  handler :decision_handler, :buyer2, {:address, addr :: binary()}, state do
+  defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
     IO.puts("&buyer2 : address(binary)")
     :timer.sleep(500)
 
@@ -40,7 +43,7 @@ defmodule TwoBuyer.Participants.Seller do
     Maty.DSL.done(state)
   end
 
-  handler :decision_handler, :buyer2, {:quit, nil}, state do
+  defhandler decision_handler(:buyer2, {:quit, nil}, state) do
     IO.puts("&buyer2 : quit()")
     :timer.sleep(500)
 
