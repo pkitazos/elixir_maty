@@ -210,4 +210,48 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
       details: %{got: got}
     }
   end
+
+  # defhandler was given a head with a guard
+  def unsupported_handler_guard(module, meta, guard_ast) do
+    %Error{
+      category: :framework_usage,
+      kind: :unsupported_handler_guard,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: guard_ast}
+    }
+  end
+
+  # defhandler was given a head that is neither `name(args, state)` nor `name(role, message, state)`
+  def invalid_handler_head(module, meta, head_ast) do
+    %Error{
+      category: :framework_usage,
+      kind: :invalid_handler_head,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: head_ast}
+    }
+  end
+
+  # a message handler was given an expression for its role, not a literal atom
+  def handler_role_not_literal(module, meta, got_ast) do
+    %Error{
+      category: :framework_usage,
+      kind: :handler_role_not_literal,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: got_ast}
+    }
+  end
+
+  # a message handler was given a message pattern that is not `{:label, payload}`
+  def handler_message_not_tagged_tuple(module, meta, got_ast) do
+    %Error{
+      category: :framework_usage,
+      kind: :handler_message_not_tagged_tuple,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: got_ast}
+    }
+  end
 end

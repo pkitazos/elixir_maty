@@ -713,6 +713,50 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :framework_usage, kind: :unsupported_handler_guard} = e) do
+    %{got: got} = e.details
+
+    """
+    Framework Usage Violation: Unsupported Handler Guard
+      Guard: #{Macro.to_string(got)}
+      --
+      defhandler does not support guards, annotate the payload instead, e.g. {:title, title :: binary()}.
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :invalid_handler_head} = e) do
+    %{got: got} = e.details
+
+    """
+    Framework Usage Violation: Invalid Handler Head
+      Got: #{Macro.to_string(got)}
+      --
+      defhandler must be given name(args, state) for an init handler, or name(role, message, state) for a message handler.
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :handler_role_not_literal} = e) do
+    %{got: got} = e.details
+
+    """
+    Framework Usage Violation: Handler Role Not a Literal
+      Got: #{Macro.to_string(got)}
+      --
+      A message handler must be given the role it receives from as a literal atom, e.g. :buyer1.
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :handler_message_not_tagged_tuple} = e) do
+    %{got: got} = e.details
+
+    """
+    Framework Usage Violation: Message Not a Tagged Tuple
+      Got: #{Macro.to_string(got)}
+      --
+      A message handler must match a message of the form {:label, payload}.
+    """
+  end
+
   defp render(%Error{category: :framework_usage, kind: :missing_global_state}) do
     """
     Framework Usage Violation: Missing Global State

@@ -292,6 +292,18 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FrameworkUsage.init_handler_not_literal(@m, @meta, {:handler, [], nil})},
       {{Error.FrameworkUsage, :register_wrong_arity},
        Error.FrameworkUsage.register_wrong_arity(@m, @meta, 3)},
+      {{Error.FrameworkUsage, :unsupported_handler_guard},
+       Error.FrameworkUsage.unsupported_handler_guard(
+         @m,
+         @meta,
+         {:is_binary, [], [{:t, [], nil}]}
+       )},
+      {{Error.FrameworkUsage, :invalid_handler_head},
+       Error.FrameworkUsage.invalid_handler_head(@m, @meta, {:install, [], [{:state, [], nil}]})},
+      {{Error.FrameworkUsage, :handler_role_not_literal},
+       Error.FrameworkUsage.handler_role_not_literal(@m, @meta, {:from, [], nil})},
+      {{Error.FrameworkUsage, :handler_message_not_tagged_tuple},
+       Error.FrameworkUsage.handler_message_not_tagged_tuple(@m, @meta, {:msg, [], nil})},
 
       # :name_resolution
       {{Error.NameResolution, :variable_not_exist},

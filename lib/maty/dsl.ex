@@ -1,5 +1,6 @@
 defmodule Maty.DSL do
   alias Maty.{DSL, Runtime}
+  alias Maty.Typechecker.Error
 
   defmacro __using__(_opts) do
     quote do
@@ -42,7 +43,7 @@ defmodule Maty.DSL do
     quote do
       @impl true
       @spec on_start(unquote(type_spec)) :: {:ok, global_state()}
-      #   somehow type the global state from this ^
+      # todo: somehow type the global state from this ^
       def on_start(unquote(clean_pattern)) do
         unquote(body)
       end
@@ -60,33 +61,46 @@ defmodule Maty.DSL do
              state_var,
              do: body
            ) do
-    message_handler_def(handler_name, role, pattern, state_var, body)
+    message_handler_def(__CALLER__, handler_name, role, pattern, state_var, body)
   end
 
-  # the handler kind is decided by its arity: `name(args, state)` is an init handler
-  # and `name(role, message, state)` is a message handler
+  # the handler kind is decided by its arity:
+  # - `name(args, state)` is an init handler
+  # - `name(role, message, state)` is a message handler
   defmacro defhandler(head, do: body) do
+    module = __CALLER__.module
+    meta = [line: __CALLER__.line]
+
     case head do
-      {:when, _, _} ->
-        # todo: make into ElixrMaty errors
-        raise ArgumentError, "Guards are not supported on defhandler"
+      {:when, _, [_call, guard]} ->
+        handler_error(nil, Error.FrameworkUsage.unsupported_handler_guard(module, meta, guard))
 
       {handler_name, _, [pattern, state_var]} when is_atom(handler_name) ->
         init_handler_def(handler_name, pattern, state_var, body)
 
       {handler_name, _, [role, pattern, state_var]} when is_atom(handler_name) ->
-        message_handler_def(handler_name, role, pattern, state_var, body)
+        message_handler_def(__CALLER__, handler_name, role, pattern, state_var, body)
 
       _ ->
-        # todo: make into ElixrMaty errors
-        raise ArgumentError,
-              "Expected defhandler name(args, state) or defhandler name(role, message, state)"
+        handler_error(nil, Error.FrameworkUsage.invalid_handler_head(module, meta, head))
+    end
+  end
+
+  # a misused handler generates no `def`
+  # we record and report an error with the other handler annotation errors at `@before_compile`
+  defp handler_error(func_id, error) do
+    quote do
+      @handler_errors {unquote(Macro.escape(func_id)), unquote(Macro.escape(error))}
     end
   end
 
   defp init_handler_def(handler_name, pattern, state_var, body) do
     {clean_pattern, type_spec} = DSL.Pattern.process_init_pattern(pattern)
 
+    build_init_handler(handler_name, clean_pattern, type_spec, state_var, body)
+  end
+
+  defp build_init_handler(handler_name, clean_pattern, type_spec, state_var, body) do
     quote do
       @init_handler unquote(handler_name)
       @spec unquote(handler_name)(
@@ -101,62 +115,75 @@ defmodule Maty.DSL do
             unquote(state_var),
             var!(session_ctx, Maty.DSL)
           ) do
-        try do
-          unquote(body)
-        catch
-          {:maty_suspend, next_handler, new_state} -> {:suspend, next_handler, new_state}
-          {:maty_done, new_state} -> {:done, new_state}
-        end
+        unquote(catch_handler_result(body))
       end
     end
   end
 
-  defp message_handler_def(handler_name, role, pattern, state_var, body) do
-    # first verify we have a proper tagged tuple pattern
-    # the pattern should be a 2-tuple with an atom tag as the first element
-    case pattern do
-      {tag, _payload} when is_atom(tag) ->
-        # process the pattern to extract the cleaned pattern and type specification
-        {clean_pattern, type_spec} = DSL.Pattern.process_pattern(pattern)
+  defp message_handler_def(caller, handler_name, role, pattern, state_var, body) do
+    func_id = {handler_name, 4}
+    meta = [line: caller.line]
 
-        # a handler may be defined by several clauses, but its expected role only needs
-        # registering once, a second identical clause would never match (and would warn)
-        expects_key = :"__handler_expects_#{handler_name}__"
+    with {:role, true} <- {:role, is_atom(role)},
+         {:message, {tag, _payload}} when is_atom(tag) <- {:message, pattern} do
+      # process the pattern to extract the cleaned pattern and type specification
+      {clean_pattern, type_spec} = DSL.Pattern.process_pattern(pattern)
 
-        quote do
-          @handler unquote(handler_name)
-          # no_return() describes the body as the typechecker sees it (it always ends in suspend/done),
-          # the generated function itself returns the caught {:suspend, ...} / {:done, ...} result
-          @spec unquote(handler_name)(
-                  unquote(role),
-                  unquote(type_spec),
-                  maty_actor_state(),
-                  session_ctx()
-                ) :: no_return()
-          def unquote(handler_name)(
-                unquote(role),
-                unquote(clean_pattern),
-                unquote(state_var),
-                var!(session_ctx, Maty.DSL)
-              ) do
-            try do
-              unquote(body)
-            catch
-              {:maty_suspend, next_handler, new_state} -> {:suspend, next_handler, new_state}
-              {:maty_done, new_state} -> {:done, new_state}
-            end
-          end
+      build_message_handler(handler_name, role, clean_pattern, type_spec, state_var, body)
+    else
+      {:role, _} ->
+        handler_error(
+          func_id,
+          Error.FrameworkUsage.handler_role_not_literal(caller.module, meta, role)
+        )
 
-          if not Module.has_attribute?(__MODULE__, unquote(expects_key)) do
-            Module.put_attribute(__MODULE__, unquote(expects_key), true)
-            def __handler_expects__(unquote(handler_name)), do: unquote(role)
-          end
-        end
+      {:message, _} ->
+        handler_error(
+          func_id,
+          Error.FrameworkUsage.handler_message_not_tagged_tuple(caller.module, meta, pattern)
+        )
+    end
+  end
 
-      _ ->
-        # ERROR: Expected a tagged tuple pattern like {:tag, payload}
-        # for now, we'll just raise a compile-time error
-        raise ArgumentError, "Expected a tagged tuple pattern like {:tag, payload}"
+  defp build_message_handler(handler_name, role, clean_pattern, type_spec, state_var, body) do
+    # a handler may be defined by several clauses, but its expected role only needs
+    # registering once, a second identical clause would never match (and would warn)
+    expects_key = :"__handler_expects_#{handler_name}__"
+
+    quote do
+      @handler unquote(handler_name)
+      @spec unquote(handler_name)(
+              unquote(role),
+              unquote(type_spec),
+              maty_actor_state(),
+              session_ctx()
+            ) :: no_return()
+      # no_return() describes the body as the typechecker sees it (it always ends in suspend/done),
+      # the generated function itself returns the caught {:suspend, ...} / {:done, ...} result
+      def unquote(handler_name)(
+            unquote(role),
+            unquote(clean_pattern),
+            unquote(state_var),
+            var!(session_ctx, Maty.DSL)
+          ) do
+        unquote(catch_handler_result(body))
+      end
+
+      if not Module.has_attribute?(__MODULE__, unquote(expects_key)) do
+        Module.put_attribute(__MODULE__, unquote(expects_key), true)
+        def __handler_expects__(unquote(handler_name)), do: unquote(role)
+      end
+    end
+  end
+
+  defp catch_handler_result(body) do
+    quote do
+      try do
+        unquote(body)
+      catch
+        {:maty_suspend, next_handler, new_state} -> {:suspend, next_handler, new_state}
+        {:maty_done, new_state} -> {:done, new_state}
+      end
     end
   end
 
