@@ -9,6 +9,8 @@ defmodule Maty.Types do
   @type init_token :: reference()
   @type role :: atom()
   @type handler_label :: atom()
+  @type init_handler :: (term(), maty_actor_state() -> no_return())
+  @type message_handler :: (role(), message(), maty_actor_state() -> no_return())
 
   # placeholders / grep targets until I decide how to type local and global state
   @type local_state :: term()

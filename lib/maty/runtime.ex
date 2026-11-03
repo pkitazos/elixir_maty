@@ -171,6 +171,15 @@ defmodule Maty.Runtime do
     %{s | global_actor_state: actor_state.global}
   end
 
+  # a handler fun is a capture of the handler's stub (`&name/n` at the written arity)
+  # the real handler takes the session context as an extra argument so its arity is n+1
+  # we extract the name from the stub and store that as before
+  @spec handler_name!(Types.init_handler() | Types.message_handler()) :: atom()
+  defp handler_name!(handler) do
+    {:name, name} = Function.info(handler, :name)
+    name
+  end
+
   @spec can_process?(InternalState.t(), Envelope.t()) :: boolean()
   defp can_process?(s, envelope) do
     with {:ok, session} <- Map.fetch(s.sessions, envelope.session_id),
@@ -191,14 +200,14 @@ defmodule Maty.Runtime do
   end
 
   @doc false
-  @spec register(pid(), Types.role(), Types.handler_label(), term()) :: :ok
+  @spec register(pid(), Types.role(), Types.init_handler(), term()) :: :ok
   def register(ap_pid, role, handler, args) do
     Kernel.send(
       self(),
       {:maty_register, ap_pid,
        %{
          role: role,
-         init_handler: handler,
+         init_handler: handler_name!(handler),
          args: args
        }}
     )
@@ -215,8 +224,8 @@ defmodule Maty.Runtime do
   end
 
   @doc false
-  @spec suspend(Types.handler_label(), Types.maty_actor_state()) :: no_return()
-  def suspend(next_handler, state), do: throw({:maty_suspend, next_handler, state})
+  @spec suspend(Types.message_handler(), Types.maty_actor_state()) :: no_return()
+  def suspend(next_handler, state), do: throw({:maty_suspend, handler_name!(next_handler), state})
 
   @doc false
   @spec done(Types.maty_actor_state()) :: no_return()

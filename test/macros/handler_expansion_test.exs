@@ -130,10 +130,8 @@ defmodule Maty.HandlerExpansionTest do
 
   describe "suspend" do
     test "returns suspend tuple with next handler and new state" do
-      assert {:suspend, next_handler, {"task_data", %{}}} =
+      assert {:suspend, :simple_handler, {"task_data", %{}}} =
                Handlers.suspend_handler(:worker, {:task, "task_data"}, %{}, nil)
-
-      assert Function.info(next_handler, :name) == {:name, :simple_handler}
     end
   end
 
