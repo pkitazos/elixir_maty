@@ -304,6 +304,8 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FrameworkUsage.handler_role_not_literal(@m, @meta, {:from, [], nil})},
       {{Error.FrameworkUsage, :handler_message_not_tagged_tuple},
        Error.FrameworkUsage.handler_message_not_tagged_tuple(@m, @meta, {:msg, [], nil})},
+      {{Error.FrameworkUsage, :handler_ref_not_capture},
+       Error.FrameworkUsage.handler_ref_not_capture(@m, @meta, :install, 2)},
       {{Error.FrameworkUsage, :handler_ref_wrong_arity},
        Error.FrameworkUsage.handler_ref_wrong_arity(@m, @meta, :install, 3, 2)},
 

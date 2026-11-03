@@ -244,6 +244,18 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
+  # register / suspend was given something other than a local capture `&name/n`
+  # (an atom, a variable, a remote capture, ...)
+  def handler_ref_not_capture(module, meta, got_ast, expected) do
+    %Error{
+      category: :framework_usage,
+      kind: :handler_ref_not_capture,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: got_ast, expected: expected}
+    }
+  end
+
   # register / suspend was given `&name/n` with the wrong arity:
   # init handlers are referenced with arity 2, message handlers with arity 3
   def handler_ref_wrong_arity(module, meta, name, got, expected) do

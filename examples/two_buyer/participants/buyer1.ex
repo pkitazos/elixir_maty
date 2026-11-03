@@ -8,7 +8,7 @@ defmodule TwoBuyer.Participants.Buyer1 do
   @st {:quote_handler, ~q/&seller:{quote(number).+buyer2:{share(number).end}}/}
 
   on_start {ap_pid, title} :: {pid(), binary()} do
-    Maty.DSL.register(ap_pid, :buyer1, :install, title)
+    Maty.DSL.register(ap_pid, :buyer1, &install/2, title)
     %{}
   end
 
@@ -17,7 +17,7 @@ defmodule TwoBuyer.Participants.Buyer1 do
     IO.puts("+seller : title(binary)")
     :timer.sleep(500)
 
-    Maty.DSL.suspend(:quote_handler, state)
+    Maty.DSL.suspend(&quote_handler/3, state)
   end
 
   defhandler quote_handler(:seller, {:quote, amount :: number()}, state) do

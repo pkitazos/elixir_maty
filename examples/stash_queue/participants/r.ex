@@ -7,7 +7,7 @@ defmodule StashQueue.Participants.R do
   @st {:install, ~q/+q:{b(number).+q:{b(number).end}}/}
 
   on_start {ap_pid, {n1, n2}} :: {pid(), {number(), number()}} do
-    Maty.DSL.register(ap_pid, :r, :install, {n1, n2})
+    Maty.DSL.register(ap_pid, :r, &install/2, {n1, n2})
     %{}
   end
 

@@ -178,8 +178,20 @@ defmodule Maty.DSL do
          {:arity, ^expected_arity, _name} <- {:arity, arity, name} do
       name
     else
-      # todo: once everything uses `&name/n`, report something here
+      # anything but a local capture (an atom, a variable, a remote capture, ...)
       {:capture, other} ->
+        Module.put_attribute(
+          caller.module,
+          :handler_errors,
+          {nil,
+           Error.FrameworkUsage.handler_ref_not_capture(
+             caller.module,
+             [line: caller.line],
+             other,
+             expected_arity
+           )}
+        )
+
         other
 
       {:arity, got, name} ->
@@ -213,7 +225,7 @@ defmodule Maty.DSL do
   ## Parameters
     - `ap_pid`: The PID of the Access Point process.
     - `role`: The role this actor will play in the session (atom).
-    - `handler`: The name of the init handler to be called when the session starts, as a literal atom
+    - `handler`: The init handler to be called when the session starts, as a capture, e.g. `&install/2`
     - `args`: The single value passed to the init handler (use a tuple for several values, and `nil` for none).
 
   ## Returns

@@ -40,7 +40,7 @@ defmodule Maty.HandlerExpansionTest.Handlers do
 
   # Suspend instead of done
   defhandler suspend_handler(:worker, {:task, data :: binary()}, state) do
-    Maty.DSL.suspend(:next_handler, {data, state})
+    Maty.DSL.suspend(&next_handler/3, {data, state})
   end
 end
 

@@ -110,8 +110,8 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Protocol Violation: Incorrect Handler Suspension
-      Got: #{render_atom(handler_received)}
-      Expected: #{render_atom(handler_expected)}
+      Got: #{render_handler_ref(handler_received, 3)}
+      Expected: #{render_handler_ref(handler_expected, 3)}
       --
       Session Type: #{Maty.ST.repr(e.st)}
     """
@@ -158,7 +158,7 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Protocol Violation: Suspended with Invalid Handler
-      Tried: #{Macro.to_string(got)}
+      Tried: #{render_handler_ref(got, 3)}
       --
       Session Type: #{Maty.ST.repr(e.st)}
     """
@@ -683,10 +683,10 @@ defmodule Maty.Typechecker.Error.Formatter do
 
     """
     Framework Usage Violation: Unknown Init Handler
-      Got: #{render_type(got)}
-      Init handlers: #{render_handler_names(known)}
+      Got: #{render_handler_ref(got, 2)}
+      Init handlers: #{render_handler_names(known, 2)}
       --
-      MatyDSL.register/4 must be given the name of an init handler defined in this module.
+      register must be given an init handler defined in this module.
     """
   end
 
@@ -746,15 +746,21 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :framework_usage, kind: :handler_ref_not_capture} = e) do
+    %{got: got, expected: expected} = e.details
+    {macro, kind} = handler_ref_macro(expected)
+
+    """
+    Framework Usage Violation: Handler Not a Capture
+      Got: #{Macro.to_string(got)}
+      --
+      #{macro} takes #{kind} as a capture of a handler in this module, e.g. &name/#{expected}.
+    """
+  end
+
   defp render(%Error{category: :framework_usage, kind: :handler_ref_wrong_arity} = e) do
     %{name: name, got: got, expected: expected} = e.details
-
-    {macro, kind} =
-      if expected == 2 do
-        {"register", "an init handler"}
-      else
-        {"suspend", "a message handler"}
-      end
+    {macro, kind} = handler_ref_macro(expected)
 
     """
     Framework Usage Violation: Wrong Handler Arity
@@ -995,10 +1001,16 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render_register_argument(:access_point), do: "1 (access point)"
   defp render_register_argument(:init_handler_args), do: "4 (init handler args)"
 
-  defp render_handler_names([]), do: "(none)"
+  defp render_handler_names([], _arity), do: "(none)"
 
-  defp render_handler_names(names),
-    do: names |> Enum.sort() |> Enum.map_join(", ", &render_type/1)
+  defp render_handler_names(names, arity),
+    do: names |> Enum.sort() |> Enum.map_join(", ", &render_handler_ref(&1, arity))
+
+  defp render_handler_ref(name, arity) when is_atom(name), do: "&#{name}/#{arity}"
+  defp render_handler_ref(ast, _arity), do: Macro.to_string(ast)
+
+  defp handler_ref_macro(2), do: {"register", "an init handler"}
+  defp handler_ref_macro(3), do: {"suspend", "a message handler"}
 
   defp render_string_segment(:interpolation), do: "Interpolation"
   defp render_string_segment(:concatenation), do: "Concatenation"
