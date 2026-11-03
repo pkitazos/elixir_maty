@@ -242,7 +242,7 @@ defmodule Maty.DSL do
     end
   end
 
-  defmacro send(recipient, message) do
+  defmacro send_to(recipient, message) do
     quote do
       Runtime.send_session_message(
         var!(session_ctx, Maty.DSL),

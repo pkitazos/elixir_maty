@@ -23,7 +23,7 @@ defmodule TwoBuyer.Participants.Buyer2 do
     :timer.sleep(500)
 
     if amount > 100 do
-      Maty.DSL.send(:seller, {:quit, nil})
+      Maty.DSL.send_to(:seller, {:quit, nil})
       IO.puts("+seller : quit()")
       :timer.sleep(500)
 
@@ -31,7 +31,7 @@ defmodule TwoBuyer.Participants.Buyer2 do
     else
       address = get_address()
 
-      Maty.DSL.send(:seller, {:address, address})
+      Maty.DSL.send_to(:seller, {:address, address})
       IO.puts("+seller : address(binary)")
       :timer.sleep(500)
 

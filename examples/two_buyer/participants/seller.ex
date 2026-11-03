@@ -24,7 +24,7 @@ defmodule TwoBuyer.Participants.Seller do
     :timer.sleep(500)
 
     amount = lookup_price(title)
-    Maty.DSL.send(:buyer1, {:quote, amount})
+    Maty.DSL.send_to(:buyer1, {:quote, amount})
     IO.puts("+buyer1 : quote(number)")
     :timer.sleep(500)
 
@@ -36,7 +36,7 @@ defmodule TwoBuyer.Participants.Seller do
     :timer.sleep(500)
 
     date = shipping_date(addr)
-    Maty.DSL.send(:buyer2, {:date, date})
+    Maty.DSL.send_to(:buyer2, {:date, date})
     IO.puts("+buyer2 : date(date)")
     :timer.sleep(500)
 

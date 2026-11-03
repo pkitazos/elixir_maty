@@ -31,13 +31,13 @@ defmodule Maty.Typechecker.CompileErrorTest do
         end
 
         defhandler install(title :: binary(), state) do
-          Maty.DSL.send(:buyer2, {:title, title})
+          Maty.DSL.send_to(:buyer2, {:title, title})
           Maty.DSL.suspend(&quote_handler/3, state)
         end
 
         defhandler quote_handler(:seller, {:quote, amount :: number()}, state) do
           share_amount = amount / 2
-          Maty.DSL.send(:buyer2, {:share, share_amount})
+          Maty.DSL.send_to(:buyer2, {:share, share_amount})
           Maty.DSL.done(state)
         end
       end
@@ -80,7 +80,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
     # `clauses` spliced in as the handler definitions so each test can control what is wrong
     @valid_handlers """
     defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
-      Maty.DSL.send(:buyer2, {:date, addr})
+      Maty.DSL.send_to(:buyer2, {:date, addr})
       Maty.DSL.done(state)
     end
 
@@ -138,7 +138,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         seller_src("ClauseAndCoverage", """
         defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
-          Maty.DSL.send(:buyer1, {:date, addr})
+          Maty.DSL.send_to(:buyer1, {:date, addr})
           Maty.DSL.done(state)
         end
         """)
@@ -153,12 +153,12 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         seller_src("HandlerClauseFrame", """
         defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
-          Maty.DSL.send(:buyer2, {:date, addr})
+          Maty.DSL.send_to(:buyer2, {:date, addr})
           Maty.DSL.done(state)
         end
 
         defhandler decision_handler(:buyer2, {:quit, nil}, state) do
-          Maty.DSL.send(:buyer2, {:date, "never"})
+          Maty.DSL.send_to(:buyer2, {:date, "never"})
           Maty.DSL.done(state)
         end
         """)
@@ -500,7 +500,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         seller_src("MissingBranchLine", """
         defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
-          Maty.DSL.send(:buyer2, {:date, addr})
+          Maty.DSL.send_to(:buyer2, {:date, addr})
           Maty.DSL.done(state)
         end
         """)
@@ -749,7 +749,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         seller_src("WrongRole", """
         defhandler decision_handler(:buyer1, {:address, addr :: binary()}, state) do
-          Maty.DSL.send(:buyer2, {:date, addr})
+          Maty.DSL.send_to(:buyer2, {:date, addr})
           Maty.DSL.done(state)
         end
 
@@ -814,7 +814,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         seller_src("FailingClauseCovers", """
         defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
-          Maty.DSL.send(:buyer1, {:date, addr})
+          Maty.DSL.send_to(:buyer1, {:date, addr})
           Maty.DSL.done(state)
         end
 
@@ -1283,7 +1283,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
         end
 
         defhandler install(title :: binary(), state) do
-          Maty.DSL.send(:seller, {:quit, title})
+          Maty.DSL.send_to(:seller, {:quit, title})
           Maty.DSL.done(state)
         end
       end
@@ -1293,14 +1293,14 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
       assert error.description =~ "Incorrect Payload Type"
       refute error.description =~ "Incorrect Message Label"
-      assert own_line(error) == line_of(src, "Maty.DSL.send(")
+      assert own_line(error) == line_of(src, "Maty.DSL.send_to(")
     end
 
     test "handling a wrong payload on the second label reports the payload" do
       src =
         seller_src("HandleSecondLabelPayload", """
         defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
-          Maty.DSL.send(:buyer2, {:date, addr})
+          Maty.DSL.send_to(:buyer2, {:date, addr})
           Maty.DSL.done(state)
         end
 

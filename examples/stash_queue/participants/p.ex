@@ -16,8 +16,8 @@ defmodule StashQueue.Participants.P do
   defhandler install({n1, n2} :: {number(), number()}, state) do
     :timer.sleep(100)
 
-    Maty.DSL.send(:q, {:a, n1})
-    Maty.DSL.send(:q, {:a, n2})
+    Maty.DSL.send_to(:q, {:a, n1})
+    Maty.DSL.send_to(:q, {:a, n2})
 
     Maty.DSL.done(state)
   end

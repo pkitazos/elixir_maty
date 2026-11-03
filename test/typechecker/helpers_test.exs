@@ -3,7 +3,6 @@ defmodule Maty.Typechecker.HelpersTest do
 
   alias Maty.Typechecker.Helpers
   alias Maty.ST.SBottom
-  alias Maty.Types.T, as: Type
 
   @meta [line: 0]
   @module TestModule

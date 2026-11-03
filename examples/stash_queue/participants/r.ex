@@ -14,10 +14,10 @@ defmodule StashQueue.Participants.R do
   # the timings set up Q's mailbox as [b(n1), a(n1), a(n2), b(n2)] (see docs/stash-queue.md)
   # R's first message goes out at once, its second only after both of P's have landed
   defhandler install({n1, n2} :: {number(), number()}, state) do
-    Maty.DSL.send(:q, {:b, n1})
+    Maty.DSL.send_to(:q, {:b, n1})
 
     :timer.sleep(300)
-    Maty.DSL.send(:q, {:b, n2})
+    Maty.DSL.send_to(:q, {:b, n2})
 
     Maty.DSL.done(state)
   end

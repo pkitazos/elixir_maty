@@ -13,7 +13,7 @@ defmodule TwoBuyer.Participants.Buyer1 do
   end
 
   defhandler install(title :: binary(), state) do
-    Maty.DSL.send(:seller, {:title, title})
+    Maty.DSL.send_to(:seller, {:title, title})
     IO.puts("+seller : title(binary)")
     :timer.sleep(500)
 
@@ -26,7 +26,7 @@ defmodule TwoBuyer.Participants.Buyer1 do
 
     share_amount = amount / 2
 
-    Maty.DSL.send(:buyer2, {:share, share_amount})
+    Maty.DSL.send_to(:buyer2, {:share, share_amount})
     IO.puts("+buyer2 : share(number)")
     :timer.sleep(500)
 
