@@ -353,11 +353,36 @@ defmodule Maty.Typechecker.TC do
     {:error, Error.FrameworkUsage.unsupported_anonymous_function(ctx.module, meta), env}
   end
 
-  # todo: not really anonymus is it?
-  # Function capture: &Mod.fun/arity, &fun/arity, &(&1 + 1)
+  # Function capture: &fun/arity
+  deftc tc_expr(ctx, env, st, {:&, meta, [{:/, _, [{name, _, context}, arity]}]} = capture_ast)
+        when is_atom(name) and is_atom(context) and is_integer(arity) do
+    check env: env, st: st do
+      cond do
+        Map.has_key?(ctx.delta_M, name) and arity == 3 ->
+          ok({:handler, :message, ctx.delta_M[name].st})
+
+        Map.has_key?(ctx.delta_I, name) and arity == 2 ->
+          {:ok, arg_types} = Helpers.init_handler_arg_types(ctx, name)
+          ok({:handler, :init, arg_types, ctx.delta_I[name].st})
+
+        Map.has_key?(ctx.delta_M, name) ->
+          fail(Error.FrameworkUsage.handler_ref_wrong_arity(ctx.module, meta, name, arity, 3))
+
+        Map.has_key?(ctx.delta_I, name) ->
+          fail(Error.FrameworkUsage.handler_ref_wrong_arity(ctx.module, meta, name, arity, 2))
+
+        true ->
+          fail(Error.FrameworkUsage.unsupported_capture(ctx.module, meta, capture_ast))
+      end
+    end
+  end
+
+  # Anonymus Function capture: &(&1 + 1)
   deftc tc_expr(ctx, env, _st, {:&, meta, [_capture]}) do
     {:error, Error.FrameworkUsage.unsupported_anonymous_function(ctx.module, meta), env}
   end
+
+  # todo: handle remote function capture/call
 
   # Block Scope
   deftc tc_expr(ctx, var_env, st_pre, {:__block__, _, body_asts}) when is_list(body_asts) do

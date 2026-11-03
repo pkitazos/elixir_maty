@@ -185,7 +185,14 @@ defmodule Maty.Typechecker.Helpers do
   def init_handler_arg_types(ctx, handler_name) do
     with {:ok, %{function: func_id}} <- Map.fetch(ctx.delta_I, handler_name) do
       # a missing psi entry is reported as a missing spec on the handler itself
-      {:ok, ctx.psi |> Map.get(func_id, []) |> Enum.map(fn {[arg | _], _} -> arg end)}
+      arg_types =
+        ctx.psi
+        |> Map.get(func_id, [])
+        |> Enum.map(fn {[arg | _], _} -> arg end)
+        |> Enum.uniq()
+        |> Enum.sort()
+
+      {:ok, arg_types}
     end
   end
 
