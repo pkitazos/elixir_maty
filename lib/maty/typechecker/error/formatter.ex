@@ -746,6 +746,18 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :framework_usage, kind: :handler_name_clash} = e) do
+    %{function: {name, arity}, handler_kind: handler_kind} = e.details
+
+    """
+    Framework Usage Violation: Function Has a Handler's Name
+      Function: #{name}/#{arity}
+      Handler: #{name} (#{handler_kind} handler)
+      --
+      A function cannot have the same name as a handler in the same module, at any arity. Rename one of them.
+    """
+  end
+
   defp render(%Error{category: :framework_usage, kind: :handler_ref_not_capture} = e) do
     %{got: got, expected: expected} = e.details
     {macro, kind} = handler_ref_macro(expected)

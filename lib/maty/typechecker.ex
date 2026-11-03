@@ -51,6 +51,10 @@ defmodule Maty.Typechecker do
       })
     end
 
+    if is_nil(handler) and is_nil(init_handler) do
+      Module.put_attribute(env.module, :non_handler_defs, {name, arity, env.line})
+    end
+
     Preprocessor.process_type_annotation(%{module: env.module, function: {name, args}})
   end
 
@@ -76,7 +80,9 @@ defmodule Maty.Typechecker do
     errors =
       Module.get_attribute(env.module, :spec_errors) ++
         Module.get_attribute(env.module, :handler_errors) ++
-        unknown_role_errors(env) ++ state_errors
+        unknown_role_errors(env) ++
+        handler_name_clash_errors(env) ++
+        state_errors
 
     # we fail here, before the bodies are checked in `handle_after_compile`, on purpose:
     # a spec or handler annotation that did not validate leaves psi and delta incomplete,
@@ -86,6 +92,29 @@ defmodule Maty.Typechecker do
     end
 
     Module.put_attribute(env.module, :state_types, state_types)
+  end
+
+  @spec handler_name_clash_errors(Macro.Env.t()) :: [{{atom(), arity()}, Error.t()}]
+  defp handler_name_clash_errors(env) do
+    all_handlers =
+      Map.merge(
+        Delta.get_key_set(env.module, :delta_M) |> Map.new(fn {name, _} -> {name, :message} end),
+        Delta.get_key_set(env.module, :delta_I) |> Map.new(fn {name, _} -> {name, :init} end)
+      )
+
+    for {name, arity, line} <-
+          Module.get_attribute(env.module, :non_handler_defs)
+          |> Enum.reverse()
+          |> Enum.uniq_by(fn {name, arity, _line} -> {name, arity} end),
+        Map.has_key?(all_handlers, name) do
+      {{name, arity},
+       Error.FrameworkUsage.handler_name_clash(
+         env.module,
+         [line: line],
+         {name, arity},
+         all_handlers[name]
+       )}
+    end
   end
 
   # every role an actor declares in `use Maty.Actor` must be a role of its protocol

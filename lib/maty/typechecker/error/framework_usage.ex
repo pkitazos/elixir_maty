@@ -244,6 +244,18 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
+  # a function that is not a handler has the same name as a handler
+  def handler_name_clash(module, meta, func_id, handler_kind)
+      when handler_kind in [:init, :message] do
+    %Error{
+      category: :framework_usage,
+      kind: :handler_name_clash,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{function: func_id, handler_kind: handler_kind}
+    }
+  end
+
   # register / suspend was given something other than a local capture `&name/n`
   # (an atom, a variable, a remote capture, ...)
   def handler_ref_not_capture(module, meta, got_ast, expected) do

@@ -17,6 +17,7 @@ defmodule Maty.Hook do
       Utils.Env.setup(__MODULE__, :psi)
       Utils.Env.setup(__MODULE__, :spec_errors)
       Utils.Env.setup(__MODULE__, :handler_errors)
+      Utils.Env.setup(__MODULE__, :non_handler_defs)
       Utils.Env.setup(__MODULE__, :global_state_type)
       Utils.Env.setup(__MODULE__, :local_state_type)
 

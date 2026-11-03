@@ -2,7 +2,7 @@ defmodule Maty.Typechecker.TC do
   require Logger
 
   alias Maty.ST.SBottom
-  alias Maty.Types
+  alias Maty.{Check, Types}
   alias Maty.Typechecker.{Error, Helpers, TC, Ctx}
 
   import Maty.Check
@@ -13,7 +13,7 @@ defmodule Maty.Typechecker.TC do
   """
   @type ast :: Macro.t()
 
-  @type result :: Maty.Check.result(Types.T.t())
+  @type result :: Check.result(Types.T.t())
 
   # -- AST shapes
   # The typechecker sees expanded AST some relatively short forms expand to very large nodes
