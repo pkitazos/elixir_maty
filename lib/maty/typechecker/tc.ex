@@ -353,6 +353,7 @@ defmodule Maty.Typechecker.TC do
     {:error, Error.FrameworkUsage.unsupported_anonymous_function(ctx.module, meta), env}
   end
 
+  # todo: not really anonymus is it?
   # Function capture: &Mod.fun/arity, &fun/arity, &(&1 + 1)
   deftc tc_expr(ctx, env, _st, {:&, meta, [_capture]}) do
     {:error, Error.FrameworkUsage.unsupported_anonymous_function(ctx.module, meta), env}
@@ -656,6 +657,12 @@ defmodule Maty.Typechecker.TC do
     func_id = {func_name, length(arg_asts)}
 
     check env: env, st: st do
+      expect not Map.has_key?(ctx.delta_M, func_name),
+        else: Error.FunctionCall.handler_called_directly(ctx.module, meta, func_id, :message)
+
+      expect not Map.has_key?(ctx.delta_I, func_name),
+        else: Error.FunctionCall.handler_called_directly(ctx.module, meta, func_id, :init)
+
       expect {:ok, signatures} = Map.fetch(ctx.psi, func_id),
         else: Error.FunctionCall.function_not_exist(ctx.module, meta, func_id)
 
@@ -663,7 +670,8 @@ defmodule Maty.Typechecker.TC do
         else: Error.FunctionCall.function_not_exist(ctx.module, meta, func_id)
 
       arg_types <-
-        chain(arg_asts, &tc(ctx, &1))
+        arg_asts
+        |> chain(&tc(ctx, &1))
         |> with_frame({:call, func_id, Keyword.take(meta, [:line, :column])})
 
       # todo: this accepts the call if the arguments fit *any* clause's spec, but at runtime the

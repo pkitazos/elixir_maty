@@ -500,6 +500,25 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :function_call, kind: :handler_called_directly} = e) do
+    %{func_id: {name, _arity} = func_id, handler_kind: handler_kind} = e.details
+
+    how =
+      case handler_kind do
+        :init -> "Register it instead: register(ap_pid, role, &#{name}/2, args)."
+        :message -> "Suspend with it instead: suspend(&#{name}/3, state)."
+      end
+
+    """
+    Function Call Error: Handler Called Directly
+      Called function: #{Utils.to_func(func_id)}
+      Handler: #{name} (#{handler_kind} handler)
+      --
+      Handlers are run by the runtime and cannot be called like functions.
+      #{how}
+    """
+  end
+
   defp render(%Error{category: :function_call, kind: :arity_mismatch} = e) do
     %{expected: expected, got: got} = e.details
 

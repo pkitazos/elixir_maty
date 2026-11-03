@@ -199,6 +199,8 @@ defmodule Maty.Typechecker.ErrorRenderTest do
       # :function_call
       {{Error.FunctionCall, :function_not_exist},
        Error.FunctionCall.function_not_exist(@m, @meta, {:f, 1})},
+      {{Error.FunctionCall, :handler_called_directly},
+       Error.FunctionCall.handler_called_directly(@m, @meta, {:install, 3}, :init)},
       {{Error.FunctionCall, :arity_mismatch},
        Error.FunctionCall.arity_mismatch(@m, @meta, {:f, 1}, expected: 1, got: 2)},
       {{Error.FunctionCall, :no_matching_function_clause},

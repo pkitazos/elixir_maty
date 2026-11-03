@@ -11,6 +11,18 @@ defmodule Maty.Typechecker.Error.FunctionCall do
     }
   end
 
+  # a handler was called like a regular function (at its real arity)
+  def handler_called_directly(module, meta, func_id, handler_kind)
+      when handler_kind in [:init, :message] do
+    %Error{
+      category: :function_call,
+      kind: :handler_called_directly,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{func_id: func_id, handler_kind: handler_kind}
+    }
+  end
+
   def arity_mismatch(module, meta, func_id, expected: expected, got: got) do
     %Error{
       category: :function_call,
