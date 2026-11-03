@@ -117,6 +117,17 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :protocol_violation, kind: :undefined_continuation_handler} = e) do
+    %{handler: handler} = e.details
+
+    """
+    Protocol Violation: Undefined Continuation Handler
+      Continues as: #{handler}
+      --
+      The session type continues as #{handler}, but no message handler named #{handler} is defined in this module.
+    """
+  end
+
   defp render(%Error{category: :protocol_violation, kind: :handler_session_type_mismatch} = e) do
     %{expected_handler: expected_handler, got: got_st, expected: expected_st} = e.details
 

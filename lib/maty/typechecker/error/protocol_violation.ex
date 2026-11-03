@@ -171,6 +171,18 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     }
   end
 
+  # the session type continues as `handler` (an `SName`), but no message handler of that name is defined
+  def undefined_continuation_handler(module, meta, st, handler) do
+    %Error{
+      category: :protocol_violation,
+      kind: :undefined_continuation_handler,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{handler: handler},
+      st: st
+    }
+  end
+
   # suspend was given a message handler, but it implements a different session type
   # than the handler the session type names (`expected_handler`)
   def handler_session_type_mismatch(module, meta, st, expected_handler,

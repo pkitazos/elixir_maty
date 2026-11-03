@@ -181,47 +181,6 @@ defmodule Maty.DSL do
     end
   end
 
-  defp handler_name(caller, handler_ast, expected_arity) do
-    with {:capture, {:&, _, [{:/, _, [{name, _, context}, arity]}]}}
-         when is_atom(name) and is_atom(context) and is_integer(arity) <-
-           {:capture, handler_ast},
-         {:arity, ^expected_arity, _name} <- {:arity, arity, name} do
-      name
-    else
-      # anything but a local capture (an atom, a variable, a remote capture, ...)
-      {:capture, other} ->
-        Module.put_attribute(
-          caller.module,
-          :handler_errors,
-          {nil,
-           Error.FrameworkUsage.handler_ref_not_capture(
-             caller.module,
-             [line: caller.line],
-             other,
-             expected_arity
-           )}
-        )
-
-        other
-
-      {:arity, got, name} ->
-        Module.put_attribute(
-          caller.module,
-          :handler_errors,
-          {nil,
-           Error.FrameworkUsage.handler_ref_wrong_arity(
-             caller.module,
-             [line: caller.line],
-             name,
-             got,
-             expected_arity
-           )}
-        )
-
-        name
-    end
-  end
-
   @doc """
   Registers an actor instance with the Access Point (AP).
 
@@ -246,7 +205,7 @@ defmodule Maty.DSL do
       Runtime.register(
         unquote(ap_pid),
         unquote(role),
-        unquote(handler_name(__CALLER__, handler_ast, 2)),
+        unquote(handler_ast),
         unquote(args)
       )
     end
@@ -264,7 +223,7 @@ defmodule Maty.DSL do
 
   defmacro suspend(next_handler_ast, state) do
     quote do
-      Runtime.suspend(unquote(handler_name(__CALLER__, next_handler_ast, 3)), unquote(state))
+      Runtime.suspend(unquote(next_handler_ast), unquote(state))
     end
   end
 

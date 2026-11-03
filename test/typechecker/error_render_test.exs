@@ -101,6 +101,13 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          @st_in.branches,
          @st_in
        )},
+      {{Error.ProtocolViolation, :undefined_continuation_handler},
+       Error.ProtocolViolation.undefined_continuation_handler(
+         @m,
+         @meta,
+         %ST.SName{handler: :decision_handler},
+         :decision_handler
+       )},
       {{Error.ProtocolViolation, :handler_session_type_mismatch},
        Error.ProtocolViolation.handler_session_type_mismatch(
          @m,

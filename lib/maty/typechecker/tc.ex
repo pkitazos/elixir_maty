@@ -358,15 +358,17 @@ defmodule Maty.Typechecker.TC do
         when is_atom(name) and is_atom(context) and is_integer(arity) do
     check env: env, st: st do
       cond do
+        # TV-MsgHandler
         Map.has_key?(ctx.delta_M, name) and arity == 3 ->
           ok({:handler, :message, ctx.delta_M[name].st})
 
+        Map.has_key?(ctx.delta_M, name) ->
+          fail(Error.FrameworkUsage.handler_ref_wrong_arity(ctx.module, meta, name, arity, 3))
+
+        # TV-InitHandler
         Map.has_key?(ctx.delta_I, name) and arity == 2 ->
           {:ok, arg_types} = Helpers.init_handler_arg_types(ctx, name)
           ok({:handler, :init, arg_types, ctx.delta_I[name].st})
-
-        Map.has_key?(ctx.delta_M, name) ->
-          fail(Error.FrameworkUsage.handler_ref_wrong_arity(ctx.module, meta, name, arity, 3))
 
         Map.has_key?(ctx.delta_I, name) ->
           fail(Error.FrameworkUsage.handler_ref_wrong_arity(ctx.module, meta, name, arity, 2))
@@ -517,16 +519,10 @@ defmodule Maty.Typechecker.TC do
           maty_runtime(:suspend, meta, [handler_ast, state_ast])
         ) do
     check env: env, st: st do
-      # TV-MsgHandler
-      # instead of typing the handler name as a value, the literal atom is checked against Δ_M directly
-      expect Map.has_key?(ctx.delta_M, handler_ast),
-        else:
-          Error.ProtocolViolation.suspend_invalid_handler_type(
-            ctx.module,
-            meta,
-            [got: handler_ast],
-            st
-          )
+      handler_type <- tc(ctx, handler_ast)
+
+      expect {:handler, :message, handler_st} = handler_type,
+        else: Error.TypeMismatch.handler_expected(ctx.module, meta, :message, handler_type)
 
       state_type <- tc(ctx, state_ast)
 
@@ -548,14 +544,24 @@ defmodule Maty.Typechecker.TC do
           )
         end
 
-      expect expected_handler == handler_ast,
+      expect {:ok, %{st: expected_st}} = Map.fetch(ctx.delta_M, expected_handler),
         else:
-          Error.ProtocolViolation.incorrect_handler_suspension(
+          Error.ProtocolViolation.undefined_continuation_handler(
             ctx.module,
             meta,
             q,
-            got: handler_ast,
-            expected: expected_handler
+            expected_handler
+          )
+
+      expect handler_st == expected_st,
+        else:
+          Error.ProtocolViolation.handler_session_type_mismatch(
+            ctx.module,
+            meta,
+            q,
+            expected_handler,
+            got: handler_st,
+            expected: expected_st
           )
 
       ok(:no_return, st: %SBottom{reason: :suspend})
@@ -602,11 +608,10 @@ defmodule Maty.Typechecker.TC do
           maty_runtime(:register, meta, [
             ap_pid_ast,
             role_ast,
-            handler_name,
+            handler_ast,
             args_ast
           ])
-        )
-        when is_atom(handler_name) do
+        ) do
     check env: env, st: st do
       pid_type <- tc(ctx, ap_pid_ast)
 
@@ -627,16 +632,10 @@ defmodule Maty.Typechecker.TC do
       expect role_ast in ctx.roles,
         else: Error.FrameworkUsage.undeclared_role(ctx.module, meta, role_ast, ctx.roles)
 
-      # TV-InitHandler
-      # instead of typing the handler name as a value, the literal atom is checked against Δ_I directly
-      expect {:ok, accepted_arg_types} = Helpers.init_handler_arg_types(ctx, handler_name),
-        else:
-          Error.FrameworkUsage.unknown_init_handler(
-            ctx.module,
-            meta,
-            handler_name,
-            Map.keys(ctx.delta_I)
-          )
+      handler_type <- tc(ctx, handler_ast)
+
+      expect {:handler, :init, accepted_arg_types, _st} = handler_type,
+        else: Error.TypeMismatch.handler_expected(ctx.module, meta, :init, handler_type)
 
       args_type <- tc(ctx, args_ast)
 
@@ -652,15 +651,6 @@ defmodule Maty.Typechecker.TC do
 
       ok(:atom)
     end
-  end
-
-  deftc tc_expr(
-          ctx,
-          env,
-          _st,
-          maty_runtime(:register, meta, [_, _, handler_ast, _])
-        ) do
-    {:error, Error.FrameworkUsage.init_handler_not_literal(ctx.module, meta, handler_ast), env}
   end
 
   deftc tc_expr(
