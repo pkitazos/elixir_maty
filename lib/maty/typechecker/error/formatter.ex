@@ -117,6 +117,18 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :protocol_violation, kind: :handler_session_type_mismatch} = e) do
+    %{expected_handler: expected_handler, got: got_st, expected: expected_st} = e.details
+
+    """
+    Protocol Violation: Handler for a Different Session Type
+      Got: a message handler for #{Maty.ST.repr(got_st)}
+      Expected: a message handler for #{Maty.ST.repr(expected_st)} (like #{render_handler_ref(expected_handler, 3)})
+      --
+      Session Type: #{Maty.ST.repr(e.st)}
+    """
+  end
+
   defp render(%Error{category: :protocol_violation, kind: :incorrect_message_label} = e) do
     %{got: label_received, expected: labels_expected} = e.details
     acceptable_labels = labels_expected |> Enum.map(&render_atom/1) |> Enum.join(" | ")
@@ -200,6 +212,23 @@ defmodule Maty.Typechecker.Error.Formatter do
       Got operand type: #{render_type(operand_type)}
       --
       Logical operators require boolean operands.
+    """
+  end
+
+  defp render(%Error{category: :type_mismatch, kind: :handler_expected} = e) do
+    %{expected_kind: expected_kind, got: got} = e.details
+
+    {title, macro, kind, arity} =
+      case expected_kind do
+        :init -> {"an Init Handler", "register", "an init handler", 2}
+        :message -> {"a Message Handler", "suspend", "a message handler", 3}
+      end
+
+    """
+    Type Mismatch Error: Expected #{title}
+      Got: #{render_type(got)}
+      --
+      #{macro} must be given #{kind}, as a capture &name/#{arity} of one defined in this module.
     """
   end
 
@@ -728,7 +757,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     Framework Usage Violation: Role Not a Literal
       Got: #{Macro.to_string(got)}
       --
-      MatyDSL.register/4 must be given the role as a literal atom, e.g. :seller.
+      register must be given the role as a literal atom.
     """
   end
 
@@ -739,7 +768,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     Framework Usage Violation: Unsupported Handler Guard
       Guard: #{Macro.to_string(got)}
       --
-      defhandler does not support guards, annotate the payload instead, e.g. {:title, title :: binary()}.
+      defhandler does not support guards, annotate the payload with its type instead, as {:label, var :: type()}.
     """
   end
 
@@ -761,7 +790,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     Framework Usage Violation: Handler Role Not a Literal
       Got: #{Macro.to_string(got)}
       --
-      A message handler must be given the role it receives from as a literal atom, e.g. :buyer1.
+      A message handler must be given the role it receives from as a literal atom.
     """
   end
 
@@ -791,14 +820,25 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render(%Error{category: :framework_usage, kind: :handler_ref_wrong_arity} = e) do
     %{name: name, got: got, expected: expected} = e.details
-    {macro, kind} = handler_ref_macro(expected)
+    {_macro, kind} = handler_ref_macro(expected)
 
     """
     Framework Usage Violation: Wrong Handler Arity
       Got: &#{name}/#{got}
       Expected: &#{name}/#{expected}
       --
-      #{macro} takes #{kind}, which is referenced with arity #{expected}.
+      #{name} is #{kind}, which is referenced with arity #{expected}.
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :unsupported_capture} = e) do
+    %{got: got} = e.details
+
+    """
+    Framework Usage Violation: Unsupported Capture
+      Capture: #{Macro.to_string(got)}
+      --
+      Only handlers can be captured: &name/2 for an init handler, &name/3 for a message handler.
     """
   end
 
@@ -874,7 +914,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     Framework Usage Violation: Init Handler Not a Literal
       Got: #{Macro.to_string(got)}
       --
-      MatyDSL.register/4 must be given the init handler as a literal atom, e.g. :install.
+      register must be given the init handler as a capture, &name/2.
     """
   end
 
@@ -1012,6 +1052,16 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render_type(nil), do: "nil"
   defp render_type(type) when is_atom(type), do: ":#{type}"
+
+  # todo: make the representations not suck
+  defp render_type({:handler, :message, st}),
+    do: "message handler for #{Maty.ST.repr(st)}"
+
+  # an init handler accepts the argument types of any of its clauses
+  defp render_type({:handler, :init, arg_types, st}),
+    do:
+      "init handler taking #{Enum.map_join(arg_types, " or ", &render_type/1)} for #{Maty.ST.repr(st)}"
+
   defp render_type(type), do: "#{inspect(type)}"
 
   # an expected type, or a description where there is no single type to show

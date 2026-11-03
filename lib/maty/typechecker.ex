@@ -24,38 +24,45 @@ defmodule Maty.Typechecker do
 
     session_types = Utils.Env.get_map(env.module, :st)
     handler = Module.get_attribute(env.module, :handler)
+    is_stub = Module.get_attribute(env.module, :handler_stub)
 
-    if not is_nil(handler) do
-      Preprocessor.process_handler_annotation(%{
-        module: env.module,
-        function: {name, arity},
-        handler_label: handler,
-        session_types: session_types,
-        store: :delta_M,
-        kind: :handler,
-        meta: [line: env.line]
-      })
+    if not is_nil(is_stub) do
+      Module.delete_attribute(env.module, :handler_stub)
+      Module.put_attribute(env.module, :handler_stubs, {name, arity})
+      #                                             ^ with an s!
+    else
+      if not is_nil(handler) do
+        Preprocessor.process_handler_annotation(%{
+          module: env.module,
+          function: {name, arity},
+          handler_label: handler,
+          session_types: session_types,
+          store: :delta_M,
+          kind: :handler,
+          meta: [line: env.line]
+        })
+      end
+
+      init_handler = Module.get_attribute(env.module, :init_handler)
+
+      if not is_nil(init_handler) do
+        Preprocessor.process_handler_annotation(%{
+          module: env.module,
+          function: {name, arity},
+          handler_label: init_handler,
+          session_types: session_types,
+          store: :delta_I,
+          kind: :init_handler,
+          meta: [line: env.line]
+        })
+      end
+
+      if is_nil(handler) and is_nil(init_handler) do
+        Module.put_attribute(env.module, :non_handler_defs, {name, arity, env.line})
+      end
+
+      Preprocessor.process_type_annotation(%{module: env.module, function: {name, args}})
     end
-
-    init_handler = Module.get_attribute(env.module, :init_handler)
-
-    if not is_nil(init_handler) do
-      Preprocessor.process_handler_annotation(%{
-        module: env.module,
-        function: {name, arity},
-        handler_label: init_handler,
-        session_types: session_types,
-        store: :delta_I,
-        kind: :init_handler,
-        meta: [line: env.line]
-      })
-    end
-
-    if is_nil(handler) and is_nil(init_handler) do
-      Module.put_attribute(env.module, :non_handler_defs, {name, arity, env.line})
-    end
-
-    Preprocessor.process_type_annotation(%{module: env.module, function: {name, args}})
   end
 
   @doc """
@@ -149,7 +156,7 @@ defmodule Maty.Typechecker do
   def handle_after_compile(env, bytecode) do
     # get the expanded AST of all the relevant definitions in this module from the bytecode
     # we omit the definitions injected into the scope by our behaviour as we can assume they are type-safe
-    all_module_definitions = fetch_module_definitions!(bytecode)
+    all_module_definitions = fetch_module_definitions!(env.module, bytecode)
 
     # Δ_M is the environment which maps message handler names to session type annotations
     delta_M = Module.get_attribute(env.module, :delta_M)
@@ -404,13 +411,17 @@ defmodule Maty.Typechecker do
   @typedoc "A top-level definition from debug_info: `{func_id, kind, meta, clauses}`."
   @type definition :: {{atom(), arity()}, atom(), keyword(), [tuple()]}
 
-  @spec fetch_module_definitions!(binary()) :: [definition()]
-  defp fetch_module_definitions!(bytecode) do
+  @spec fetch_module_definitions!(module(), binary()) :: [definition()]
+  defp fetch_module_definitions!(module, bytecode) do
+    stub_defs = Module.get_attribute(module, :handler_stubs)
+
     bytecode
     |> read_debug_info!()
     |> Map.fetch!(:definitions)
     |> Enum.reject(fn {func_id, _, meta, _} ->
-      Keyword.get(meta, :context) == Maty.Actor or match?({:__handler_expects__, _}, func_id)
+      Keyword.get(meta, :context) == Maty.Actor or
+        match?({:__handler_expects__, _}, func_id) or
+        Enum.member?(stub_defs, func_id)
     end)
   end
 

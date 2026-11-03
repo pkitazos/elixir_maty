@@ -104,6 +104,11 @@ defmodule Maty.Types do
             | {:tuple, [t()]}
             | {:list, t()}
             | {:map_record, %{atom() => t()}}
+            # really these should be S?
+            | {:handler, :message, Maty.ST.t()}
+            # and S! | h
+            # but we don't have unions for this one..
+            | {:handler, :init, [t()], Maty.ST.t()}
 
     def session_id, do: :ref
     def init_token, do: :ref

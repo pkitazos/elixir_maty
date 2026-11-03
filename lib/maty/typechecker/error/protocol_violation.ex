@@ -171,6 +171,22 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     }
   end
 
+  # suspend was given a message handler, but it implements a different session type
+  # than the handler the session type names (`expected_handler`)
+  def handler_session_type_mismatch(module, meta, st, expected_handler,
+        got: got_st,
+        expected: expected_st
+      ) do
+    %Error{
+      category: :protocol_violation,
+      kind: :handler_session_type_mismatch,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{expected_handler: expected_handler, got: got_st, expected: expected_st},
+      st: st
+    }
+  end
+
   def suspend_invalid_handler_type(module, meta, [got: got], st) do
     %Error{
       category: :protocol_violation,

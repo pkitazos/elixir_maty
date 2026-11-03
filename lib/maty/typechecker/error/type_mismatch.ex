@@ -22,6 +22,18 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
     }
   end
 
+  # `register` was given something that is not an init handler or `suspend` was something that is not a message handler
+  def handler_expected(module, meta, expected_kind, got_type)
+      when expected_kind in [:init, :message] do
+    %Error{
+      category: :type_mismatch,
+      kind: :handler_expected,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{expected_kind: expected_kind, got: got_type}
+    }
+  end
+
   def return_type_mismatch(module, meta, expected: expected, got: got) do
     %Error{
       category: :type_mismatch,

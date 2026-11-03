@@ -85,6 +85,8 @@ defmodule Maty.DSL do
   end
 
   defp build_init_handler(handler_name, clean_pattern, type_spec, state_var, body) do
+    stub_key = :"__handler_stub_#{handler_name}__"
+
     quote do
       @init_handler unquote(handler_name)
       @spec unquote(handler_name)(
@@ -100,6 +102,12 @@ defmodule Maty.DSL do
             var!(session_ctx, Maty.DSL)
           ) do
         unquote(catch_handler_result(body))
+      end
+
+      if not Module.has_attribute?(__MODULE__, unquote(stub_key)) do
+        Module.put_attribute(__MODULE__, unquote(stub_key), true)
+        @handler_stub true
+        def unquote(handler_name)(_, _), do: raise("handlers cannot be called directly")
       end
     end
   end
@@ -156,6 +164,8 @@ defmodule Maty.DSL do
       if not Module.has_attribute?(__MODULE__, unquote(expects_key)) do
         Module.put_attribute(__MODULE__, unquote(expects_key), true)
         def __handler_expects__(unquote(handler_name)), do: unquote(role)
+        @handler_stub true
+        def unquote(handler_name)(_, _, _), do: raise("handlers cannot be called directly")
       end
     end
   end

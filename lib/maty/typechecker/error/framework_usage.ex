@@ -256,6 +256,17 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
+  # a capture of something other than a handler (only handlers are first class for now)
+  def unsupported_capture(module, meta, capture_ast) do
+    %Error{
+      category: :framework_usage,
+      kind: :unsupported_capture,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: capture_ast}
+    }
+  end
+
   # register / suspend was given something other than a local capture `&name/n`
   # (an atom, a variable, a remote capture, ...)
   def handler_ref_not_capture(module, meta, got_ast, expected) do

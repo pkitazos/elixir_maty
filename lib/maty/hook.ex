@@ -8,6 +8,7 @@ defmodule Maty.Hook do
       # ephemeral annotations
       Module.register_attribute(__MODULE__, :init_handler, accumulate: false, persist: false)
       Module.register_attribute(__MODULE__, :handler, accumulate: false, persist: false)
+      Module.register_attribute(__MODULE__, :handler_stub, accumulate: false, persist: false)
       Module.register_attribute(__MODULE__, :spec, accumulate: false, persist: false)
 
       # attribute stores
@@ -18,6 +19,7 @@ defmodule Maty.Hook do
       Utils.Env.setup(__MODULE__, :spec_errors)
       Utils.Env.setup(__MODULE__, :handler_errors)
       Utils.Env.setup(__MODULE__, :non_handler_defs)
+      Utils.Env.setup(__MODULE__, :handler_stubs)
       Utils.Env.setup(__MODULE__, :global_state_type)
       Utils.Env.setup(__MODULE__, :local_state_type)
 

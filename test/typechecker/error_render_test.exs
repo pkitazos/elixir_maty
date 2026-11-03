@@ -101,6 +101,15 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          @st_in.branches,
          @st_in
        )},
+      {{Error.ProtocolViolation, :handler_session_type_mismatch},
+       Error.ProtocolViolation.handler_session_type_mismatch(
+         @m,
+         @meta,
+         %ST.SName{handler: :decision_handler},
+         :decision_handler,
+         got: @st_in,
+         expected: %ST.SIn{from: :buyer2, branches: [@branch]}
+       )},
       {{Error.ProtocolViolation, :suspend_invalid_handler_type},
        Error.ProtocolViolation.suspend_invalid_handler_type(@m, @meta, [got: :number], @st_out)},
       {{Error.ProtocolViolation, :handler_body_wrong_termination},
@@ -116,6 +125,13 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.TypeMismatch.arithmetic_operator_requires_number(@m, @meta, :-, :binary)},
       {{Error.TypeMismatch, :logical_operator_requires_boolean},
        Error.TypeMismatch.logical_operator_requires_boolean(@m, @meta, :not, :number)},
+      {{Error.TypeMismatch, :handler_expected},
+       Error.TypeMismatch.handler_expected(
+         @m,
+         @meta,
+         :message,
+         {:handler, :init, [:binary], @st_out}
+       )},
       {{Error.TypeMismatch, :return_type_mismatch},
        Error.TypeMismatch.return_type_mismatch(@m, @meta, expected: :number, got: :binary)},
       {{Error.TypeMismatch, :binary_operator_type_mismatch},
@@ -308,6 +324,12 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FrameworkUsage.handler_message_not_tagged_tuple(@m, @meta, {:msg, [], nil})},
       {{Error.FrameworkUsage, :handler_name_clash},
        Error.FrameworkUsage.handler_name_clash(@m, @meta, {:install, 3}, :init)},
+      {{Error.FrameworkUsage, :unsupported_capture},
+       Error.FrameworkUsage.unsupported_capture(
+         @m,
+         @meta,
+         {:&, [], [{:/, [], [{:helper, [], nil}, 1]}]}
+       )},
       {{Error.FrameworkUsage, :handler_ref_not_capture},
        Error.FrameworkUsage.handler_ref_not_capture(@m, @meta, :install, 2)},
       {{Error.FrameworkUsage, :handler_ref_wrong_arity},
