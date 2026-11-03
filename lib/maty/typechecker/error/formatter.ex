@@ -105,18 +105,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :protocol_violation, kind: :incorrect_handler_suspension} = e) do
-    %{got: handler_received, expected: handler_expected} = e.details
-
-    """
-    Protocol Violation: Incorrect Handler Suspension
-      Got: #{render_handler_ref(handler_received, 3)}
-      Expected: #{render_handler_ref(handler_expected, 3)}
-      --
-      Session Type: #{Maty.ST.repr(e.st)}
-    """
-  end
-
   defp render(%Error{category: :protocol_violation, kind: :undefined_continuation_handler} = e) do
     %{handler: handler} = e.details
 
@@ -171,17 +159,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     Protocol Violation: Incomplete Message Handler Implementation
       Missing implementation for branches: #{Maty.ST.repr(%{e.st | branches: missing_branches})}
-      --
-      Session Type: #{Maty.ST.repr(e.st)}
-    """
-  end
-
-  defp render(%Error{category: :protocol_violation, kind: :suspend_invalid_handler_type} = e) do
-    %{got: got} = e.details
-
-    """
-    Protocol Violation: Suspended with Invalid Handler
-      Tried: #{render_handler_ref(got, 3)}
       --
       Session Type: #{Maty.ST.repr(e.st)}
     """
@@ -737,18 +714,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :framework_usage, kind: :unknown_init_handler} = e) do
-    %{got: got, known: known} = e.details
-
-    """
-    Framework Usage Violation: Unknown Init Handler
-      Got: #{render_handler_ref(got, 2)}
-      Init handlers: #{render_handler_names(known, 2)}
-      --
-      register must be given an init handler defined in this module.
-    """
-  end
-
   defp render(%Error{category: :framework_usage, kind: :unknown_roles} = e) do
     %{protocol: protocol, got: got, known: known} = e.details
 
@@ -817,21 +782,9 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :framework_usage, kind: :handler_ref_not_capture} = e) do
-    %{got: got, expected: expected} = e.details
-    {macro, kind} = handler_ref_macro(expected)
-
-    """
-    Framework Usage Violation: Handler Not a Capture
-      Got: #{Macro.to_string(got)}
-      --
-      #{macro} takes #{kind} as a capture of a handler in this module, e.g. &name/#{expected}.
-    """
-  end
-
   defp render(%Error{category: :framework_usage, kind: :handler_ref_wrong_arity} = e) do
     %{name: name, got: got, expected: expected} = e.details
-    {_macro, kind} = handler_ref_macro(expected)
+    kind = handler_ref_kind(expected)
 
     """
     Framework Usage Violation: Wrong Handler Arity
@@ -915,17 +868,6 @@ defmodule Maty.Typechecker.Error.Formatter do
       Declared roles: #{Enum.map_join(known, ", ", &inspect/1)}
       --
       MatyDSL.register/4 must be given a role declared in this module's use Maty.Actor.
-    """
-  end
-
-  defp render(%Error{category: :framework_usage, kind: :init_handler_not_literal} = e) do
-    %{got: got} = e.details
-
-    """
-    Framework Usage Violation: Init Handler Not a Literal
-      Got: #{Macro.to_string(got)}
-      --
-      register must be given the init handler as a capture, &name/2.
     """
   end
 
@@ -1093,16 +1035,10 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render_register_argument(:access_point), do: "1 (access point)"
   defp render_register_argument(:init_handler_args), do: "4 (init handler args)"
 
-  defp render_handler_names([], _arity), do: "(none)"
-
-  defp render_handler_names(names, arity),
-    do: names |> Enum.sort() |> Enum.map_join(", ", &render_handler_ref(&1, arity))
-
   defp render_handler_ref(name, arity) when is_atom(name), do: "&#{name}/#{arity}"
-  defp render_handler_ref(ast, _arity), do: Macro.to_string(ast)
 
-  defp handler_ref_macro(2), do: {"register", "an init handler"}
-  defp handler_ref_macro(3), do: {"suspend", "a message handler"}
+  defp handler_ref_kind(2), do: "an init handler"
+  defp handler_ref_kind(3), do: "a message handler"
 
   defp render_string_segment(:interpolation), do: "Interpolation"
   defp render_string_segment(:concatenation), do: "Concatenation"

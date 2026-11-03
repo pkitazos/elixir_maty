@@ -40,7 +40,7 @@ defmodule Maty.HandlerExpansionTest.Handlers do
 
   # Suspend instead of done
   defhandler suspend_handler(:worker, {:task, data :: binary()}, state) do
-    Maty.DSL.suspend(&next_handler/3, {data, state})
+    Maty.DSL.suspend(&simple_handler/3, {data, state})
   end
 end
 
@@ -130,8 +130,10 @@ defmodule Maty.HandlerExpansionTest do
 
   describe "suspend" do
     test "returns suspend tuple with next handler and new state" do
-      assert {:suspend, :next_handler, {"task_data", %{}}} =
+      assert {:suspend, next_handler, {"task_data", %{}}} =
                Handlers.suspend_handler(:worker, {:task, "task_data"}, %{}, nil)
+
+      assert Function.info(next_handler, :name) == {:name, :simple_handler}
     end
   end
 

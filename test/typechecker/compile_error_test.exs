@@ -172,6 +172,8 @@ defmodule Maty.Typechecker.CompileErrorTest do
     test "an error in one clause of a multi-clause function names that clause" do
       src =
         seller_src("FunctionClauseFrame", """
+        #{@valid_handlers}
+
         @spec f(number()) :: number()
         def f(1), do: 1
 
@@ -188,6 +190,8 @@ defmodule Maty.Typechecker.CompileErrorTest do
     test "a single-clause function has no clause frame" do
       src =
         seller_src("SingleClause", """
+        #{@valid_handlers}
+
         @spec f(number()) :: number()
         def f(_x), do: "not a number"
         """)
@@ -601,6 +605,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
         seller_src("RawHandlerNoSpec", """
         @handler :decision_handler
         def decision_handler(_session_ctx, _role, {:quit, nil}, state), do: Maty.DSL.done(state)
+
+        @handler_stub true
+        def decision_handler(_role, _message, _state), do: raise("stub")
         """)
 
       error = compile_error!(src)
@@ -630,6 +637,9 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
         @init_handler :install
         def install(_session_ctx, _arg, state), do: Maty.DSL.done(state)
+
+        @handler_stub true
+        def install(_arg, _state), do: raise("stub")
       end
       """
 
@@ -1145,18 +1155,25 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert [{MatyCompileErrorFixture.RegisterSecondClause, _}] = Code.compile_string(src)
     end
 
-    test "an atom that is not an init handler is reported with the known init handlers" do
+    test "a capture of a function that is not a handler is reported" do
       src =
         register_src(
-          "RegisterUnknownHandler",
-          ~s|Maty.DSL.register(ap_pid, @role, &nope/2, {ap_pid, "title"})|
+          "RegisterNonHandler",
+          ~s|Maty.DSL.register(ap_pid, @role, &nope/2, {ap_pid, "title"})|,
+          """
+          defhandler install({_ap_pid, _title} :: {pid(), binary()}, state) do
+            Maty.DSL.suspend(&decision_handler/3, state)
+          end
+
+          @spec nope(pid(), binary()) :: atom()
+          def nope(_ap_pid, _title), do: :ok
+          """
         )
 
       error = compile_error!(src)
 
-      assert error.description =~ "Unknown Init Handler"
-      assert error.description =~ "Got: &nope/2"
-      assert error.description =~ "Init handlers: &install/2"
+      assert error.description =~ "Unsupported Capture"
+      assert error.description =~ "Capture: &nope/2"
       assert error.line == line_of(src, "Maty.DSL.register(")
     end
 
@@ -1164,16 +1181,16 @@ defmodule Maty.Typechecker.CompileErrorTest do
       src =
         register_src(
           "RegisterMessageHandler",
-          ~s|Maty.DSL.register(ap_pid, @role, &decision_handler/2, {ap_pid, "title"})|
+          ~s|Maty.DSL.register(ap_pid, @role, &decision_handler/3, {ap_pid, "title"})|
         )
 
       error = compile_error!(src)
 
-      assert error.description =~ "Unknown Init Handler"
-      assert error.description =~ "Got: &decision_handler/2"
+      assert error.description =~ "Expected an Init Handler"
+      assert error.description =~ "Got: message handler"
     end
 
-    test "an init handler that is not a capture is reported" do
+    test "registering with a variable that is not a handler is reported" do
       src =
         register_src("RegisterNonLiteralHandler", """
         handler_name = :install
@@ -1182,8 +1199,8 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
       error = compile_error!(src)
 
-      assert error.description =~ "Handler Not a Capture"
-      assert error.description =~ "Got: handler_name"
+      assert error.description =~ "Expected an Init Handler"
+      assert error.description =~ "Got: :atom"
       assert error.line == line_of(src, "Maty.DSL.register(")
     end
 
@@ -1236,22 +1253,22 @@ defmodule Maty.Typechecker.CompileErrorTest do
     end
 
     test "suspending with an init handler is reported" do
-      src = suspend_src("SuspendInitHandler", "&install/3")
+      src = suspend_src("SuspendInitHandler", "&install/2")
 
       error = compile_error!(src)
 
-      assert error.description =~ "Suspended with Invalid Handler"
-      assert error.description =~ "Tried: &install/3"
+      assert error.description =~ "Expected a Message Handler"
+      assert error.description =~ "Got: init handler"
       assert error.line == line_of(src, "Maty.DSL.suspend(")
     end
 
-    test "suspending with a variable is reported" do
+    test "suspending with a variable that is not a handler is reported" do
       src = suspend_src("SuspendVariable", "next_handler")
 
       error = compile_error!(src)
 
-      assert error.description =~ "Handler Not a Capture"
-      assert error.description =~ "Got: next_handler"
+      assert error.description =~ "Expected a Message Handler"
+      assert error.description =~ "Got: :atom"
       assert error.line == line_of(src, "Maty.DSL.suspend(")
     end
 

@@ -100,17 +100,6 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
-  # register was given an atom that does not name an init handler of this module
-  def unknown_init_handler(module, meta, handler_name, known) do
-    %Error{
-      category: :framework_usage,
-      kind: :unknown_init_handler,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{got: handler_name, known: known}
-    }
-  end
-
   # `use Maty.Actor` declared roles that are not roles of the given protocol
   def unknown_roles(module, meta, protocol, unknown_roles, protocol_roles) do
     %Error{
@@ -189,17 +178,6 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
-  # register was given an expression for the init handler, not a literal atom
-  def init_handler_not_literal(module, meta, got_ast) do
-    %Error{
-      category: :framework_usage,
-      kind: :init_handler_not_literal,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{got: got_ast}
-    }
-  end
-
   # register was called with the wrong number of arguments
   def register_wrong_arity(module, meta, got) do
     %Error{
@@ -264,18 +242,6 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
       module: module,
       meta: Keyword.take(meta, [:line, :column]),
       details: %{got: capture_ast}
-    }
-  end
-
-  # register / suspend was given something other than a local capture `&name/n`
-  # (an atom, a variable, a remote capture, ...)
-  def handler_ref_not_capture(module, meta, got_ast, expected) do
-    %Error{
-      category: :framework_usage,
-      kind: :handler_ref_not_capture,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{got: got_ast, expected: expected}
     }
   end
 

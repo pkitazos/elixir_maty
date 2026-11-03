@@ -115,20 +115,6 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     }
   end
 
-  def incorrect_handler_suspension(module, meta, st,
-        got: handler_received,
-        expected: handler_expected
-      ) do
-    %Error{
-      category: :protocol_violation,
-      kind: :incorrect_handler_suspension,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{got: handler_received, expected: handler_expected},
-      st: st
-    }
-  end
-
   def incorrect_message_label(module, meta, st,
         got: label_received,
         expected: labels_expected
@@ -195,17 +181,6 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
       module: module,
       meta: Keyword.take(meta, [:line, :column]),
       details: %{expected_handler: expected_handler, got: got_st, expected: expected_st},
-      st: st
-    }
-  end
-
-  def suspend_invalid_handler_type(module, meta, [got: got], st) do
-    %Error{
-      category: :protocol_violation,
-      kind: :suspend_invalid_handler_type,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{got: got},
       st: st
     }
   end

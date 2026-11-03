@@ -78,11 +78,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          got: :buyer2,
          expected: :seller
        )},
-      {{Error.ProtocolViolation, :incorrect_handler_suspension},
-       Error.ProtocolViolation.incorrect_handler_suspension(@m, @meta, %ST.SName{handler: :h},
-         got: :other_handler,
-         expected: :h
-       )},
       {{Error.ProtocolViolation, :incorrect_message_label},
        Error.ProtocolViolation.incorrect_message_label(@m, @meta, @st_out,
          got: :name,
@@ -117,8 +112,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          got: @st_in,
          expected: %ST.SIn{from: :buyer2, branches: [@branch]}
        )},
-      {{Error.ProtocolViolation, :suspend_invalid_handler_type},
-       Error.ProtocolViolation.suspend_invalid_handler_type(@m, @meta, [got: :number], @st_out)},
       {{Error.ProtocolViolation, :handler_body_wrong_termination},
        Error.ProtocolViolation.handler_body_wrong_termination(
          @meta,
@@ -293,8 +286,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FrameworkUsage.on_link_altered_session_state(@m, @meta, @st_out)},
       {{Error.FrameworkUsage, :on_link_bad_return},
        Error.FrameworkUsage.on_link_bad_return(@m, @meta, :number)},
-      {{Error.FrameworkUsage, :unknown_init_handler},
-       Error.FrameworkUsage.unknown_init_handler(@m, @meta, :nope, [:install])},
       {{Error.FrameworkUsage, :unknown_roles},
        Error.FrameworkUsage.unknown_roles(@m, @meta, TwoBuyer.Protocol, [:sellr], [
          :buyer1,
@@ -313,8 +304,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FrameworkUsage.duplicate_state_declaration(@m, @meta, :global)},
       {{Error.FrameworkUsage, :local_state_undeclared_role},
        Error.FrameworkUsage.local_state_undeclared_role(@m, @meta, :buyer1, [:seller])},
-      {{Error.FrameworkUsage, :init_handler_not_literal},
-       Error.FrameworkUsage.init_handler_not_literal(@m, @meta, {:handler, [], nil})},
       {{Error.FrameworkUsage, :register_wrong_arity},
        Error.FrameworkUsage.register_wrong_arity(@m, @meta, 3)},
       {{Error.FrameworkUsage, :unsupported_handler_guard},
@@ -337,8 +326,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          @meta,
          {:&, [], [{:/, [], [{:helper, [], nil}, 1]}]}
        )},
-      {{Error.FrameworkUsage, :handler_ref_not_capture},
-       Error.FrameworkUsage.handler_ref_not_capture(@m, @meta, :install, 2)},
       {{Error.FrameworkUsage, :handler_ref_wrong_arity},
        Error.FrameworkUsage.handler_ref_wrong_arity(@m, @meta, :install, 3, 2)},
 
