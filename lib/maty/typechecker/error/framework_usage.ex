@@ -178,17 +178,6 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
-  # register was called with the wrong number of arguments
-  def register_wrong_arity(module, meta, got) do
-    %Error{
-      category: :framework_usage,
-      kind: :register_wrong_arity,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{got: got}
-    }
-  end
-
   # defhandler was given a head with a guard
   def unsupported_handler_guard(module, meta, guard_ast) do
     %Error{

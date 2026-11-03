@@ -871,16 +871,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :framework_usage, kind: :register_wrong_arity} = e) do
-    %{got: got} = e.details
-
-    """
-    Framework Usage Violation: Wrong Number of Arguments to register
-      Expected: 4 (access point, role, init handler, init handler args)
-      Got: #{got}
-    """
-  end
-
   defp render(%Error{category: :framework_usage, kind: :unsupported_anonymous_function}) do
     """
     Framework Usage Violation: Unsupported Anonymous Function

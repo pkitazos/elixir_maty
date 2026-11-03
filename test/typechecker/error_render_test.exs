@@ -304,8 +304,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FrameworkUsage.duplicate_state_declaration(@m, @meta, :global)},
       {{Error.FrameworkUsage, :local_state_undeclared_role},
        Error.FrameworkUsage.local_state_undeclared_role(@m, @meta, :buyer1, [:seller])},
-      {{Error.FrameworkUsage, :register_wrong_arity},
-       Error.FrameworkUsage.register_wrong_arity(@m, @meta, 3)},
       {{Error.FrameworkUsage, :unsupported_handler_guard},
        Error.FrameworkUsage.unsupported_handler_guard(
          @m,

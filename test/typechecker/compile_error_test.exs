@@ -1203,20 +1203,6 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.description =~ "Got: :atom"
       assert error.line == line_of(src, "Maty.DSL.register(")
     end
-
-    test "register with the wrong number of arguments is reported" do
-      src =
-        register_src(
-          "RegisterWrongArity",
-          "Maty.DSL.register(ap_pid, @role, :install)"
-        )
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Wrong Number of Arguments to register"
-      assert error.description =~ "Got: 3"
-      assert error.line == line_of(src, "Maty.DSL.register(")
-    end
   end
 
   describe "suspend" do

@@ -653,17 +653,6 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  deftc tc_expr(
-          ctx,
-          env,
-          _st,
-          {{:., _m1, [Maty.DSL, :register]}, meta, args}
-        ) do
-    # function is called with the wrong number of args
-    # todo: maybe not necessary?
-    {:error, Error.FrameworkUsage.register_wrong_arity(ctx.module, meta, length(args)), env}
-  end
-
   # -- T-App
   # todo: how could I handle remote calls?
   deftc tc_expr(ctx, env, st, {func_name, meta, arg_asts})
