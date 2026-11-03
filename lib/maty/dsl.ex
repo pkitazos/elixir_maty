@@ -1,4 +1,11 @@
 defmodule Maty.DSL do
+  @moduledoc """
+  Provides user-friendly macros for the Maty framework.
+
+  These macros simplify the process of writing session-typed actors by providing
+  a more declarative syntax for handlers and communication operations.
+  """
+
   alias Maty.{DSL, Runtime}
   alias Maty.Typechecker.Error
 
@@ -11,19 +18,10 @@ defmodule Maty.DSL do
           global_state: 1,
           local_state: 2,
           on_start: 2,
-          init_handler: 4,
-          handler: 5,
           defhandler: 2
         ]
     end
   end
-
-  @moduledoc """
-  Provides user-friendly macros for the Maty framework.
-
-  These macros simplify the process of writing session-typed actors by providing
-  a more declarative syntax for handlers and communication operations.
-  """
 
   defmacro global_state(type_ast) do
     quote do
@@ -48,20 +46,6 @@ defmodule Maty.DSL do
         unquote(body)
       end
     end
-  end
-
-  defmacro init_handler(handler_name, pattern, state_var, do: body) do
-    init_handler_def(handler_name, pattern, state_var, body)
-  end
-
-  defmacro handler(
-             handler_name,
-             role,
-             pattern,
-             state_var,
-             do: body
-           ) do
-    message_handler_def(__CALLER__, handler_name, role, pattern, state_var, body)
   end
 
   # the handler kind is decided by its arity:
@@ -200,8 +184,8 @@ defmodule Maty.DSL do
   ## Parameters
     - `ap_pid`: The PID of the Access Point process.
     - `role`: The role this actor will play in the session (atom).
-    - `handler`: The name of the `init_handler` to be called when the session starts, as a literal atom
-    - `args`: The single value passed to the `init_handler` (use a tuple for several values, and `nil` for none).
+    - `handler`: The name of the init handler to be called when the session starts, as a literal atom
+    - `args`: The single value passed to the init handler (use a tuple for several values, and `nil` for none).
 
   ## Returns
     - `{:ok, updated_state}`.
