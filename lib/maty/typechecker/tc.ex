@@ -379,12 +379,24 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
+  # Remote function capture: &Mod.fun/arity
+  # handlers are always local, so a remote capture is never one
+  deftc tc_expr(
+          ctx,
+          env,
+          _st,
+          {:&, meta, [{:/, _, [{{:., _, [mod, fun]}, _, []}, arity]}]} = capture_ast
+        )
+        when is_atom(mod) and is_atom(fun) and is_integer(arity) do
+    {:error, Error.FrameworkUsage.unsupported_capture(ctx.module, meta, capture_ast), env}
+  end
+
   # Anonymus Function capture: &(&1 + 1)
   deftc tc_expr(ctx, env, _st, {:&, meta, [_capture]}) do
     {:error, Error.FrameworkUsage.unsupported_anonymous_function(ctx.module, meta), env}
   end
 
-  # todo: handle remote function capture/call
+  # todo: handle remote function call
 
   # Block Scope
   deftc tc_expr(ctx, var_env, st_pre, {:__block__, _, body_asts}) when is_list(body_asts) do

@@ -1177,6 +1177,20 @@ defmodule Maty.Typechecker.CompileErrorTest do
       assert error.line == line_of(src, "Maty.DSL.register(")
     end
 
+    test "a remote capture is reported as an unsupported capture" do
+      src =
+        register_src(
+          "RegisterRemoteCapture",
+          ~s|Maty.DSL.register(ap_pid, @role, &Kernel.elem/2, {ap_pid, "title"})|
+        )
+
+      error = compile_error!(src)
+
+      assert error.description =~ "Unsupported Capture"
+      assert error.description =~ "Capture: &Kernel.elem/2"
+      assert error.line == line_of(src, "Maty.DSL.register(")
+    end
+
     test "a message handler is not accepted as an init handler" do
       src =
         register_src(

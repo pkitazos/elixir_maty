@@ -640,12 +640,6 @@ defmodule Maty.Typechecker.TCExprTest do
       assert %Error{category: :framework_usage, kind: :unsupported_anonymous_function} = msg
     end
 
-    test "remote function capture &Mod.fun/arity is rejected" do
-      ast = {:&, @meta, [{:/, @meta, [{{:., @meta, [String, :length]}, @meta, []}, 1]}]}
-      assert {:error, msg, _env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
-      assert %Error{category: :framework_usage, kind: :unsupported_anonymous_function} = msg
-    end
-
     test "local function capture &fun/arity is rejected" do
       ast = {:&, @meta, [{:/, @meta, [:my_fun, 2]}]}
       assert {:error, msg, _env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
