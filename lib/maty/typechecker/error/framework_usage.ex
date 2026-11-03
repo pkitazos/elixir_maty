@@ -244,6 +244,18 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
+  # register / suspend was given `&name/n` with the wrong arity:
+  # init handlers are referenced with arity 2, message handlers with arity 3
+  def handler_ref_wrong_arity(module, meta, name, got, expected) do
+    %Error{
+      category: :framework_usage,
+      kind: :handler_ref_wrong_arity,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{name: name, got: got, expected: expected}
+    }
+  end
+
   # a message handler was given a message pattern that is not `{:label, payload}`
   def handler_message_not_tagged_tuple(module, meta, got_ast) do
     %Error{

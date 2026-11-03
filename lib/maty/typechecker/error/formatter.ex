@@ -746,6 +746,25 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :framework_usage, kind: :handler_ref_wrong_arity} = e) do
+    %{name: name, got: got, expected: expected} = e.details
+
+    {macro, kind} =
+      if expected == 2 do
+        {"register", "an init handler"}
+      else
+        {"suspend", "a message handler"}
+      end
+
+    """
+    Framework Usage Violation: Wrong Handler Arity
+      Got: &#{name}/#{got}
+      Expected: &#{name}/#{expected}
+      --
+      #{macro} takes #{kind}, which is referenced with arity #{expected}.
+    """
+  end
+
   defp render(%Error{category: :framework_usage, kind: :handler_message_not_tagged_tuple} = e) do
     %{got: got} = e.details
 
