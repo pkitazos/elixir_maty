@@ -19,22 +19,6 @@ defmodule Maty.Typechecker.Helpers do
     end
   end
 
-  @base_types [
-    :atom,
-    nil,
-    :boolean,
-    :number,
-    :binary,
-    :date,
-    :pid,
-    :ref
-  ]
-
-  @doc """
-  b in base_types
-  """
-  def is_base_type?(type), do: type in @base_types
-
   @arith_ops [:+, :-, :*, :/]
   @ord_ops [:<, :>, :<=, :>=]
   @log_ops [:and, :or]
@@ -196,6 +180,7 @@ defmodule Maty.Typechecker.Helpers do
     end
   end
 
+  # todo: move somewhere else?
   @spec contains_register_call?(Macro.t()) :: boolean()
   def contains_register_call?(ast) do
     {_, found} =

@@ -33,24 +33,6 @@ defmodule Maty.Typechecker.HelpersTest do
     end
   end
 
-  # --- is_base_type?/1 ---
-
-  describe "is_base_type?/1" do
-    test "all base types return true" do
-      for type <- [:atom, nil, :boolean, :number, :binary, :date, :pid, :ref] do
-        assert Helpers.is_base_type?(type), "expected #{inspect(type)} to be a base type"
-      end
-    end
-
-    test "compound type returns false" do
-      refute Helpers.is_base_type?({:tuple, [:number]})
-    end
-
-    test "arbitrary atom returns false" do
-      refute Helpers.is_base_type?(:foobar)
-    end
-  end
-
   # --- op_type_rel/3 ---
 
   describe "op_type_rel/3" do

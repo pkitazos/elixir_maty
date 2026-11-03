@@ -47,10 +47,6 @@ defmodule Maty.Types do
   # this maps our type names to their actual structural type
   def __map__ do
     %{
-      session_id: T.session_id(),
-      init_token: T.init_token(),
-      role: T.role(),
-      session: T.session(),
       session_ctx: T.session_ctx(),
       local_state: T.local_state(),
       global_state: T.global_state(),
@@ -112,12 +108,7 @@ defmodule Maty.Types do
             # but we don't have unions for this one..
             | {:handler, :init, [t()], Maty.ST.t()}
 
-    def session_id, do: :ref
-    def init_token, do: :ref
     def role, do: :atom
-    def handler_label, do: :atom
-
-    def message, do: {:tuple, [:atom, :any]}
 
     # opaque: users never look inside a session, they only pass the session context along, only needed to type `session_ctx`
     def session, do: :any

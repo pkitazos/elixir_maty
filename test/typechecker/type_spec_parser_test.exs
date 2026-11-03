@@ -175,22 +175,9 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
       assert {:ok, ^expected} = TypeSpecParser.parse(type_ast(:maty_actor_state))
     end
 
-    test "session" do
-      expected = Type.session()
-      assert {:ok, ^expected} = TypeSpecParser.parse(type_ast(:session))
-    end
-
     test "session_ctx" do
       expected = Type.session_ctx()
       assert {:ok, ^expected} = TypeSpecParser.parse(type_ast(:session_ctx))
-    end
-
-    test "role" do
-      assert {:ok, :atom} = TypeSpecParser.parse(type_ast(:role))
-    end
-
-    test "session_id" do
-      assert {:ok, :ref} = TypeSpecParser.parse(type_ast(:session_id))
     end
   end
 end
