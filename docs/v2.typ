@@ -116,10 +116,6 @@ Top-level names are qualified by their module. Inside module $m$, a bare $f$ or 
 #let pty(P, A, D) = $tack.r #P arrow.l.double #A tack.l #D$
 #let dty(D) = $tack.r #D$
 
-// Scaffolding
-#let blank = text(fill: gray)[?]
-#let scaffold(name, conclusion) = prooftree(rule(name: [#name], blank, conclusion))
-
 // Utils
 #let nuffin = $emptyset$
 #let each(J, idx) = box(inset: (bottom: 0.3em), $(#J)_(#idx)$)
@@ -131,6 +127,10 @@ Top-level names are qualified by their module. Inside module $m$, a bare $f$ or 
   prooftree(rule(..args)),
 )
 
+// Scaffolding
+#let blank = text(fill: gray)[?]
+#let scaffold(name, conclusion) = trule(name, blank, conclusion)
+
 === Values
 
 #rule-set(
@@ -138,75 +138,72 @@ Top-level names are qualified by their module. Inside module $m$, a bare $f$ or 
       [c has base type C],
       vty($Gamma$, $c$, $syn C$)
   ),
-  prooftree(rule(name: [TV-Var],
-      [$x : A in Gamma$],
-      vty($Gamma$, $x$, $syn A$)
-  )),
-  prooftree(rule(name: [TV-Fun],
-      [$f : arrow(A) arrow.r B in Sigma$],
-      vty($Gamma$, $f$, $syn arrow(A) arrow.r B$)
-  )),
-  prooftree(rule(name: [TV-InitHandler],
-      [$h : #ty_init in Sigma$],
-      vty($Gamma$, $h$, $syn #ty_init$)
-  )),
-  prooftree(rule(name: [TV-MessageHandler],
-      [$h : #ty_handler in Sigma$],
-      vty($Gamma$, $h$, $syn #ty_handler$)
-  )),
+  trule([TV-Var],
+    [$x : A in Gamma$],
+    vty($Gamma$, $x$, $syn A$)
+  ),
+  trule([TV-Fun],
+    [$f : arrow(A) arrow.r B in Sigma$],
+    vty($Gamma$, $f$, $syn arrow(A) arrow.r B$)
+  ),
+  trule([TV-InitHandler],
+    [$h : #ty_init in Sigma$],
+    vty($Gamma$, $h$, $syn #ty_init$)
+  ),
+  trule([TV-MessageHandler],
+    [$h : #ty_handler in Sigma$],
+    vty($Gamma$, $h$, $syn #ty_handler$)
+  ),
   trule([TV-Tuple-Syn],
     each(vty($Gamma$, $V_i$, $syn A_i$), $i in 1..n$),
     vty($Gamma$, $(V_1, ..., V_n)$, $syn A_1 times ... times A_n$)
   ),
-  prooftree(rule(name: [TV-Tuple-Chk],
-      // todo: fix vertical spacing
-      each(vty($Gamma$, $V_i$, $chk A_i$), $i in 1..n$),
-      vty($Gamma$, $(V_1, ..., V_n)$, $chk A_1 times ... times A_n$)
-  )),
-  prooftree(rule(name: [TV-Nil],
-      vty($Gamma$, [$[]$], $chk [A]$)
-  )),
-  prooftree(rule(name: [TV-Cons-Syn],
-      vty($Gamma$, $V$, $syn A$), vty($Gamma$, $W$, $chk [A]$),
-      vty($Gamma$, $[V | W]$, $syn [A]$)
-  )),
-  prooftree(rule(name: [TV-Cons-Chk],
-      vty($Gamma$, $V$, $chk A$), vty($Gamma$, $W$, $chk [A]$),
-      vty($Gamma$, $[V | W]$, $chk [A]$)
-  )),
+  trule([TV-Tuple-Chk],
+    each(vty($Gamma$, $V_i$, $chk A_i$), $i in 1..n$),
+    vty($Gamma$, $(V_1, ..., V_n)$, $chk A_1 times ... times A_n$)
+  ),
+  trule([TV-Nil],
+    vty($Gamma$, [$[]$], $chk [A]$)
+  ),
+  trule([TV-Cons-Syn],
+    vty($Gamma$, $V$, $syn A$), vty($Gamma$, $W$, $chk [A]$),
+    vty($Gamma$, $[V | W]$, $syn [A]$)
+  ),
+  trule([TV-Cons-Chk],
+    vty($Gamma$, $V$, $chk A$), vty($Gamma$, $W$, $chk [A]$),
+    vty($Gamma$, $[V | W]$, $chk [A]$)
+  ),
 
   // todo: mention that records are unordered
-  prooftree(rule(name: [TV-Record-Syn],
-      // todo: fix vertical spacing
-      each(vty($Gamma$, $V_i$, $syn A_i$), $i in 1..n$),
-      vty($Gamma$, ${ell_1 = V_1, ..., ell_n = V_n}$, $syn {ell_1: A_1, ..., ell_n : A_n}$ )
-  )),
-  prooftree(rule(name: [TV-Record-Chk],
-      // todo: fix vertical spacing
-      each(vty($Gamma$, $V_i$, $chk A_i$), $i in 1..n$),
-      vty($Gamma$, ${ell_1 = V_1, ..., ell_n = V_n}$, $chk {ell_1: A_1, ..., ell_n : A_n}$ )
-  )),
-  prooftree(rule(name: [TV-Dict-Syn],
-      vty($Gamma$, $V_1$, $syn C$), vty($Gamma$, $W_1$, $syn A$),
-      each($#vty($Gamma$, $V_i$, $chk C$) quad #vty($Gamma$, $W_i$, $chk A$)$, $i in 2..n$),
-      vty($Gamma$, ${V_1 arrow.r.bar W_1, ..., V_n arrow.r.bar W_n}$, $syn {C arrow.r.bar A}$)
-  )),
-  prooftree(rule(name: [TV-Dict-Chk],
-      each($#vty($Gamma$, $V_i$, $chk C$) quad #vty($Gamma$, $W_i$, $chk A$)$, $i in 1..n$),
-      vty($Gamma$, ${V_1 arrow.r.bar W_1, ..., V_n arrow.r.bar W_n}$, $chk {C arrow.r.bar A}$)
-  )),
-  prooftree(rule(name: [TV-Abs],
-      cty($Gamma, x_1 : A_1, ..., x_n : A_n$, nuffin, $M$, $chk B$, nuffin),
-      vty($Gamma$, $lambda (x_1, ..., x_n). M$, $chk (A_1, ..., A_n) arrow.r B$)
-  )),
-  prooftree(rule(name: [TV-Ann],
-      vty($Gamma$, $V$, $chk A$),
-      vty($Gamma$, $(V : A)$, $syn A$)
-  )),
-  prooftree(rule(name: [TV-Switch],
-      vty($Gamma$, $V$, $syn A$),
-      vty($Gamma$, $V$, $chk A$)
-  )),
+  trule([TV-Record-Syn],
+    each(vty($Gamma$, $V_i$, $syn A_i$), $i in 1..n$),
+    vty($Gamma$, ${ell_1 = V_1, ..., ell_n = V_n}$, $syn {ell_1: A_1, ..., ell_n : A_n}$ )
+  ),
+  trule([TV-Record-Chk],
+    each(vty($Gamma$, $V_i$, $chk A_i$), $i in 1..n$),
+    vty($Gamma$, ${ell_1 = V_1, ..., ell_n = V_n}$, $chk {ell_1: A_1, ..., ell_n : A_n}$ )
+  ),
+  trule([TV-Dict-Syn],
+    vty($Gamma$, $V_1$, $syn C$), vty($Gamma$, $W_1$, $syn A$),
+    each($#vty($Gamma$, $V_i$, $chk C$) quad #vty($Gamma$, $W_i$, $chk A$)$, $i in 2..n$),
+    vty($Gamma$, ${V_1 arrow.r.bar W_1, ..., V_n arrow.r.bar W_n}$, $syn {C arrow.r.bar A}$)
+  ),
+  trule([TV-Dict-Chk],
+    each($#vty($Gamma$, $V_i$, $chk C$) quad #vty($Gamma$, $W_i$, $chk A$)$, $i in 1..n$),
+    vty($Gamma$, ${V_1 arrow.r.bar W_1, ..., V_n arrow.r.bar W_n}$, $chk {C arrow.r.bar A}$)
+  ),
+  trule([TV-Abs],
+    cty($Gamma, x_1 : A_1, ..., x_n : A_n$, nuffin, $M$, $chk B$, nuffin),
+    vty($Gamma$, $lambda (x_1, ..., x_n). M$, $chk (A_1, ..., A_n) arrow.r B$)
+  ),
+  trule([TV-Ann],
+    vty($Gamma$, $V$, $chk A$),
+    vty($Gamma$, $(V : A)$, $syn A$)
+  ),
+  trule([TV-Switch],
+    vty($Gamma$, $V$, $syn A$),
+    vty($Gamma$, $V$, $chk A$)
+  ),
 )
 
 === Computations
