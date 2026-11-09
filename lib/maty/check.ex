@@ -50,9 +50,13 @@ defmodule Maty.Check do
 
   # -- typing judgements + friends
 
-  # Ψ; Δ; Γ | Q₁ |> e : T <| Q₂
-  @spec tc(Maty.Typechecker.Ctx.t(), Macro.t()) :: t(Maty.Types.T.t())
-  def tc(ctx, e), do: fn env, st -> TC.synth(ctx, env, st, e) end
+  # Ψ; Δ; Γ | Q₁ |> e ==> T <| Q₂
+  @spec syn(Maty.Typechecker.Ctx.t(), Macro.t()) :: t(Maty.Types.T.t())
+  def syn(ctx, e), do: fn env, st -> TC.synth(ctx, env, st, e) end
+
+  # Ψ; Δ; Γ | Q₁ |> e <== T <| Q₂
+  @spec chk(Maty.Typechecker.Ctx.t(), Macro.t(), Maty.Types.t()) :: t(Maty.Types.T.t())
+  def chk(ctx, e, t), do: fn env, st -> TC.check(ctx, env, st, e, t) end
 
   # ⊢ p : a ⇒ Γ'
   @spec match_pattern(Maty.Typechecker.Ctx.t(), Macro.t(), Maty.Types.T.t()) :: t(nil)
@@ -85,6 +89,25 @@ defmodule Maty.Check do
       items
       |> Enum.reduce_while({:ok, [], st, env}, fn item, {:ok, acc, st, env} ->
         case apply_check(fun.(item), env, st) do
+          {:ok, value, st, env} -> {:cont, {:ok, [value | acc], st, env}}
+          {:error, _, _} = err -> {:halt, err}
+        end
+      end)
+      |> case do
+        {:ok, rev, st, env} -> {:ok, Enum.reverse(rev), st, env}
+        {:error, _, _} = err -> err
+      end
+    end
+  end
+
+  # todo: better name
+  @spec chain_4_check([a], [ty], (a, ty -> t(b))) :: t([b]) when a: var, b: var, ty: var
+  def chain_4_check(items, types, fun) do
+    fn env, st ->
+      items
+      |> Enum.zip(types)
+      |> Enum.reduce_while({:ok, [], st, env}, fn {v, ty}, {:ok, acc, st, env} ->
+        case apply_check(fun.(v, ty), env, st) do
           {:ok, value, st, env} -> {:cont, {:ok, [value | acc], st, env}}
           {:error, _, _} = err -> {:halt, err}
         end

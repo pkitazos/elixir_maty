@@ -12,7 +12,7 @@ defmodule Maty.Typechecker.TC.Timer do
         ) do
     # or could just not typecheck this..
     tcm env: env, st: st do
-      arg_type <- tc(ctx, arg)
+      arg_type <- syn(ctx, arg)
 
       expect arg_type == :number,
         else:

@@ -12,7 +12,7 @@ defmodule Maty.Typechecker.TC.IO do
         ) do
     # or could just not typecheck this..
     tcm env: env, st: st do
-      arg_type <- tc(ctx, arg)
+      arg_type <- syn(ctx, arg)
 
       expect arg_type in [:binary, {:list, :binary}],
         else:
