@@ -11,7 +11,7 @@ defmodule Maty.Typechecker.TC.IO do
           {{:., _meta1, [IO, :puts]}, meta, [arg]}
         ) do
     # or could just not typecheck this..
-    check env: env, st: st do
+    tcm env: env, st: st do
       arg_type <- tc(ctx, arg)
 
       expect arg_type in [:binary, {:list, :binary}],

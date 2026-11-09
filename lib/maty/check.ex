@@ -115,7 +115,7 @@ defmodule Maty.Check do
   # -- internals
 
   @doc false
-  # what `check env: env, st: st_pre do` compiles to: run a check from a starting Γ and Q
+  # what `tcm env: env, st: st_pre do` compiles to: run a check from a starting Γ and Q
   @spec __run__(t(a), env: var_env(), st: Maty.ST.t()) :: result(a) when a: var
   def __run__(check, start) when is_list(start) do
     case Enum.sort_by(start, &elem(&1, 0)) do
@@ -124,7 +124,7 @@ defmodule Maty.Check do
 
       other ->
         raise ArgumentError,
-              "check expects exactly `env:` and `st:`, got: #{inspect(Keyword.keys(other))}"
+              "tcm expects exactly `env:` and `st:`, got: #{inspect(Keyword.keys(other))}"
     end
   end
 
@@ -155,10 +155,10 @@ defmodule Maty.Check do
   # macro time!
 
   @doc "Builds a check from a sequence of statements"
-  defmacro check(do: block), do: build_check(block)
+  defmacro tcm(do: block), do: build_check(block)
 
   @doc "Builds a check and runs it from a starting Γ and Q"
-  defmacro check(start, do: block) do
+  defmacro tcm(start, do: block) do
     quote do
       Maty.Check.__run__(unquote(build_check(block)), unquote(start))
     end
@@ -198,12 +198,12 @@ defmodule Maty.Check do
     conclusion_tail(last)
   end
 
-  defp reject_check_run({:check, meta, [_start, [do: _]]}),
+  defp reject_check_run({:tcm, meta, [_start, [do: _]]}),
     do:
       raise(CompileError,
         line: meta[:line],
         description:
-          "`check env: _, st: _` cannot be used inside a check block (it would restart from the given state partway through the rule); use `check do` for nested blocks"
+          "`tcm env: _, st: _` cannot be used inside a check block (it would restart from the given state partway through the rule); use `tcm do` for nested blocks"
       )
 
   defp reject_check_run(other), do: other
@@ -218,7 +218,7 @@ defmodule Maty.Check do
 
   # each check block checks itself so we don't need to walk further
   # any atom stops the walk
-  defp reject_ok_st({:check, _, [[do: _]]}), do: nil
+  defp reject_ok_st({:tcm, _, [[do: _]]}), do: nil
   defp reject_ok_st(other), do: other
 
   defp conclusion_tail({:case, _, [_, [do: clauses]]}), do: conclusion_clauses(clauses)

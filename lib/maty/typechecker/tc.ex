@@ -114,7 +114,7 @@ defmodule Maty.Typechecker.TC do
   # List Construction [v1, v2, ...]
   # Enforces homogeneity. Preserves session state.
   deftc synth(ctx, env, st, items) when is_list(items) do
-    check env: env, st: st do
+    tcm env: env, st: st do
       list_types <- chain(items, &tc(ctx, &1))
 
       expect {:ok, type} = Helpers.unify_list_types(list_types),
@@ -133,7 +133,7 @@ defmodule Maty.Typechecker.TC do
   # -- Val-Tuple
   # 2-Tuple Value Construction
   deftc synth(ctx, env, st, {lhs_ast, rhs_ast}) do
-    check env: env, st: st do
+    tcm env: env, st: st do
       lhs_type <- tc(ctx, lhs_ast)
       rhs_type <- tc(ctx, rhs_ast)
       ok({:tuple, [lhs_type, rhs_type]})
@@ -143,7 +143,7 @@ defmodule Maty.Typechecker.TC do
   # -- Val-Tuple
   # n-Tuple Construction {v1, v2, ...}
   deftc synth(ctx, var_env, st_pre, {:{}, _, items}) when is_list(items) do
-    check env: var_env, st: st_pre do
+    tcm env: var_env, st: st_pre do
       types <- chain(items, &tc(ctx, &1))
       ok({:tuple, types})
     end
@@ -154,14 +154,14 @@ defmodule Maty.Typechecker.TC do
   # (at runtime `|` raises a KeyError for a missing key, so an update can never add a key)
   deftc synth(ctx, env, st, {:%{}, meta, [{:|, _, [map_ast, updates]}]})
         when is_list(updates) do
-    check env: env, st: st do
+    tcm env: env, st: st do
       map_type <- tc(ctx, map_ast)
 
       expect {:map_record, fields} = map_type,
         else: Error.TypeMismatch.map_update_not_record(ctx.module, meta, got: map_type)
 
       chain(updates, fn {key_ast, val_ast} ->
-        check do
+        tcm do
           # keys must be literal atoms, a record's fields are known statically
           expect is_atom(key_ast),
             else: Error.PatternMatching.complex_map_key(ctx.module, meta, key_ast)
@@ -190,10 +190,10 @@ defmodule Maty.Typechecker.TC do
 
   # Map Construction %{k1 => v1, ...} (Val-Map)
   deftc synth(ctx, env, st, {:%{}, meta, pairs}) do
-    check env: env, st: st do
+    tcm env: env, st: st do
       fields <-
         chain(pairs, fn {key_ast, val_ast} ->
-          check do
+          tcm do
             # keys must be literal atoms, a record's fields are known statically
             expect is_atom(key_ast),
               else: Error.PatternMatching.complex_map_key(ctx.module, meta, key_ast)
@@ -213,7 +213,7 @@ defmodule Maty.Typechecker.TC do
   # a zero-arity remote call `Mod.fun()` has the same shape, but its left-hand side is always a module atom
   deftc synth(ctx, env, st, {{:., meta, [map_ast, key]}, _call_meta, []})
         when not is_atom(map_ast) and is_atom(key) do
-    check env: env, st: st do
+    tcm env: env, st: st do
       map_type <- tc(ctx, map_ast)
 
       expect {:map_record, fields} = map_type,
@@ -228,7 +228,7 @@ defmodule Maty.Typechecker.TC do
 
   # -- T-Not
   deftc synth(ctx, env, st, erlang(:not, meta, [operand_ast])) do
-    check env: env, st: st do
+    tcm env: env, st: st do
       res_type <- tc(ctx, operand_ast)
 
       expect res_type == :boolean,
@@ -246,7 +246,7 @@ defmodule Maty.Typechecker.TC do
 
   # Unary minus `-x`
   deftc synth(ctx, env, st, erlang(:-, meta, [operand_ast])) do
-    check env: env, st: st do
+    tcm env: env, st: st do
       operand_type <- tc(ctx, operand_ast)
 
       expect operand_type == :number,
@@ -267,7 +267,7 @@ defmodule Maty.Typechecker.TC do
         when erlang_op in [:+, :-, :*, :/, :<, :>, :"=<", :>=, :==, :"/="] do
     op = Map.get(@source_ops, erlang_op, erlang_op)
 
-    check env: env, st: st do
+    tcm env: env, st: st do
       lhs_type <- tc(ctx, lhs_ast)
       rhs_type <- tc(ctx, rhs_ast)
 
@@ -289,7 +289,7 @@ defmodule Maty.Typechecker.TC do
   # after expansion both `"a" <> b <> "c"` and `"a=#{n}"` are a single `<<>>` with one `segment :: binary` per part
   # Other bitstring syntax (sizes, integer segments, ...) is not supported
   deftc synth(ctx, env, st, {:<<>>, meta, segments}) when is_list(segments) do
-    check env: env, st: st do
+    tcm env: env, st: st do
       _ <- chain(segments, &tc_string_segment(ctx, meta, &1))
       ok(:binary)
     end
@@ -340,7 +340,7 @@ defmodule Maty.Typechecker.TC do
   # Function capture: &fun/arity
   deftc synth(ctx, env, st, {:&, meta, [{:/, _, [{name, _, context}, arity]}]} = capture_ast)
         when is_atom(name) and is_atom(context) and is_integer(arity) do
-    check env: env, st: st do
+    tcm env: env, st: st do
       cond do
         # TV-MsgHandler
         Map.has_key?(ctx.delta_M, name) and arity == 3 ->
@@ -391,7 +391,7 @@ defmodule Maty.Typechecker.TC do
 
   # -- T-Let
   deftc synth(ctx, env, st, {:=, _meta, [pat_ast, expr_ast]}) do
-    check env: env, st: st do
+    tcm env: env, st: st do
       expr_type <- tc(ctx, expr_ast)
       _ <- match_pattern(ctx, pat_ast, expr_type)
       ok(expr_type)
@@ -401,13 +401,13 @@ defmodule Maty.Typechecker.TC do
   # -- T-Case
   # todo: revisit this
   deftc synth(ctx, env, st, {:case, meta, [scrutinee_ast, [do: clauses_list]]}) do
-    check env: env, st: st do
+    tcm env: env, st: st do
       scrutinee_type <- tc(ctx, scrutinee_ast)
 
       branch_results <-
         fan_out(Enum.with_index(clauses_list, 1), fn
           {{:->, branch_meta, [[pat_ast], expr_ast]}, index} ->
-            check do
+            tcm do
               # a literal pattern has no meta of its own, so its errors are reported at the branch
               _ <- match_pattern(%{ctx | meta: branch_meta}, pat_ast, scrutinee_type)
               tc(ctx, expr_ast)
@@ -432,7 +432,7 @@ defmodule Maty.Typechecker.TC do
           st_pre,
           maty_runtime(:send_session_message, meta, [_, recipient_ast, message_ast])
         ) do
-    check env: env, st: st_pre do
+    tcm env: env, st: st_pre do
       # the message must be a literal 2-tuple
       expect {literal_label, payload_expr_ast} = message_ast,
         else: Error.TypeMismatch.send_message_not_tuple(ctx.module, meta, got: message_ast)
@@ -514,7 +514,7 @@ defmodule Maty.Typechecker.TC do
           st,
           maty_runtime(:suspend, meta, [handler_ast, state_ast])
         ) do
-    check env: env, st: st do
+    tcm env: env, st: st do
       handler_type <- tc(ctx, handler_ast)
 
       expect {:handler, :message, handler_st} = handler_type,
@@ -571,7 +571,7 @@ defmodule Maty.Typechecker.TC do
           st,
           maty_runtime(:done, meta, [state_ast])
         ) do
-    check env: env, st: st do
+    tcm env: env, st: st do
       state_type <- tc(ctx, state_ast)
 
       expect state_type == Types.T.maty_actor_state(),
@@ -608,7 +608,7 @@ defmodule Maty.Typechecker.TC do
             args_ast
           ])
         ) do
-    check env: env, st: st do
+    tcm env: env, st: st do
       pid_type <- tc(ctx, ap_pid_ast)
 
       expect pid_type == :pid,
@@ -656,7 +656,7 @@ defmodule Maty.Typechecker.TC do
                func_name not in [:=, :%, :{}, :|, :<<>>] do
     func_id = {func_name, length(arg_asts)}
 
-    check env: env, st: st do
+    tcm env: env, st: st do
       expect not Map.has_key?(ctx.delta_M, func_name),
         else: Error.FunctionCall.handler_called_directly(ctx.module, meta, func_id, :message)
 
@@ -731,7 +731,7 @@ defmodule Maty.Typechecker.TC do
          meta,
          {:"::", seg_meta, [{{:., _, [String.Chars, :to_string]}, _, [val_ast]}, {:binary, _, _}]}
        ) do
-    check do
+    tcm do
       val_type <- tc(ctx, val_ast)
 
       expect val_type in @interpolatable_types,
@@ -750,7 +750,7 @@ defmodule Maty.Typechecker.TC do
 
   # a literal or concatenated operand: `x :: binary`
   defp tc_string_segment(ctx, meta, {:"::", seg_meta, [val_ast, {:binary, _, _}]}) do
-    check do
+    tcm do
       val_type <- tc(ctx, val_ast)
 
       expect val_type == :binary,
@@ -777,7 +777,7 @@ defmodule Maty.Typechecker.TC do
   end
 
   defp tc_boolean_op(ctx, env, st, op, meta, lhs_ast, rhs_ast) do
-    check env: env, st: st do
+    tcm env: env, st: st do
       lhs_type <- tc(ctx, lhs_ast)
       rhs_type <- tc(ctx, rhs_ast)
 
@@ -800,7 +800,7 @@ defmodule Maty.Typechecker.TC do
   # the only reason this isn't inlined is because it's used in a bunch of places in the wf module
   @spec tc_expr_list(Ctx.t(), Check.var_env(), Maty.ST.t(), [ast()]) :: result()
   def tc_expr_list(ctx, var_env, st_pre, ast_list) do
-    check env: var_env, st: st_pre do
+    tcm env: var_env, st: st_pre do
       types <- chain(ast_list, &tc(ctx, &1))
       ok(List.last(types))
     end

@@ -104,12 +104,12 @@ defmodule Maty.Utils do
 
   # Catches a typechecking clause that returns a check it never ran.
   #
-  # A `check do ... end` block does not typecheck anything by itself: it only *builds* a check,
+  # A `tcm do ... end` block does not typecheck anything by itself: it only *builds* a check,
   # which is a function `fn env, st -> result end` waiting to be given the starting env and
   # session type. Nothing happens until that function is called.
-  # A `check env: env, st: st do ... end` block builds the check, and then runs it with `env` and `st`
+  # A `tcm env: env, st: st do ... end` block builds the check, and then runs it with `env` and `st`
   #
-  # So a clause that uses `check do` at the top level, and forgets the `env:`/`st:`, (which has happened to me)
+  # So a clause that uses `tcm do` at the top level, and forgets the `env:`/`st:`, (which has happened to me)
   # just returns that check function instead of a result.
   # Nothing would fail at that point: the function would travel up to wherever it was called from and only blow up there,
   # when it's matched against `{:ok, type, st, env}`, which gives a hard to reas error
@@ -122,8 +122,8 @@ defmodule Maty.Utils do
   def ensure_run!(check, module, {name, arity}) when is_function(check, 2) do
     raise ArgumentError,
           "#{inspect(module)}.#{name}/#{arity} returned a check that was never run. " <>
-            "A `check do ... end` block only builds the check; run it from the clause's " <>
-            "starting state with `check env: env, st: st do ... end`"
+            "A `tcm do ... end` block only builds the check; run it from the clause's " <>
+            "starting state with `tcm env: env, st: st do ... end`"
   end
 
   def ensure_run!(result, _module, _function), do: result
