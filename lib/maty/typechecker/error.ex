@@ -14,6 +14,7 @@ defmodule Maty.Typechecker.Error do
   @type category ::
           :protocol_violation
           | :type_mismatch
+          | :type_inference
           | :pattern_matching
           | :function_call
           | :type_specification

@@ -433,6 +433,19 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  # --- :type_inference
+
+  defp render(%Error{category: :type_inference, kind: :cannot_infer_type} = e) do
+    %{term: term} = e.details
+
+    """
+    Type Inference Error: Cannot Infer Type
+      Expression: #{render_uninferable(term)}
+      --
+      #{render_uninferable_hint(term)}
+    """
+  end
+
   defp render(%Error{category: :pattern_matching, kind: :conflicting_pattern_bindings} = e) do
     %{conflicting_vars: conflicting_vars} = e.details
 

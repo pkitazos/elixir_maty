@@ -94,42 +94,26 @@ defmodule Maty.Typechecker.TC do
     - `{:ok, elixir_type, next_session_state, var_env}` on success
     - `{:error, error, var_env}` on failure
   """
-  @spec tc_expr(Ctx.t(), Check.var_env(), Maty.ST.t(), ast()) :: result()
+  @spec synth(Ctx.t(), Check.var_env(), Maty.ST.t(), ast()) :: result()
 
   # -- Val-BaseLit
-  deftc tc_expr(_ctx, env, st, value) when is_boolean(value) do
-    {:ok, :boolean, st, env}
-  end
 
-  deftc tc_expr(_ctx, env, st, falsy_guard()) do
-    {:ok, :boolean, st, env}
-  end
-
-  deftc tc_expr(_ctx, env, st, nil) do
-    {:ok, nil, st, env}
-  end
-
-  deftc tc_expr(_ctx, env, st, value) when is_binary(value) do
-    {:ok, :binary, st, env}
-  end
-
-  deftc tc_expr(_ctx, env, st, value) when is_number(value) do
-    {:ok, :number, st, env}
-  end
-
-  deftc tc_expr(_ctx, env, st, {:%, _, [Date, {:%{}, _, _}]}) do
-    {:ok, :date, st, env}
-  end
+  deftc synth(_ctx, env, st, nil), do: {:ok, nil, st, env}
+  deftc synth(_ctx, env, st, value) when is_boolean(value), do: {:ok, :boolean, st, env}
+  deftc synth(_ctx, env, st, value) when is_binary(value), do: {:ok, :binary, st, env}
+  deftc synth(_ctx, env, st, value) when is_number(value), do: {:ok, :number, st, env}
 
   # -- Val-EmptyList
-  deftc tc_expr(_ctx, env, st, []) do
-    {:ok, {:list, :any}, st, env}
+  deftc synth(ctx, env, _st, []) do
+    # ! not sure where to get the meta line from
+    error = Error.TypeInference.cannot_infer_type(ctx.module, [line: 0], :empty_list)
+    {:error, error, env}
   end
 
   # -- Val-Cons
   # List Construction [v1, v2, ...]
   # Enforces homogeneity. Preserves session state.
-  deftc tc_expr(ctx, env, st, items) when is_list(items) do
+  deftc synth(ctx, env, st, items) when is_list(items) do
     check env: env, st: st do
       list_types <- chain(items, &tc(ctx, &1))
 
@@ -142,13 +126,13 @@ defmodule Maty.Typechecker.TC do
 
   # -- Val-EmptyTuple
   # Empty Tuple Construction
-  deftc tc_expr(_ctx, env, st, {:{}, _, []}) do
+  deftc synth(_ctx, env, st, {:{}, _, []}) do
     {:ok, {:tuple, []}, st, env}
   end
 
   # -- Val-Tuple
   # 2-Tuple Value Construction
-  deftc tc_expr(ctx, env, st, {lhs_ast, rhs_ast}) do
+  deftc synth(ctx, env, st, {lhs_ast, rhs_ast}) do
     check env: env, st: st do
       lhs_type <- tc(ctx, lhs_ast)
       rhs_type <- tc(ctx, rhs_ast)
@@ -158,7 +142,7 @@ defmodule Maty.Typechecker.TC do
 
   # -- Val-Tuple
   # n-Tuple Construction {v1, v2, ...}
-  deftc tc_expr(ctx, var_env, st_pre, {:{}, _, items}) when is_list(items) do
+  deftc synth(ctx, var_env, st_pre, {:{}, _, items}) when is_list(items) do
     check env: var_env, st: st_pre do
       types <- chain(items, &tc(ctx, &1))
       ok({:tuple, types})
@@ -168,7 +152,7 @@ defmodule Maty.Typechecker.TC do
   # Map Record Update %{m | k1: v1, ...}
   # every key must already be in the record and keep its field's type, so the result has the record's type
   # (at runtime `|` raises a KeyError for a missing key, so an update can never add a key)
-  deftc tc_expr(ctx, env, st, {:%{}, meta, [{:|, _, [map_ast, updates]}]})
+  deftc synth(ctx, env, st, {:%{}, meta, [{:|, _, [map_ast, updates]}]})
         when is_list(updates) do
     check env: env, st: st do
       map_type <- tc(ctx, map_ast)
@@ -205,7 +189,7 @@ defmodule Maty.Typechecker.TC do
   end
 
   # Map Construction %{k1 => v1, ...} (Val-Map)
-  deftc tc_expr(ctx, env, st, {:%{}, meta, pairs}) do
+  deftc synth(ctx, env, st, {:%{}, meta, pairs}) do
     check env: env, st: st do
       fields <-
         chain(pairs, fn {key_ast, val_ast} ->
@@ -227,7 +211,7 @@ defmodule Maty.Typechecker.TC do
   # Map Record Field Access m.k
   # expanded AST: {{:., _, [map_ast, key]}, [no_parens: true, ...], []}
   # a zero-arity remote call `Mod.fun()` has the same shape, but its left-hand side is always a module atom
-  deftc tc_expr(ctx, env, st, {{:., meta, [map_ast, key]}, _call_meta, []})
+  deftc synth(ctx, env, st, {{:., meta, [map_ast, key]}, _call_meta, []})
         when not is_atom(map_ast) and is_atom(key) do
     check env: env, st: st do
       map_type <- tc(ctx, map_ast)
@@ -243,7 +227,7 @@ defmodule Maty.Typechecker.TC do
   end
 
   # -- T-Not
-  deftc tc_expr(ctx, env, st, erlang(:not, meta, [operand_ast])) do
+  deftc synth(ctx, env, st, erlang(:not, meta, [operand_ast])) do
     check env: env, st: st do
       res_type <- tc(ctx, operand_ast)
 
@@ -261,7 +245,7 @@ defmodule Maty.Typechecker.TC do
   end
 
   # Unary minus `-x`
-  deftc tc_expr(ctx, env, st, erlang(:-, meta, [operand_ast])) do
+  deftc synth(ctx, env, st, erlang(:-, meta, [operand_ast])) do
     check env: env, st: st do
       operand_type <- tc(ctx, operand_ast)
 
@@ -279,7 +263,7 @@ defmodule Maty.Typechecker.TC do
   end
 
   # -- T-Op
-  deftc tc_expr(ctx, env, st, erlang(erlang_op, meta, [lhs_ast, rhs_ast]))
+  deftc synth(ctx, env, st, erlang(erlang_op, meta, [lhs_ast, rhs_ast]))
         when erlang_op in [:+, :-, :*, :/, :<, :>, :"=<", :>=, :==, :"/="] do
     op = Map.get(@source_ops, erlang_op, erlang_op)
 
@@ -304,7 +288,7 @@ defmodule Maty.Typechecker.TC do
   # Strings: Concatenation and Interpolation
   # after expansion both `"a" <> b <> "c"` and `"a=#{n}"` are a single `<<>>` with one `segment :: binary` per part
   # Other bitstring syntax (sizes, integer segments, ...) is not supported
-  deftc tc_expr(ctx, env, st, {:<<>>, meta, segments}) when is_list(segments) do
+  deftc synth(ctx, env, st, {:<<>>, meta, segments}) when is_list(segments) do
     check env: env, st: st do
       _ <- chain(segments, &tc_string_segment(ctx, meta, &1))
       ok(:binary)
@@ -313,32 +297,32 @@ defmodule Maty.Typechecker.TC do
 
   # Handles Boolean Ops: and, or
   # matched in the `case` they expand to (see `boolean_op/4`)
-  deftc tc_expr(ctx, env, st, boolean_op(:and, meta, lhs_ast, rhs_ast)) do
+  deftc synth(ctx, env, st, boolean_op(:and, meta, lhs_ast, rhs_ast)) do
     tc_boolean_op(ctx, env, st, :and, meta, lhs_ast, rhs_ast)
   end
 
-  deftc tc_expr(ctx, env, st, boolean_op(:or, meta, lhs_ast, rhs_ast)) do
+  deftc synth(ctx, env, st, boolean_op(:or, meta, lhs_ast, rhs_ast)) do
     tc_boolean_op(ctx, env, st, :or, meta, lhs_ast, rhs_ast)
   end
 
   # rejected cause they're annoying to type
-  deftc tc_expr(ctx, env, _st, truthy_op(:&&, meta)) do
+  deftc synth(ctx, env, _st, truthy_op(:&&, meta)) do
     {:error, Error.FrameworkUsage.unsupported_truthy_operator(ctx.module, meta, :&&), env}
   end
 
-  deftc tc_expr(ctx, env, _st, truthy_op(:||, meta)) do
+  deftc synth(ctx, env, _st, truthy_op(:||, meta)) do
     {:error, Error.FrameworkUsage.unsupported_truthy_operator(ctx.module, meta, :||), env}
   end
 
   # Raw Communication Checks
 
   # Disallow raw 'receive'
-  deftc tc_expr(ctx, env, _st, {:receive, meta, _}) do
+  deftc synth(ctx, env, _st, {:receive, meta, _}) do
     {:error, Error.FrameworkUsage.no_native_receive(ctx.module, meta), env}
   end
 
   # Disallow raw 'send' (Kernel.send/2 or :erlang.send/2)
-  deftc tc_expr(ctx, env, _st, erlang(:send, meta, args))
+  deftc synth(ctx, env, _st, erlang(:send, meta, args))
         when length(args) in [2, 3] do
     {:error, Error.FrameworkUsage.no_native_send(ctx.module, meta), env}
   end
@@ -349,12 +333,12 @@ defmodule Maty.Typechecker.TC do
   # Reject them explicitly so they do not fall through to T-App
 
   # Anonymous function: fn args -> ... end
-  deftc tc_expr(ctx, env, _st, {:fn, meta, _clauses}) do
+  deftc synth(ctx, env, _st, {:fn, meta, _clauses}) do
     {:error, Error.FrameworkUsage.unsupported_anonymous_function(ctx.module, meta), env}
   end
 
   # Function capture: &fun/arity
-  deftc tc_expr(ctx, env, st, {:&, meta, [{:/, _, [{name, _, context}, arity]}]} = capture_ast)
+  deftc synth(ctx, env, st, {:&, meta, [{:/, _, [{name, _, context}, arity]}]} = capture_ast)
         when is_atom(name) and is_atom(context) and is_integer(arity) do
     check env: env, st: st do
       cond do
@@ -381,7 +365,7 @@ defmodule Maty.Typechecker.TC do
 
   # Remote function capture: &Mod.fun/arity
   # handlers are always local, so a remote capture is never one
-  deftc tc_expr(
+  deftc synth(
           ctx,
           env,
           _st,
@@ -392,21 +376,21 @@ defmodule Maty.Typechecker.TC do
   end
 
   # Anonymus Function capture: &(&1 + 1)
-  deftc tc_expr(ctx, env, _st, {:&, meta, [_capture]}) do
+  deftc synth(ctx, env, _st, {:&, meta, [_capture]}) do
     {:error, Error.FrameworkUsage.unsupported_anonymous_function(ctx.module, meta), env}
   end
 
   # todo: handle remote function call
 
   # Block Scope
-  deftc tc_expr(ctx, var_env, st_pre, {:__block__, _, body_asts}) when is_list(body_asts) do
+  deftc synth(ctx, var_env, st_pre, {:__block__, _, body_asts}) when is_list(body_asts) do
     tc_expr_list(ctx, var_env, st_pre, body_asts)
   end
 
   # Computation Typing
 
   # -- T-Let
-  deftc tc_expr(ctx, env, st, {:=, _meta, [pat_ast, expr_ast]}) do
+  deftc synth(ctx, env, st, {:=, _meta, [pat_ast, expr_ast]}) do
     check env: env, st: st do
       expr_type <- tc(ctx, expr_ast)
       _ <- match_pattern(ctx, pat_ast, expr_type)
@@ -416,7 +400,7 @@ defmodule Maty.Typechecker.TC do
 
   # -- T-Case
   # todo: revisit this
-  deftc tc_expr(ctx, env, st, {:case, meta, [scrutinee_ast, [do: clauses_list]]}) do
+  deftc synth(ctx, env, st, {:case, meta, [scrutinee_ast, [do: clauses_list]]}) do
     check env: env, st: st do
       scrutinee_type <- tc(ctx, scrutinee_ast)
 
@@ -442,7 +426,7 @@ defmodule Maty.Typechecker.TC do
   end
 
   # -- T-Send
-  deftc tc_expr(
+  deftc synth(
           ctx,
           env,
           st_pre,
@@ -515,16 +499,16 @@ defmodule Maty.Typechecker.TC do
 
   # Demo only (I really do not like these)
 
-  deftc tc_expr(ctx, var_env, st_pre, {{:., _, [IO, _]}, _, _} = ast) do
-    TC.IO.tc_expr(ctx, var_env, st_pre, ast)
+  deftc synth(ctx, var_env, st_pre, {{:., _, [IO, _]}, _, _} = ast) do
+    TC.IO.synth(ctx, var_env, st_pre, ast)
   end
 
-  deftc tc_expr(ctx, var_env, st_pre, {{:., _, [:timer, _]}, _, _} = ast) do
-    TC.Timer.tc_expr(ctx, var_env, st_pre, ast)
+  deftc synth(ctx, var_env, st_pre, {{:., _, [:timer, _]}, _, _} = ast) do
+    TC.Timer.synth(ctx, var_env, st_pre, ast)
   end
 
   # -- T-Suspend
-  deftc tc_expr(
+  deftc synth(
           ctx,
           env,
           st,
@@ -581,7 +565,7 @@ defmodule Maty.Typechecker.TC do
   end
 
   # -- T-Done
-  deftc tc_expr(
+  deftc synth(
           ctx,
           env,
           st,
@@ -613,7 +597,7 @@ defmodule Maty.Typechecker.TC do
   end
 
   # -- T-Register
-  deftc tc_expr(
+  deftc synth(
           ctx,
           env,
           st,
@@ -667,7 +651,7 @@ defmodule Maty.Typechecker.TC do
 
   # -- T-App
   # todo: how could I handle remote calls?
-  deftc tc_expr(ctx, env, st, {func_name, meta, arg_asts})
+  deftc synth(ctx, env, st, {func_name, meta, arg_asts})
         when is_atom(func_name) and is_list(arg_asts) and meta != [] and
                func_name not in [:=, :%, :{}, :|, :<<>>] do
     func_id = {func_name, length(arg_asts)}
@@ -715,7 +699,7 @@ defmodule Maty.Typechecker.TC do
   # a variable's context is `nil`
   # variables introduced by some macro would have an atom context, currently Γ is keyed by name only,
   # so looking those up could pick up the user's variable of the same name so they are left to the catch-all below
-  deftc tc_expr(ctx, env, st, {var_name, meta, nil}) when is_atom(var_name) do
+  deftc synth(ctx, env, st, {var_name, meta, nil}) when is_atom(var_name) do
     case Map.fetch(env, var_name) do
       {:ok, type} ->
         {:ok, type, st, env}
@@ -727,12 +711,12 @@ defmodule Maty.Typechecker.TC do
 
   # -- Val-BaseLit (I gotta do something about these names..)
   # Atom literals
-  deftc tc_expr(_ctx, env, st, value) when is_atom(value) and not is_nil(value) do
+  deftc synth(_ctx, env, st, value) when is_atom(value) and not is_nil(value) do
     {:ok, :atom, st, env}
   end
 
   # Catch-all: anything no rule above covers is reported
-  deftc tc_expr(ctx, env, _st, ast) do
+  deftc synth(ctx, env, _st, ast) do
     meta = Helpers.extract_meta_from_ast(ast)
     meta = if Keyword.has_key?(meta, :line), do: meta, else: ctx.meta
     {:error, Error.FrameworkUsage.unsupported_expression(ctx.module, meta, ast), env}
@@ -811,7 +795,7 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # Processes a list of expressions sequentially using tc_expr.
+  # Processes a list of expressions sequentially using synth.
   # Returns the result of the *last* expression in the list.
   # the only reason this isn't inlined is because it's used in a bunch of places in the wf module
   @spec tc_expr_list(Ctx.t(), Check.var_env(), Maty.ST.t(), [ast()]) :: result()

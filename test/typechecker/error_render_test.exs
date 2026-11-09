@@ -23,7 +23,8 @@ defmodule Maty.Typechecker.ErrorRenderTest do
     Error.FunctionCall,
     Error.TypeSpecification,
     Error.FrameworkUsage,
-    Error.NameResolution
+    Error.NameResolution,
+    Error.TypeInference
   ]
 
   @cause_constructors [
@@ -193,6 +194,32 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          :missing,
          {:map_record, %{name: :binary}}
        )},
+      {{Error.TypeMismatch, :dict_op_not_dict},
+       Error.TypeMismatch.dict_op_not_dict(@m, @meta, :put, got: {:map_record, %{name: :binary}})},
+      {{Error.TypeMismatch, :dict_arg_type_mismatch},
+       Error.TypeMismatch.dict_arg_type_mismatch(@m, @meta, :fetch!, :key,
+         expected: :binary,
+         got: :number
+       )},
+      {{Error.TypeMismatch, :dict_entries_incompatible},
+       Error.TypeMismatch.dict_entries_incompatible(@m, @meta, :value, [:number, :binary])},
+      {{Error.TypeMismatch, :dict_key_not_base_type},
+       Error.TypeMismatch.dict_key_not_base_type(@m, @meta, got: {:list, :number})},
+      {{Error.TypeMismatch, :not_a_function},
+       Error.TypeMismatch.not_a_function(@m, @meta, got: :number)},
+      {{Error.TypeMismatch, :function_arg_type_mismatch},
+       Error.TypeMismatch.function_arg_type_mismatch(@m, @meta, 1,
+         expected: :number,
+         got: :binary
+       )},
+      {{Error.TypeMismatch, :lambda_not_expected},
+       Error.TypeMismatch.lambda_not_expected(@m, @meta, expected: :number)},
+      {{Error.TypeMismatch, :lambda_arity_mismatch},
+       Error.TypeMismatch.lambda_arity_mismatch(@m, @meta, expected: 1, got: 2)},
+
+      # :type_inference
+      {{Error.TypeInference, :cannot_infer_type},
+       Error.TypeInference.cannot_infer_type(@m, @meta, :anonymous_function)},
 
       # :pattern_matching
       {{Error.PatternMatching, :conflicting_pattern_bindings},
@@ -219,6 +246,8 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FunctionCall.handler_called_directly(@m, @meta, {:install, 3}, :init)},
       {{Error.FunctionCall, :arity_mismatch},
        Error.FunctionCall.arity_mismatch(@m, @meta, {:f, 1}, expected: 1, got: 2)},
+      {{Error.FunctionCall, :application_arity_mismatch},
+       Error.FunctionCall.application_arity_mismatch(@m, @meta, expected: 1, got: 2)},
       {{Error.FunctionCall, :no_matching_function_clause},
        Error.FunctionCall.no_matching_function_clause(@m, @meta, {:f, 1}, [:binary])},
       {{Error.FunctionCall, :function_altered_session_state},
@@ -268,6 +297,12 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FrameworkUsage.no_native_receive(@m, @meta)},
       {{Error.FrameworkUsage, :unsupported_anonymous_function},
        Error.FrameworkUsage.unsupported_anonymous_function(@m, @meta)},
+      {{Error.FrameworkUsage, :unsupported_lambda},
+       Error.FrameworkUsage.unsupported_lambda(@m, @meta, :multiple_clauses)},
+      {{Error.FrameworkUsage, :communication_in_lambda},
+       Error.FrameworkUsage.communication_in_lambda(@m, @meta,
+         got: {:send, [:seller, {:title, "a title"}]}
+       )},
       {{Error.FrameworkUsage, :unsupported_bitstring},
        Error.FrameworkUsage.unsupported_bitstring(@m, @meta)},
       {{Error.FrameworkUsage, :unsupported_expression},
