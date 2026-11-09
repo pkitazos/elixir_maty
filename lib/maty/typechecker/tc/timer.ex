@@ -4,7 +4,7 @@ defmodule Maty.Typechecker.TC.Timer do
   import Maty.Check
   import Maty.Utils, only: [deftc: 2]
 
-  deftc tc_expr(
+  deftc synth(
           ctx,
           env,
           st,

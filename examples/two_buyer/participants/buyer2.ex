@@ -7,7 +7,7 @@ defmodule TwoBuyer.Participants.Buyer2 do
   @st {:install, ~q"share_handler"}
   @st {:share_handler,
        ~q"&buyer1:{share(number).+seller:{address(binary).date_handler, quit(nil).end}}"}
-  @st {:date_handler, ~q"&seller:{date(date).end}"}
+  @st {:date_handler, ~q"&seller:{date(number).end}"}
 
   on_start ap_pid :: pid() do
     Maty.DSL.register(ap_pid, :buyer2, &install/2, nil)
@@ -39,8 +39,8 @@ defmodule TwoBuyer.Participants.Buyer2 do
     end
   end
 
-  defhandler date_handler(:seller, {:date, _date :: Date.t()}, state) do
-    IO.puts("&seller : date(date)")
+  defhandler date_handler(:seller, {:date, _date :: number()}, state) do
+    IO.puts("&seller : date(number)")
     :timer.sleep(100)
 
     Maty.DSL.done(state)

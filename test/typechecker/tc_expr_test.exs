@@ -56,60 +56,60 @@ defmodule Maty.Typechecker.TCExprTest do
 
   # --- Literals
 
-  describe "tc_expr/4 literals" do
+  describe "synth/4 literals" do
     test "boolean true" do
-      assert {:ok, :boolean, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, true)
+      assert {:ok, :boolean, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, true)
     end
 
     test "boolean false" do
-      assert {:ok, :boolean, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, false)
+      assert {:ok, :boolean, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, false)
     end
 
     test "nil" do
-      assert {:ok, nil, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, nil)
+      assert {:ok, nil, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, nil)
     end
 
     test "binary string" do
-      assert {:ok, :binary, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, "hello")
+      assert {:ok, :binary, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, "hello")
     end
 
     test "number integer" do
-      assert {:ok, :number, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, 42)
+      assert {:ok, :number, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, 42)
     end
 
     test "number float" do
-      assert {:ok, :number, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, 3.14)
+      assert {:ok, :number, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, 3.14)
     end
 
     test "literals preserve session state" do
-      assert {:ok, :number, @st_out, %{}} = TC.tc_expr(@ctx, %{}, @st_out, 42)
-      assert {:ok, :binary, @st_out, %{}} = TC.tc_expr(@ctx, %{}, @st_out, "hi")
-      assert {:ok, :boolean, @st_out, %{}} = TC.tc_expr(@ctx, %{}, @st_out, true)
+      assert {:ok, :number, @st_out, %{}} = TC.synth(@ctx, %{}, @st_out, 42)
+      assert {:ok, :binary, @st_out, %{}} = TC.synth(@ctx, %{}, @st_out, "hi")
+      assert {:ok, :boolean, @st_out, %{}} = TC.synth(@ctx, %{}, @st_out, true)
     end
 
     test "literals preserve var env" do
       env = %{x: :number, y: :binary}
-      assert {:ok, :number, @st_end, ^env} = TC.tc_expr(@ctx, env, @st_end, 42)
+      assert {:ok, :number, @st_end, ^env} = TC.synth(@ctx, env, @st_end, 42)
     end
   end
 
   # --- Variables
 
-  describe "tc_expr/4 variables" do
+  describe "synth/4 variables" do
     test "variable lookup succeeds when bound" do
       env = %{x: :number}
-      assert {:ok, :number, @st_end, ^env} = TC.tc_expr(@ctx, env, @st_end, var(:x))
+      assert {:ok, :number, @st_end, ^env} = TC.synth(@ctx, env, @st_end, var(:x))
     end
 
     test "variable lookup returns type from env" do
       env = %{name: :binary, count: :number, flag: :boolean}
-      assert {:ok, :binary, @st_end, _} = TC.tc_expr(@ctx, env, @st_end, var(:name))
-      assert {:ok, :number, @st_end, _} = TC.tc_expr(@ctx, env, @st_end, var(:count))
-      assert {:ok, :boolean, @st_end, _} = TC.tc_expr(@ctx, env, @st_end, var(:flag))
+      assert {:ok, :binary, @st_end, _} = TC.synth(@ctx, env, @st_end, var(:name))
+      assert {:ok, :number, @st_end, _} = TC.synth(@ctx, env, @st_end, var(:count))
+      assert {:ok, :boolean, @st_end, _} = TC.synth(@ctx, env, @st_end, var(:flag))
     end
 
     test "unbound variable returns error" do
-      assert {:error, msg, %{}} = TC.tc_expr(@ctx, %{}, @st_end, var(:unknown_var))
+      assert {:error, msg, %{}} = TC.synth(@ctx, %{}, @st_end, var(:unknown_var))
 
       assert %Error{
                category: :name_resolution,
@@ -120,79 +120,79 @@ defmodule Maty.Typechecker.TCExprTest do
 
     test "variable preserves session state" do
       env = %{x: :number}
-      assert {:ok, :number, @st_out, ^env} = TC.tc_expr(@ctx, env, @st_out, var(:x))
+      assert {:ok, :number, @st_out, ^env} = TC.synth(@ctx, env, @st_out, var(:x))
     end
   end
 
   # --- Lists
 
-  describe "tc_expr/4 lists" do
+  describe "synth/4 lists" do
     test "empty list" do
-      assert {:ok, {:list, :any}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, [])
+      assert {:ok, {:list, :any}, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, [])
     end
 
     test "homogeneous number list" do
-      assert {:ok, {:list, :number}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, [1, 2, 3])
+      assert {:ok, {:list, :number}, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, [1, 2, 3])
     end
 
     test "homogeneous binary list" do
       assert {:ok, {:list, :binary}, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, ["a", "b", "c"])
+               TC.synth(@ctx, %{}, @st_end, ["a", "b", "c"])
     end
 
     test "homogeneous boolean list" do
       assert {:ok, {:list, :boolean}, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, [true, false])
+               TC.synth(@ctx, %{}, @st_end, [true, false])
     end
 
     test "heterogeneous list returns error" do
-      assert {:error, msg, _env} = TC.tc_expr(@ctx, %{}, @st_end, [1, "two"])
+      assert {:error, msg, _env} = TC.synth(@ctx, %{}, @st_end, [1, "two"])
       assert %Error{category: :type_mismatch, kind: :list_elements_incompatible} = msg
     end
 
     test "single element list" do
-      assert {:ok, {:list, :number}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, [42])
+      assert {:ok, {:list, :number}, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, [42])
     end
 
     test "list of variables" do
       env = %{x: :number, y: :number}
 
       assert {:ok, {:list, :number}, @st_end, ^env} =
-               TC.tc_expr(@ctx, env, @st_end, [var(:x), var(:y)])
+               TC.synth(@ctx, env, @st_end, [var(:x), var(:y)])
     end
 
     test "list preserves session state" do
-      assert {:ok, {:list, :number}, @st_out, %{}} = TC.tc_expr(@ctx, %{}, @st_out, [1, 2])
+      assert {:ok, {:list, :number}, @st_out, %{}} = TC.synth(@ctx, %{}, @st_out, [1, 2])
     end
   end
 
   # --- Tuples
 
-  describe "tc_expr/4 tuples" do
+  describe "synth/4 tuples" do
     test "2-tuple" do
       ast = {1, "hello"}
 
       assert {:ok, {:tuple, [:number, :binary]}, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, ast)
+               TC.synth(@ctx, %{}, @st_end, ast)
     end
 
     test "3-tuple" do
       ast = {:{}, @meta, [1, "hello", true]}
 
       assert {:ok, {:tuple, [:number, :binary, :boolean]}, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, ast)
+               TC.synth(@ctx, %{}, @st_end, ast)
     end
 
     test "nested tuple" do
       ast = {1, {2, 3}}
 
       assert {:ok, {:tuple, [:number, {:tuple, [:number, :number]}]}, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, ast)
+               TC.synth(@ctx, %{}, @st_end, ast)
     end
 
     test "empty tuple" do
       ast = {:{}, @meta, []}
-      assert {:ok, {:tuple, []}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, {:tuple, []}, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, ast)
     end
 
     test "tuple with variables" do
@@ -200,104 +200,104 @@ defmodule Maty.Typechecker.TCExprTest do
       ast = {var(:x), var(:y)}
 
       assert {:ok, {:tuple, [:number, :binary]}, @st_end, ^env} =
-               TC.tc_expr(@ctx, env, @st_end, ast)
+               TC.synth(@ctx, env, @st_end, ast)
     end
 
     test "tuple preserves session state" do
       assert {:ok, {:tuple, [:number, :number]}, @st_out, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_out, {1, 2})
+               TC.synth(@ctx, %{}, @st_out, {1, 2})
     end
   end
 
   # --- Maps
 
-  describe "tc_expr/4 maps" do
+  describe "synth/4 maps" do
     test "empty map" do
       ast = {:%{}, @meta, []}
-      assert {:ok, {:map_record, %{}}, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, {:map_record, %{}}, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, ast)
     end
 
     test "map with atom keys" do
       ast = {:%{}, @meta, [name: "alice", age: 42]}
 
       assert {:ok, {:map_record, %{name: :binary, age: :number}}, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, ast)
+               TC.synth(@ctx, %{}, @st_end, ast)
     end
 
     test "map preserves session state" do
       ast = {:%{}, @meta, [x: 1]}
 
       assert {:ok, {:map_record, %{x: :number}}, @st_out, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_out, ast)
+               TC.synth(@ctx, %{}, @st_out, ast)
     end
   end
 
-  describe "tc_expr/4 map record field access" do
+  describe "synth/4 map record field access" do
     @person {:map_record, %{name: :binary, age: :number}}
 
     test "accessing a field has the field's type" do
       ast = field_access(var(:p), :name)
 
       assert {:ok, :binary, @st_end, %{p: @person}} =
-               TC.tc_expr(@ctx, %{p: @person}, @st_end, ast)
+               TC.synth(@ctx, %{p: @person}, @st_end, ast)
     end
 
     test "nested field access" do
       user = {:map_record, %{address: {:map_record, %{city: :binary}}}}
       ast = field_access(field_access(var(:u), :address), :city)
 
-      assert {:ok, :binary, @st_end, _env} = TC.tc_expr(@ctx, %{u: user}, @st_end, ast)
+      assert {:ok, :binary, @st_end, _env} = TC.synth(@ctx, %{u: user}, @st_end, ast)
     end
 
     test "field access preserves session state" do
       ast = field_access(var(:p), :age)
 
-      assert {:ok, :number, @st_out, _env} = TC.tc_expr(@ctx, %{p: @person}, @st_out, ast)
+      assert {:ok, :number, @st_out, _env} = TC.synth(@ctx, %{p: @person}, @st_out, ast)
     end
 
     test "accessing a field of a value that is not a map record" do
       ast = field_access(var(:n), :name)
 
       assert {:error, %Error{kind: :field_access_not_record}, _env} =
-               TC.tc_expr(@ctx, %{n: :number}, @st_end, ast)
+               TC.synth(@ctx, %{n: :number}, @st_end, ast)
     end
 
     test "accessing a key the record does not have" do
       ast = field_access(var(:p), :email)
 
       assert {:error, %Error{kind: :field_access_key_not_found, details: %{key: :email}}, _env} =
-               TC.tc_expr(@ctx, %{p: @person}, @st_end, ast)
+               TC.synth(@ctx, %{p: @person}, @st_end, ast)
     end
   end
 
-  describe "tc_expr/4 map record update" do
+  describe "synth/4 map record update" do
     @person {:map_record, %{name: :binary, age: :number}}
 
     test "updating existing keys keeps the record's type" do
       ast = map_update(var(:p), name: "bob", age: 30)
 
       assert {:ok, @person, @st_end, %{p: @person}} =
-               TC.tc_expr(@ctx, %{p: @person}, @st_end, ast)
+               TC.synth(@ctx, %{p: @person}, @st_end, ast)
     end
 
     test "update preserves session state" do
       ast = map_update(var(:p), age: 30)
 
-      assert {:ok, @person, @st_out, _env} = TC.tc_expr(@ctx, %{p: @person}, @st_out, ast)
+      assert {:ok, @person, @st_out, _env} = TC.synth(@ctx, %{p: @person}, @st_out, ast)
     end
 
     test "updating a value that is not a map record" do
       ast = map_update(var(:n), age: 30)
 
       assert {:error, %Error{kind: :map_update_not_record}, _env} =
-               TC.tc_expr(@ctx, %{n: :number}, @st_end, ast)
+               TC.synth(@ctx, %{n: :number}, @st_end, ast)
     end
 
     test "updating a key the record does not have" do
       ast = map_update(var(:p), email: "bob@example.com")
 
       assert {:error, %Error{kind: :map_update_key_not_found, details: %{key: :email}}, _env} =
-               TC.tc_expr(@ctx, %{p: @person}, @st_end, ast)
+               TC.synth(@ctx, %{p: @person}, @st_end, ast)
     end
 
     test "updating a key with a value of a different type" do
@@ -307,91 +307,91 @@ defmodule Maty.Typechecker.TCExprTest do
               %Error{
                 kind: :map_update_value_type_mismatch,
                 details: %{key: :age, expected: :number, got: :binary}
-              }, _env} = TC.tc_expr(@ctx, %{p: @person}, @st_end, ast)
+              }, _env} = TC.synth(@ctx, %{p: @person}, @st_end, ast)
     end
   end
 
   # --- Binary operators (expanded erlang form)
 
-  describe "tc_expr/4 arithmetic operators" do
+  describe "synth/4 arithmetic operators" do
     test "addition of numbers" do
       assert {:ok, :number, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:+, 1, 2))
+               TC.synth(@ctx, %{}, @st_end, erlang_op(:+, 1, 2))
     end
 
     test "subtraction of numbers" do
       assert {:ok, :number, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:-, 5, 3))
+               TC.synth(@ctx, %{}, @st_end, erlang_op(:-, 5, 3))
     end
 
     test "multiplication" do
       assert {:ok, :number, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:*, 4, 3))
+               TC.synth(@ctx, %{}, @st_end, erlang_op(:*, 4, 3))
     end
 
     test "division" do
       assert {:ok, :number, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:/, 10, 2))
+               TC.synth(@ctx, %{}, @st_end, erlang_op(:/, 10, 2))
     end
 
     test "arithmetic with variables" do
       env = %{x: :number, y: :number}
 
       assert {:ok, :number, @st_end, ^env} =
-               TC.tc_expr(@ctx, env, @st_end, erlang_op(:+, var(:x), var(:y)))
+               TC.synth(@ctx, env, @st_end, erlang_op(:+, var(:x), var(:y)))
     end
 
     test "arithmetic type error: number + binary" do
       env = %{x: :number, y: :binary}
 
       assert {:error, msg, _env} =
-               TC.tc_expr(@ctx, env, @st_end, erlang_op(:+, var(:x), var(:y)))
+               TC.synth(@ctx, env, @st_end, erlang_op(:+, var(:x), var(:y)))
 
       assert %Error{category: :type_mismatch, kind: :binary_operator_type_mismatch} = msg
     end
 
     test "arithmetic preserves session state" do
       assert {:ok, :number, @st_out, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_out, erlang_op(:+, 1, 2))
+               TC.synth(@ctx, %{}, @st_out, erlang_op(:+, 1, 2))
     end
   end
 
-  describe "tc_expr/4 comparison operators" do
+  describe "synth/4 comparison operators" do
     test "less than" do
       assert {:ok, :boolean, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:<, 1, 2))
+               TC.synth(@ctx, %{}, @st_end, erlang_op(:<, 1, 2))
     end
 
     test "greater than" do
       assert {:ok, :boolean, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:>, 5, 3))
+               TC.synth(@ctx, %{}, @st_end, erlang_op(:>, 5, 3))
     end
 
     test "less than or equal" do
       assert {:ok, :boolean, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:"=<", 1, 2))
+               TC.synth(@ctx, %{}, @st_end, erlang_op(:"=<", 1, 2))
     end
 
     test "greater than or equal" do
       assert {:ok, :boolean, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:>=, 5, 3))
+               TC.synth(@ctx, %{}, @st_end, erlang_op(:>=, 5, 3))
     end
 
     test "equality" do
       assert {:ok, :boolean, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:==, 1, 1))
+               TC.synth(@ctx, %{}, @st_end, erlang_op(:==, 1, 1))
     end
 
     test "inequality" do
       assert {:ok, :boolean, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, erlang_op(:"/=", 1, 2))
+               TC.synth(@ctx, %{}, @st_end, erlang_op(:"/=", 1, 2))
     end
 
     test "comparison type error: number < binary" do
       env = %{x: :number, y: :binary}
 
       assert {:error, msg, _env} =
-               TC.tc_expr(@ctx, env, @st_end, erlang_op(:<, var(:x), var(:y)))
+               TC.synth(@ctx, env, @st_end, erlang_op(:<, var(:x), var(:y)))
 
       assert %Error{category: :type_mismatch, kind: :binary_operator_type_mismatch} = msg
     end
@@ -400,30 +400,30 @@ defmodule Maty.Typechecker.TCExprTest do
       env = %{x: :number, y: :binary}
 
       assert {:error, msg, _env} =
-               TC.tc_expr(@ctx, env, @st_end, erlang_op(:==, var(:x), var(:y)))
+               TC.synth(@ctx, env, @st_end, erlang_op(:==, var(:x), var(:y)))
 
       assert %Error{category: :type_mismatch, kind: :binary_operator_type_mismatch} = msg
     end
   end
 
-  describe "tc_expr/4 not operator" do
+  describe "synth/4 not operator" do
     test "not boolean" do
       assert {:ok, :boolean, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, erlang_not(true))
+               TC.synth(@ctx, %{}, @st_end, erlang_not(true))
     end
 
     test "not variable" do
       env = %{flag: :boolean}
 
       assert {:ok, :boolean, @st_end, _env} =
-               TC.tc_expr(@ctx, env, @st_end, erlang_not(var(:flag)))
+               TC.synth(@ctx, env, @st_end, erlang_not(var(:flag)))
     end
 
     test "not type error: not number" do
       env = %{x: :number}
 
       assert {:error, msg, _env} =
-               TC.tc_expr(@ctx, env, @st_end, erlang_not(var(:x)))
+               TC.synth(@ctx, env, @st_end, erlang_not(var(:x)))
 
       assert %Error{category: :type_mismatch, kind: :logical_operator_requires_boolean} = msg
     end
@@ -431,24 +431,24 @@ defmodule Maty.Typechecker.TCExprTest do
 
   # --- String concatenation
 
-  describe "tc_expr/4 string concatenation" do
+  describe "synth/4 string concatenation" do
     test "binary <> binary" do
       assert {:ok, :binary, @st_end, %{}} =
-               TC.tc_expr(@ctx, %{}, @st_end, string_concat("hello", " world"))
+               TC.synth(@ctx, %{}, @st_end, string_concat("hello", " world"))
     end
 
     test "binary <> variable" do
       env = %{suffix: :binary}
 
       assert {:ok, :binary, @st_end, _env} =
-               TC.tc_expr(@ctx, env, @st_end, string_concat("hello", var(:suffix)))
+               TC.synth(@ctx, env, @st_end, string_concat("hello", var(:suffix)))
     end
 
     test "string concat type error: number <> binary" do
       env = %{x: :number}
 
       assert {:error, msg, _env} =
-               TC.tc_expr(@ctx, env, @st_end, string_concat(var(:x), "world"))
+               TC.synth(@ctx, env, @st_end, string_concat(var(:x), "world"))
 
       assert %Error{
                category: :type_mismatch,
@@ -461,32 +461,32 @@ defmodule Maty.Typechecker.TCExprTest do
       env = %{middle: :binary}
 
       assert {:ok, :binary, @st_end, _env} =
-               TC.tc_expr(@ctx, env, @st_end, string(["a", var(:middle), "c"]))
+               TC.synth(@ctx, env, @st_end, string(["a", var(:middle), "c"]))
     end
   end
 
   # --- String interpolation
 
-  describe "tc_expr/4 string interpolation" do
+  describe "synth/4 string interpolation" do
     test "interpolating each supported type" do
       env = %{a: :atom, b: :binary, c: :boolean, d: :date, n: :number, z: nil}
       segments = for name <- [:a, :b, :c, :d, :n, :z], do: {:interp, var(name)}
 
-      assert {:ok, :binary, @st_end, _env} = TC.tc_expr(@ctx, env, @st_end, string(segments))
+      assert {:ok, :binary, @st_end, _env} = TC.synth(@ctx, env, @st_end, string(segments))
     end
 
     test "interpolation mixed with literal text" do
       env = %{n: :number}
 
       assert {:ok, :binary, @st_end, _env} =
-               TC.tc_expr(@ctx, env, @st_end, string(["n=", {:interp, var(:n)}, "!"]))
+               TC.synth(@ctx, env, @st_end, string(["n=", {:interp, var(:n)}, "!"]))
     end
 
     test "interpolating a type String.Chars does not implement is an error" do
       env = %{p: :pid}
 
       assert {:error, msg, _env} =
-               TC.tc_expr(@ctx, env, @st_end, string(["p=", {:interp, var(:p)}]))
+               TC.synth(@ctx, env, @st_end, string(["p=", {:interp, var(:p)}]))
 
       assert %Error{
                category: :type_mismatch,
@@ -497,7 +497,7 @@ defmodule Maty.Typechecker.TCExprTest do
 
     test "an unbound variable inside an interpolation is reported as unbound" do
       assert {:error, msg, _env} =
-               TC.tc_expr(@ctx, %{}, @st_end, string([{:interp, var(:missing)}]))
+               TC.synth(@ctx, %{}, @st_end, string([{:interp, var(:missing)}]))
 
       assert %Error{category: :name_resolution, kind: :variable_not_exist} = msg
     end
@@ -505,24 +505,24 @@ defmodule Maty.Typechecker.TCExprTest do
     test "other bitstring syntax is unsupported" do
       ast = {:<<>>, @meta, [{:"::", @meta, [1, 8]}]}
 
-      assert {:error, msg, _env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:error, msg, _env} = TC.synth(@ctx, %{}, @st_end, ast)
       assert %Error{category: :framework_usage, kind: :unsupported_bitstring} = msg
     end
   end
 
   # --- Match / let binding
 
-  describe "tc_expr/4 match operator" do
+  describe "synth/4 match operator" do
     test "simple variable binding" do
       ast = match(var(:x), 42)
-      assert {:ok, :number, @st_end, env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, :number, @st_end, env} = TC.synth(@ctx, %{}, @st_end, ast)
       assert env[:x] == :number
     end
 
     test "rebinding a variable" do
       initial_env = %{x: :binary}
       ast = match(var(:x), 42)
-      assert {:ok, :number, @st_end, env} = TC.tc_expr(@ctx, initial_env, @st_end, ast)
+      assert {:ok, :number, @st_end, env} = TC.synth(@ctx, initial_env, @st_end, ast)
       assert env[:x] == :number
     end
 
@@ -532,7 +532,7 @@ defmodule Maty.Typechecker.TCExprTest do
       ast = match(pattern, var(:pair))
 
       assert {:ok, {:tuple, [:number, :binary]}, @st_end, result_env} =
-               TC.tc_expr(@ctx, env, @st_end, ast)
+               TC.synth(@ctx, env, @st_end, ast)
 
       assert result_env[:a] == :number
       assert result_env[:b] == :binary
@@ -540,13 +540,13 @@ defmodule Maty.Typechecker.TCExprTest do
 
     test "wildcard pattern" do
       ast = match({:_, @meta, nil}, 42)
-      assert {:ok, :number, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, :number, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, ast)
     end
   end
 
   # --- Block expressions
 
-  describe "tc_expr/4 blocks" do
+  describe "synth/4 blocks" do
     test "block returns type of last expression" do
       ast =
         block([
@@ -555,7 +555,7 @@ defmodule Maty.Typechecker.TCExprTest do
           var(:y)
         ])
 
-      assert {:ok, :binary, @st_end, env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, :binary, @st_end, env} = TC.synth(@ctx, %{}, @st_end, ast)
       assert env[:x] == :number
       assert env[:y] == :binary
     end
@@ -568,20 +568,20 @@ defmodule Maty.Typechecker.TCExprTest do
           erlang_op(:+, var(:x), var(:y))
         ])
 
-      assert {:ok, :number, @st_end, env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, :number, @st_end, env} = TC.synth(@ctx, %{}, @st_end, ast)
       assert env[:x] == :number
       assert env[:y] == :number
     end
 
     test "single expression block" do
       ast = block([42])
-      assert {:ok, :number, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:ok, :number, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, ast)
     end
   end
 
   # --- Case expression
 
-  describe "tc_expr/4 case" do
+  describe "synth/4 case" do
     test "case with consistent branch types" do
       env = %{x: :number}
 
@@ -591,7 +591,7 @@ defmodule Maty.Typechecker.TCExprTest do
           {2, "two"}
         ])
 
-      assert {:ok, :binary, @st_end, _env} = TC.tc_expr(@ctx, env, @st_end, ast)
+      assert {:ok, :binary, @st_end, _env} = TC.synth(@ctx, env, @st_end, ast)
     end
 
     test "case with inconsistent branch types returns error" do
@@ -603,7 +603,7 @@ defmodule Maty.Typechecker.TCExprTest do
           {2, 42}
         ])
 
-      assert {:error, msg, _env} = TC.tc_expr(@ctx, env, @st_end, ast)
+      assert {:error, msg, _env} = TC.synth(@ctx, env, @st_end, ast)
       assert %Error{category: :type_mismatch, kind: :case_branches_incompatible} = msg
     end
 
@@ -615,7 +615,7 @@ defmodule Maty.Typechecker.TCExprTest do
           {var(:n), var(:n)}
         ])
 
-      assert {:ok, :number, @st_end, _env} = TC.tc_expr(@ctx, env, @st_end, ast)
+      assert {:ok, :number, @st_end, _env} = TC.synth(@ctx, env, @st_end, ast)
     end
 
     test "case with wildcard pattern" do
@@ -627,52 +627,52 @@ defmodule Maty.Typechecker.TCExprTest do
           {{:_, @meta, nil}, "other"}
         ])
 
-      assert {:ok, :binary, @st_end, _env} = TC.tc_expr(@ctx, env, @st_end, ast)
+      assert {:ok, :binary, @st_end, _env} = TC.synth(@ctx, env, @st_end, ast)
     end
   end
 
   # --- Anonymous functions and captures are rejected
 
-  describe "tc_expr/4 anonymous functions and captures" do
+  describe "synth/4 anonymous functions and captures" do
     test "fn is rejected" do
       ast = {:fn, @meta, [{:->, @meta, [[var(:x)], var(:x)]}]}
-      assert {:error, msg, _env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:error, msg, _env} = TC.synth(@ctx, %{}, @st_end, ast)
       assert %Error{category: :framework_usage, kind: :unsupported_anonymous_function} = msg
     end
 
     test "local function capture &fun/arity is rejected" do
       ast = {:&, @meta, [{:/, @meta, [:my_fun, 2]}]}
-      assert {:error, msg, _env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:error, msg, _env} = TC.synth(@ctx, %{}, @st_end, ast)
       assert %Error{category: :framework_usage, kind: :unsupported_anonymous_function} = msg
     end
   end
 
   # --- Raw send/receive are disallowed
 
-  describe "tc_expr/4 raw communication disallowed" do
+  describe "synth/4 raw communication disallowed" do
     test "raw receive is rejected" do
       ast = {:receive, @meta, [[do: [{:->, @meta, [[var(:msg)], var(:msg)]}]]]}
-      assert {:error, msg, _env} = TC.tc_expr(@ctx, %{}, @st_end, ast)
+      assert {:error, msg, _env} = TC.synth(@ctx, %{}, @st_end, ast)
       assert %Error{category: :framework_usage, kind: :no_native_receive} = msg
     end
 
     test "raw erlang send is rejected" do
       ast = {{:., @meta, [:erlang, :send]}, @meta, [var(:pid), "message"]}
       env = %{pid: :pid}
-      assert {:error, msg, _env} = TC.tc_expr(@ctx, env, @st_end, ast)
+      assert {:error, msg, _env} = TC.synth(@ctx, env, @st_end, ast)
       assert %Error{category: :framework_usage, kind: :no_native_send} = msg
     end
   end
 
   # --- Atom literals
 
-  describe "tc_expr/4 atom literals" do
+  describe "synth/4 atom literals" do
     test "plain atom without handler match" do
-      assert {:ok, :atom, @st_end, %{}} = TC.tc_expr(@ctx, %{}, @st_end, :some_atom)
+      assert {:ok, :atom, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, :some_atom)
     end
 
     test "atom preserves session state" do
-      assert {:ok, :atom, @st_out, %{}} = TC.tc_expr(@ctx, %{}, @st_out, :hello)
+      assert {:ok, :atom, @st_out, %{}} = TC.synth(@ctx, %{}, @st_out, :hello)
     end
   end
 
@@ -682,27 +682,27 @@ defmodule Maty.Typechecker.TCExprTest do
     test "pure expressions don't alter session state" do
       st = ST.output_one(:client, :request, :binary, @st_end)
 
-      assert {:ok, :number, ^st, _} = TC.tc_expr(@ctx, %{}, st, 42)
-      assert {:ok, :binary, ^st, _} = TC.tc_expr(@ctx, %{}, st, "hello")
-      assert {:ok, :boolean, ^st, _} = TC.tc_expr(@ctx, %{}, st, true)
-      assert {:ok, {:list, :number}, ^st, _} = TC.tc_expr(@ctx, %{}, st, [1, 2, 3])
+      assert {:ok, :number, ^st, _} = TC.synth(@ctx, %{}, st, 42)
+      assert {:ok, :binary, ^st, _} = TC.synth(@ctx, %{}, st, "hello")
+      assert {:ok, :boolean, ^st, _} = TC.synth(@ctx, %{}, st, true)
+      assert {:ok, {:list, :number}, ^st, _} = TC.synth(@ctx, %{}, st, [1, 2, 3])
     end
 
     test "variable lookup preserves session state" do
       st = ST.input_one(:client, :request, :binary, @st_end)
       env = %{x: :number}
-      assert {:ok, :number, ^st, _} = TC.tc_expr(@ctx, env, st, var(:x))
+      assert {:ok, :number, ^st, _} = TC.synth(@ctx, env, st, var(:x))
     end
 
     test "arithmetic preserves session state" do
       st = ST.output_one(:client, :request, :binary, @st_end)
-      assert {:ok, :number, ^st, _} = TC.tc_expr(@ctx, %{}, st, erlang_op(:+, 1, 2))
+      assert {:ok, :number, ^st, _} = TC.synth(@ctx, %{}, st, erlang_op(:+, 1, 2))
     end
 
     test "match preserves session state" do
       st = ST.output_one(:client, :request, :binary, @st_end)
       ast = match(var(:x), 42)
-      assert {:ok, :number, ^st, _} = TC.tc_expr(@ctx, %{}, st, ast)
+      assert {:ok, :number, ^st, _} = TC.synth(@ctx, %{}, st, ast)
     end
   end
 end

@@ -147,7 +147,7 @@ defmodule Maty.Typechecker.TC.WF do
          {:ok, handler_branch} <-
            match_handler_branch(ctx, handler_label, st_pre, branches, label, payload_type),
          # typecheck received role is an atom
-         {:ok, :atom, ^st_pre, env} <- TC.tc_expr(ctx, %{}, st_pre, received_role),
+         {:ok, :atom, ^st_pre, env} <- TC.synth(ctx, %{}, st_pre, received_role),
          # bind variables from the message pattern
          {:ok, _bindings, env} <- tc_pattern(ctx, message_pattern_ast, message_type, env),
          # extend env with state variable binding

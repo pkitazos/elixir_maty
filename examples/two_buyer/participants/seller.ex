@@ -6,7 +6,7 @@ defmodule TwoBuyer.Participants.Seller do
 
   @st {:install, ~q"title_handler"}
   @st {:title_handler, ~q"&buyer1:{title(binary).+buyer1:{quote(number).decision_handler}}"}
-  @st {:decision_handler, ~q"&buyer2:{address(binary).+buyer2:{date(date).end},quit(nil).end}"}
+  @st {:decision_handler, ~q"&buyer2:{address(binary).+buyer2:{date(number).end},quit(nil).end}"}
 
   on_start ap_pid :: pid() do
     Maty.DSL.register(ap_pid, :seller, &install/2, ap_pid)
@@ -37,7 +37,7 @@ defmodule TwoBuyer.Participants.Seller do
 
     date = shipping_date(addr)
     Maty.DSL.send_to(:buyer2, {:date, date})
-    IO.puts("+buyer2 : date(date)")
+    IO.puts("+buyer2 : date(number)")
     :timer.sleep(100)
 
     Maty.DSL.done(state)
@@ -53,6 +53,6 @@ defmodule TwoBuyer.Participants.Seller do
   @spec lookup_price(binary()) :: number()
   defp lookup_price(_title_str), do: 150
 
-  @spec shipping_date(binary()) :: Date.t()
-  defp shipping_date(_addr_str), do: ~D[2021-12-31]
+  @spec shipping_date(binary()) :: number()
+  defp shipping_date(_addr_str), do: 20_211_231
 end

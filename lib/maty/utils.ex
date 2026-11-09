@@ -81,13 +81,13 @@ defmodule Maty.Utils do
   # It also hands the clause's result to `ensure_run!/3` before returning it
   # For a clause written as
   #
-  #     deftc tc_expr(ctx, env, st, ast) do
+  #     deftc synth(ctx, env, st, ast) do
   #       ...body...
   #     end
   #
   # the generated code is
   #
-  #     def tc_expr(ctx, env, st, ast) do
+  #     def synth(ctx, env, st, ast) do
   #       Maty.Utils.stack_trace()
   #       result = ...body...
   #       Maty.Utils.ensure_run!(result, __MODULE__, __ENV__.function)

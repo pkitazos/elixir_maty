@@ -52,7 +52,7 @@ defmodule Maty.Check do
 
   # Ψ; Δ; Γ | Q₁ |> e : T <| Q₂
   @spec tc(Maty.Typechecker.Ctx.t(), Macro.t()) :: t(Maty.Types.T.t())
-  def tc(ctx, e), do: fn env, st -> TC.tc_expr(ctx, env, st, e) end
+  def tc(ctx, e), do: fn env, st -> TC.synth(ctx, env, st, e) end
 
   # ⊢ p : a ⇒ Γ'
   @spec match_pattern(Maty.Typechecker.Ctx.t(), Macro.t(), Maty.Types.T.t()) :: t(nil)

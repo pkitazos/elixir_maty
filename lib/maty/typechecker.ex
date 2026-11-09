@@ -172,7 +172,7 @@ defmodule Maty.Typechecker do
     # Ψ is the function definition environment, maps function names to type signatures
     psi = Utils.Env.get_map(env.module, :psi)
 
-    # build the typing context struct for tc_expr and friends
+    # build the typing context struct for synth and friends
     ctx = %Ctx{
       module: env.module,
       # until a clause sets its own, errors that have no location of their own point at the module

@@ -4,7 +4,7 @@ defmodule Maty.Typechecker.TC.IO do
   import Maty.Utils, only: [deftc: 2]
   import Maty.Check
 
-  deftc tc_expr(
+  deftc synth(
           ctx,
           env,
           st,
@@ -26,7 +26,7 @@ defmodule Maty.Typechecker.TC.IO do
   end
 
   # catch-all for other IO functions (IO.inspect, IO.write, etc.)
-  deftc tc_expr(_ctx, env, st, {{:., _meta1, [IO, _func]}, _meta2, _args}) do
+  deftc synth(_ctx, env, st, {{:., _meta1, [IO, _func]}, _meta2, _args}) do
     {:ok, :atom, st, env}
   end
 end
