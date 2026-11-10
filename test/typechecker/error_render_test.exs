@@ -351,6 +351,11 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FrameworkUsage.handler_message_not_tagged_tuple(@m, @meta, {:msg, [], nil})},
       {{Error.FrameworkUsage, :handler_name_clash},
        Error.FrameworkUsage.handler_name_clash(@m, @meta, {:install, 3}, :init)},
+      {{Error.FrameworkUsage, :init_handler_arg_type_mismatch},
+       Error.FrameworkUsage.init_handler_arg_type_mismatch(@m, @meta, :install,
+         expected: :number,
+         got: :binary
+       )},
       {{Error.FrameworkUsage, :unsupported_capture},
        Error.FrameworkUsage.unsupported_capture(
          @m,

@@ -223,6 +223,17 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
+  # a clause of an init handler takes a different argument type than the handler's first clause
+  def init_handler_arg_type_mismatch(module, meta, handler, expected: expected, got: got) do
+    %Error{
+      category: :framework_usage,
+      kind: :init_handler_arg_type_mismatch,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{handler: handler, expected: expected, got: got}
+    }
+  end
+
   # a capture of something other than a handler (only handlers are first class for now)
   def unsupported_capture(module, meta, capture_ast) do
     %Error{

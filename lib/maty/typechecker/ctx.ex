@@ -11,8 +11,8 @@ defmodule Maty.Typechecker.Ctx do
 
           # new Σ env/map
           signatures: %{
-            atom() => {:handler, :message, ST.t()} | {:handler, :init, [Types.t()], St.t()},
-            {module(), atom(), arity()} => {:function, [Types.t()], Types.t()}
+            atom() => {:handler, :message, ST.t()} | {:handler, :init, Types.T.t(), St.t()},
+            {module(), atom(), arity()} => {:function, [Types.T.t()], Types.T.t()}
           },
 
           # todo: deprecate

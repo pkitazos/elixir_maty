@@ -32,7 +32,7 @@ defmodule Maty.Typechecker.Signatures do
 
   @type handler_type ::
           {:handler, :message, ST.t()}
-          | {:handler, :init, [Type.t()], ST.t()}
+          | {:handler, :init, Type.t(), ST.t()}
 
   @typedoc """
   Σ - Handlers are keyed by name, since a handler's name is unique in its module at any arity
@@ -132,12 +132,12 @@ defmodule Maty.Typechecker.Signatures do
   #
   # A message handler `h` has the type `{:handler, :message, st}`, where `st` is the session type declared for `h`
   #
-  # An init handler `h` has the type `{:handler, :init, arg_types, st}`,
-  # where `arg_types` are the types of the first argument in each clause's spec, sorted and without duplicates.
+  # An init handler `h` has the type `{:handler, :init, arg_type, st}`, every clause takes the same type
   #
   # Errors:
   #   * a handler with no session type declared for its name
   #   * an init handler clause whose spec does not parse
+  #   * an init handler clause that takes a different argument type than the first clause
   @spec handler_signatures(module(), [clause()], %{Types.handler_label() => ST.t()}) ::
           result(%{Types.handler_label() => handler_type()})
   defp handler_signatures(module, cs, session_types) do
@@ -348,9 +348,31 @@ defmodule Maty.Typechecker.Signatures do
     do: {:ok, {:handler, :message, st}}
 
   defp handler_type(module, st, clauses) do
-    clauses
-    |> map_m(&init_arg_type(module, &1))
-    |> f_map(fn tys -> {:handler, :init, Enum.sort(tys) |> Enum.dedup(), st} end)
+    with {:ok, [ty | _] = tys} <- map_m(clauses, &init_arg_type(module, &1)),
+         :ok <- check_same_arg_type(module, clauses, tys) do
+      {:ok, {:handler, :init, ty, st}}
+    end
+  end
+
+  # all of the clauses of an init handler should take the same argument type
+  @spec check_same_arg_type(module(), [clause()], [Type.t()]) ::
+          :ok | {:error, [located_error()]}
+  defp check_same_arg_type(module, clauses, [ty | _] = tys) do
+    errors =
+      for {c, t} <- Enum.zip(clauses, tys), t != ty do
+        error =
+          Error.FrameworkUsage.init_handler_arg_type_mismatch(module, [line: c.line], c.name,
+            expected: ty,
+            got: t
+          )
+
+        {{c.name, c.arity}, error}
+      end
+
+    case errors do
+      [] -> :ok
+      _ -> {:error, errors}
+    end
   end
 
   # todo: better names for all these

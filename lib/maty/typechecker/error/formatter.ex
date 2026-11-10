@@ -863,6 +863,19 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :framework_usage, kind: :init_handler_arg_type_mismatch} = e) do
+    %{handler: handler, expected: expected, got: got} = e.details
+
+    """
+    Framework Usage Violation: Init Handler Clauses Take Different Types
+      Handler: #{handler}
+      First clause takes: #{render_type(expected)}
+      This clause takes: #{render_type(got)}
+      --
+      An init handler has one type, so every clause must take the same argument type. Use a separate handler for a different argument type.
+    """
+  end
+
   defp render(%Error{category: :framework_usage, kind: :handler_ref_wrong_arity} = e) do
     %{name: name, got: got, expected: expected} = e.details
     kind = handler_ref_kind(expected)
