@@ -13,6 +13,8 @@ defmodule Maty.Typechecker.Error do
           # positions are 1-based
           | {:tuple_element, pos_integer()}
           | {:list_element, pos_integer()}
+          # the `t` of `[h | t]`
+          | :list_tail
           | {:dict_key, pos_integer()}
           | {:dict_value, pos_integer()}
           | {:record_field, atom()}

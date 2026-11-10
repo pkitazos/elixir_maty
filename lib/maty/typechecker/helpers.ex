@@ -5,20 +5,6 @@ defmodule Maty.Typechecker.Helpers do
   alias Maty.Typechecker.Error
   alias Maty.Types.T, as: Type
 
-  # Helper to unify list element types (simple version)
-  # Returns `{:ok, unified_type}` or `:error`
-  # todo: figure out how to handle this
-  def unify_list_types(l) when not is_list(l), do: :error
-  def unify_list_types([]), do: {:ok, :any}
-
-  def unify_list_types([type | rest]) do
-    if Enum.all?(rest, &(&1 == type)) do
-      {:ok, type}
-    else
-      :error
-    end
-  end
-
   @arith_ops [:+, :-, :*, :/]
   @ord_ops [:<, :>, :<=, :>=]
   @log_ops [:and, :or]

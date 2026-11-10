@@ -1069,6 +1069,7 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render_frame({:tuple_element, index}), do: "in tuple element ##{index}"
   defp render_frame({:list_element, index}), do: "in list element ##{index}"
+  defp render_frame(:list_tail), do: "in the list tail"
   defp render_frame({:dict_key, index}), do: "in the key of dict entry ##{index}"
   defp render_frame({:dict_value, index}), do: "in the value of dict entry ##{index}"
   defp render_frame({:record_field, label}), do: "in record field #{inspect(label)}"

@@ -110,14 +110,18 @@ defmodule Maty.Typechecker.TC do
   end
 
   # -- TV-Cons-Syn
-  # List Construction [v1, v2, ...]
-  deftc synth(ctx, env, st, [v | vs]) do
+  # List Construction [v1, v2, ...] or [v | vs] both match
+  deftc synth(ctx, env, st, [_ | _] = xs) do
+    {[v | vs], tail} = normalise_list_shapes(xs)
+
     tcm env: env, st: st do
-      ty <- syn(ctx, v)
+      ty <- syn(ctx, v) |> with_frame({:list_element, 1})
 
       chain(vs |> Enum.with_index(2), fn {v, i} ->
         chk(ctx, v, ty) |> with_frame({:list_element, i})
       end)
+
+      chk(ctx, tail, {:list, ty}) |> with_frame(:list_tail)
 
       ok({:list, ty})
     end
@@ -312,6 +316,7 @@ defmodule Maty.Typechecker.TC do
   end
 
   # Raw Communication Checks
+  # todo: can probably move these much further down
 
   # Disallow raw 'receive'
   deftc synth(ctx, env, _st, {:receive, meta, _}) do
@@ -384,8 +389,6 @@ defmodule Maty.Typechecker.TC do
     # todo: reconsider what to do here..
     tc_expr_list(ctx, var_env, st_pre, body_asts)
   end
-
-  # Computation Typing
 
   # -- T-Let
   deftc synth(ctx, env, st, {:=, _meta, [pat_ast, expr_ast]}) do
@@ -843,6 +846,13 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
+  defp normalise_list_shapes(xs) do
+    case Enum.split(xs, -1) do
+      {init, [{:|, _, [x, tail]}]} -> {init ++ [x], tail}
+      _ -> {xs, []}
+    end
+  end
+
   # Processes a list of expressions sequentially using synth.
   # Returns the result of the *last* expression in the list.
   # the only reason this isn't inlined is because it's used in a bunch of places in the wf module
@@ -905,13 +915,17 @@ defmodule Maty.Typechecker.TC do
   deftc check(_ctx, env, st, [], {:list, _ty} = t), do: {:ok, t, st, env}
 
   # -- TV-Cons-Chk
-  deftc check(ctx, env, st, [v | vs], {:list, ty} = t) do
+  deftc check(ctx, env, st, [_ | _] = xs, {:list, ty} = t) do
+    {[v | vs], tail} = normalise_list_shapes(xs)
+
     tcm env: env, st: st do
       chk(ctx, v, ty) |> with_frame({:list_element, 1})
 
       chain(vs |> Enum.with_index(2), fn {v, i} ->
         chk(ctx, v, ty) |> with_frame({:list_element, i})
       end)
+
+      chk(ctx, tail, t) |> with_frame(:list_tail)
 
       ok(t)
     end

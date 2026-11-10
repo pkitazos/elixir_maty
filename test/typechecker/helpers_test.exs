@@ -9,30 +9,6 @@ defmodule Maty.Typechecker.HelpersTest do
   @st_end %ST.SEnd{}
   @st_out ST.output_one(:server, :msg, :binary, @st_end)
 
-  # --- unify_list_types/1 ---
-
-  describe "unify_list_types/1" do
-    test "empty list returns :any" do
-      assert {:ok, :any} = Helpers.unify_list_types([])
-    end
-
-    test "homogeneous list returns element type" do
-      assert {:ok, :number} = Helpers.unify_list_types([:number, :number, :number])
-    end
-
-    test "single element list returns that type" do
-      assert {:ok, :binary} = Helpers.unify_list_types([:binary])
-    end
-
-    test "heterogeneous list returns error" do
-      assert :error = Helpers.unify_list_types([:number, :binary])
-    end
-
-    test "non-list input returns error" do
-      assert :error = Helpers.unify_list_types(:number)
-    end
-  end
-
   # --- op_type_rel/3 ---
 
   describe "op_type_rel/3" do
