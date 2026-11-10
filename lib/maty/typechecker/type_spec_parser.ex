@@ -15,14 +15,12 @@ defmodule Maty.Typechecker.TypeSpecParser do
   """
   @spec parse(type_ast :: Macro.t()) :: {:ok, Type.t()} | {:error, Error.Cause.t()}
   def parse(type_ast) do
+    # todo: this should probably be build in `Types`
     type_env =
       Maty.Types.payload_types()
-      |> Enum.map(&{&1, &1})
-      |> Enum.into(%{})
+      |> Map.new(fn x -> {x, x} end)
       |> Map.merge(Maty.Types.__map__())
       |> Map.put(:no_return, :no_return)
-      |> Map.put(:any, :any)
-      |> Map.put(:map, :map)
 
     parse(type_ast, type_env)
   end
