@@ -43,8 +43,6 @@ defmodule Maty.Typechecker.Signatures do
           optional(func_id()) => function_type()
         }
 
-  # -- raw records
-
   @type raw_spec :: {:spec, Macro.t(), term()}
 
   @typedoc """
@@ -69,7 +67,6 @@ defmodule Maty.Typechecker.Signatures do
           specs: [raw_spec()]
         }
 
-  @typedoc "The ephemeral attributes `@on_definition` reads for one clause, `nil` when unset."
   @type annotations :: %{
           handler: Types.handler_label() | nil,
           init_handler: Types.handler_label() | nil,
@@ -77,13 +74,12 @@ defmodule Maty.Typechecker.Signatures do
           spec: [raw_spec()] | nil
         }
 
-  # -- result
-
   @typedoc """
-  An error and the definition it is about, `nil` when it is about the module as a whole.
-  This is the shape `Maty.Typechecker` reports errors in.
+  An error and the definition it is about or `nil` if it is about the whole module
   """
   @type located_error :: {{atom(), arity()} | nil, Error.t()}
+
+  # figure our a nicer way to go from 3-arity func_id to 2-arity func_id
 
   # todo: I have like a hundred different results all over the place, eventually make them generic?
   @type result(a) :: {:ok, a} | {:error, [located_error()]}
@@ -114,22 +110,38 @@ defmodule Maty.Typechecker.Signatures do
     }
   end
 
+  # -- build
+
   @doc """
-  The handler entries of Σ.
+  Builds Σ for `module` from its clause records and its session types.
 
-  A message handler `h` has the type `{:handler, :message, st}`, where `st` is the session type declared for `h`
-
-  An init handler `h` has the type `{:handler, :init, arg_types, st}`,
-  where `arg_types` are the types of the first argument in each clause's spec, sorted and without duplicates.
-
-  Errors:
-    * a handler with no session type declared for its name
-    * an init handler clause whose spec does not parse
+  `clauses` are in source order
+  `session_types` is a map of the `@st` declarations
   """
+  @spec build(module(), [clause()], %{Types.handler_label() => ST.t()}) :: result(t())
+  def build(module, cs, session_types) do
+    join(
+      handler_signatures(module, cs, session_types),
+      function_signatures(module, cs),
+      &Map.merge/2
+    )
+    |> join_err(name_clash_errors(module, cs))
+  end
+
+  # The handler entries of Σ.
+  #
+  # A message handler `h` has the type `{:handler, :message, st}`, where `st` is the session type declared for `h`
+  #
+  # An init handler `h` has the type `{:handler, :init, arg_types, st}`,
+  # where `arg_types` are the types of the first argument in each clause's spec, sorted and without duplicates.
+  #
+  # Errors:
+  #   * a handler with no session type declared for its name
+  #   * an init handler clause whose spec does not parse
   @spec handler_signatures(module(), [clause()], %{Types.handler_label() => ST.t()}) ::
           result(%{Types.handler_label() => handler_type()})
-  def handler_signatures(module, cs, session_types) do
-    hs = for %{kind: kind} = d <- cs, match?({:handler, _}, kind), do: d
+  defp handler_signatures(module, cs, session_types) do
+    hs = for c <- cs, match?({:handler, _}, c.kind), do: c
 
     hs
     |> Enum.group_by(fn d -> d.name end)
@@ -137,18 +149,54 @@ defmodule Maty.Typechecker.Signatures do
     |> f_map(&Map.new/1)
   end
 
-  @doc """
-  Parses one raw spec into the type of the function it is written above.
+  # The function entries of Σ.
+  #
+  # A function has a single type.
+  # A function with no spec gets no entry and no error here, it is reported when
+  # its body is checked (WF-Func). (maybe it should be reported here..)
+  #
+  # Errors:
+  #   * more than one spec for the same function
+  #   * the errors of `parse_spec/3`
+  @spec function_signatures(module(), [clause()]) :: result(%{func_id() => function_type()})
+  defp function_signatures(module, cs) do
+    fs = for c <- cs, match?(:function, c.kind), do: c
 
-  Errors:
+    fs
+    |> Enum.group_by(fn c -> {c.name, c.arity} end)
+    |> map_m(fn {_, cs} -> function_signature(module, cs) end)
+    |> f_map(&Map.new/1)
+  end
 
-    * the spec's name or arity is not that of the function
-    * an argument type does not parse (reported with its position)
-    * the return type does not parse
-  """
-  @spec parse_spec(module(), {atom(), arity()}, raw_spec()) ::
-          {:ok, function_type()} | {:error, Error.t()}
-  def parse_spec(_module, {func_name, arity}, raw_spec) do
+  # The entry of one function in Σ, from all of its clauses
+  @spec function_signature(module(), [clause()]) :: result({func_id(), function_type()})
+  defp function_signature(module, [c | _] = cs) do
+    func_id = {module, c.name, c.arity}
+
+    # the specs of all function clauses (technically allows adding the spec in between clauses)
+    case Enum.flat_map(cs, fn c -> c.specs end) do
+      [spec] ->
+        func_id
+        |> parse_spec(spec)
+        |> map_err(fn e -> [localise_err(e, func_id)] end)
+        |> f_map(fn ty -> {func_id, ty} end)
+
+      [] ->
+        {:error, [:missing]}
+
+      _ ->
+        {:error, [:too_many]}
+    end
+  end
+
+  # Parses one raw spec into the type of the function it is written above.
+  #
+  # Errors:
+  #   * the spec's name or arity is not that of the function
+  #   * an argument type does not parse (reported with its position)
+  #   * the return type does not parse
+  @spec parse_spec(func_id(), raw_spec()) :: {:ok, function_type()} | {:error, Error.t()}
+  defp parse_spec({_module, func_name, arity}, raw_spec) do
     # ? why do I need the module passed here? just for meta?
     {:spec, {:"::", _meta, [{spec_name, _, args_asts}, ret_ast]}, _module} = raw_spec
 
@@ -164,6 +212,19 @@ defmodule Maty.Typechecker.Signatures do
       {:arity, _wrong_number_of_types} -> {:error, :wrong_arity}
       {:args, {:error, _error, _idx}} -> {:error, :bad_args}
       {:ret, {:error, _error}} -> {:error, :bad_ret}
+    end
+  end
+
+  # One error for each plain function that has the name of a handler
+  @spec name_clash_errors(module(), [clause()]) :: [located_error()]
+  defp name_clash_errors(_module, cs) do
+    hs = for c <- cs, match?({:handler, _}, c.kind), do: {c.name, c.kind}
+    hs = Map.new(hs)
+
+    collisions = for c <- cs, match?(:function, c.kind), Map.has_key?(hs, c.name), do: c
+
+    for c <- Enum.uniq_by(collisions, fn c -> {c.name, c.arity} end) do
+      {{c.name, c.arity}, :bad_name_error}
     end
   end
 
@@ -247,13 +308,13 @@ defmodule Maty.Typechecker.Signatures do
 
   @spec handler_type(module(), ST.t(), [clause()]) :: result(handler_type())
   # the type of a message handler only depends on its name
-  def handler_type(_, st, [%{kind: {:handler, :message}} | _]),
+  defp handler_type(_, st, [%{kind: {:handler, :message}} | _]),
     do: {:ok, {:handler, :message, st}}
 
-  def handler_type(module, st, clauses) do
+  defp handler_type(module, st, clauses) do
     clauses
     |> map_m(&init_arg_type(module, &1))
-    |> f_map(fn args_ty -> {:handler, :init, args_ty, st} end)
+    |> f_map(fn tys -> {:handler, :init, Enum.sort(tys) |> Enum.dedup(), st} end)
   end
 
   # todo: better names for all these
@@ -267,9 +328,17 @@ defmodule Maty.Typechecker.Signatures do
   defp f_map({:ok, a}, f), do: {:ok, f.(a)}
   defp f_map({:error, _} = e, _), do: e
 
-  # is there a name for something that goes from
-  #   v | {:error, e} -> {:ok, v} | {:error, e}
-  # or is my type on the left probably just poorly designed
+  # as far as I can tell this is similar to `liftA2` in haskell
+  @spec join(result(a), result(b), (a, b -> c)) :: result(c) when a: var, b: var, c: var
+  defp join({:ok, a}, {:ok, b}, f), do: {:ok, f.(a, b)}
+  defp join({:error, err}, {:ok, _}, _), do: {:error, err}
+  defp join({:ok, _}, {:error, err}, _), do: {:error, err}
+  defp join({:error, a}, {:error, b}, _), do: {:error, a ++ b}
+
+  @spec join_err(result(a), [located_error()]) :: result(a) when a: var
+  defp join_err(res, []), do: res
+  defp join_err({:ok, _}, errs), do: {:error, errs}
+  defp join_err({:error, es}, errs), do: {:error, es ++ errs}
 
   @spec map_m([a], (a -> result(b))) :: result([b]) when a: var, b: var
   defp map_m(xs, f) do
@@ -280,4 +349,7 @@ defmodule Maty.Typechecker.Signatures do
       _ -> {:error, Enum.flat_map(errs, fn {:error, e} -> e end)}
     end
   end
+
+  @spec localise_err(Error.t(), func_id() | nil) :: located_error()
+  defp localise_err(e, {_mod, name, arity}), do: {{name, arity}, e}
 end
