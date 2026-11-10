@@ -10,6 +10,12 @@ defmodule Maty.Typechecker.Error do
           {:call, {atom(), non_neg_integer()}, Keyword.t()}
           | {:clause, {atom(), non_neg_integer()}, non_neg_integer()}
           | {:case_branch, non_neg_integer(), Keyword.t()}
+          # positions are 1-based
+          | {:tuple_element, pos_integer()}
+          | {:list_element, pos_integer()}
+          | {:dict_key, pos_integer()}
+          | {:dict_value, pos_integer()}
+          | {:record_field, atom()}
 
   @type category ::
           :protocol_violation

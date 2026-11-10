@@ -305,8 +305,9 @@ defmodule Maty.Typechecker.TCExprTest do
 
       assert {:error,
               %Error{
-                kind: :map_update_value_type_mismatch,
-                details: %{key: :age, expected: :number, got: :binary}
+                kind: :expected,
+                details: %{expected: :number, got: :binary},
+                trace: [record_field: :age]
               }, _env} = TC.synth(@ctx, %{p: @person}, @st_end, ast)
     end
   end

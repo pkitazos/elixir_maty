@@ -19,18 +19,18 @@ maty-*.tar
 
 *.beam
 /config/*.secret.exs
-.elixir_ls/
+/.elixir_ls/
 
-priv/plts/*.plt
-priv/plts/*.plt.hash
-out/
+/priv/plts/*.plt
+/priv/plts/*.plt.hash
+/out/
 
-.vscode/
-.zed/
-docs/notes/
-docs/squiggles/**/*.pdf
-.obsidian/
-.nix-mix/
-.nix-hex/
-scratch/
-playground/
+/.vscode/
+/.zed/
+/.obsidian/
+/.nix-mix/
+/.nix-hex/
+
+/docs/**/*.pdf
+/scratch/
+/playground/

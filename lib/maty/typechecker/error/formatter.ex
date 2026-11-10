@@ -232,6 +232,18 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :type_mismatch, kind: :expected} = e) do
+    %{expected: expected, got: got} = e.details
+
+    """
+    Type Mismatch Error: Unexpected Type
+      Expected: #{render_type(expected)}
+      Got: #{render_type(got)}
+      --
+      The expression's type does not match the type expected here.
+    """
+  end
+
   defp render(%Error{category: :type_mismatch, kind: :binary_operator_type_mismatch} = e) do
     %{operator: operator, lhs: lhs_type, rhs: rhs_type} = e.details
 
@@ -371,19 +383,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :type_mismatch, kind: :map_update_value_type_mismatch} = e) do
-    %{key: key, expected: expected, got: got} = e.details
-
-    """
-    Type Mismatch Error: Map Update Value Type
-      Key: #{render_type(key)}
-      Expected: #{render_type(expected)}
-      Got: #{render_type(got)}
-      --
-      `%{m | k: v}` must keep the type of the field it updates.
-    """
-  end
-
   defp render(%Error{category: :type_mismatch, kind: :field_access_not_record} = e) do
     %{got: got} = e.details
 
@@ -405,6 +404,64 @@ defmodule Maty.Typechecker.Error.Formatter do
       Record: #{render_type(record)}
       --
       `m.k` can only access keys the record has.
+    """
+  end
+
+  defp render(%Error{category: :type_mismatch, kind: :record_duplicate_label} = e) do
+    %{label: label} = e.details
+
+    """
+    Type Mismatch Error: Duplicate Record Label
+      Label: #{inspect(label)}
+      --
+      Each label can appear only once in a record.
+    """
+  end
+
+  defp render(%Error{category: :type_mismatch, kind: :record_missing_fields} = e) do
+    %{labels: labels, record: record} = e.details
+
+    """
+    Type Mismatch Error: Missing Record Fields
+      Missing: #{Enum.map_join(labels, ", ", &inspect/1)}
+      Expected: #{render_type(record)}
+      --
+      A record must give every field of its type.
+    """
+  end
+
+  defp render(%Error{category: :type_mismatch, kind: :record_unexpected_field} = e) do
+    %{label: label, record: record} = e.details
+
+    """
+    Type Mismatch Error: Unexpected Record Field
+      Field: #{inspect(label)}
+      Expected: #{render_type(record)}
+      --
+      A record can only give the fields of its type.
+    """
+  end
+
+  defp render(%Error{category: :type_mismatch, kind: :tuple_arity_mismatch} = e) do
+    %{expected: expected, got: got} = e.details
+
+    """
+    Type Mismatch Error: Tuple Arity Mismatch
+      Expected size: #{expected}
+      Got size: #{got}
+      --
+      A tuple must have as many elements as its type.
+    """
+  end
+
+  defp render(%Error{category: :type_mismatch, kind: :dict_key_not_base_type} = e) do
+    %{got: got} = e.details
+
+    """
+    Type Mismatch Error: Dict Key Not a Base Type
+      Got: #{render_type(got)}
+      --
+      Dict keys must have a base type.
     """
   end
 
@@ -994,6 +1051,12 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render_frame({:case_branch, index, meta}),
     do: "in case branch ##{index}#{render_line(meta)}"
 
+  defp render_frame({:tuple_element, index}), do: "in tuple element ##{index}"
+  defp render_frame({:list_element, index}), do: "in list element ##{index}"
+  defp render_frame({:dict_key, index}), do: "in the key of dict entry ##{index}"
+  defp render_frame({:dict_value, index}), do: "in the value of dict entry ##{index}"
+  defp render_frame({:record_field, label}), do: "in record field #{inspect(label)}"
+
   defp render_line(meta) do
     case Keyword.get(meta, :line) do
       nil -> ""
@@ -1056,6 +1119,18 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render_string_segment_hint(:concatenation),
     do: "Both operands of <> must be binaries."
+
+  defp render_uninferable(:empty_list), do: "[]"
+  defp render_uninferable(:empty_map), do: "%{}"
+  defp render_uninferable(:anonymous_function), do: "an anonymous function"
+
+  defp render_uninferable_hint(:anonymous_function),
+    do:
+      "The types of its parameters cannot be inferred here. Use it where a function type is expected, or consider creating a named function."
+
+  defp render_uninferable_hint(_empty),
+    do:
+      "The type of its elements cannot be inferred here. Use it where its type is expected, e.g. as an argument to a function with a spec."
 
   defp render_operator(op) when is_atom(op), do: "#{op}"
   defp render_operator(op), do: "#{inspect(op)}"

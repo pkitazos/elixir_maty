@@ -62,7 +62,6 @@ defmodule Maty.Types do
     :number,
     nil,
     # maybe not these actually
-    :date,
     :pid,
     :ref
   ]
@@ -70,42 +69,47 @@ defmodule Maty.Types do
   @doc """
   Returns a list of all accepted types, including :number, :atom, ...
   """
-  @spec payload_types ::
-          nonempty_list(:atom | :binary | :boolean | :date | :number | :pid | :ref | nil)
-  def payload_types() do
-    @supported_payload_types
-  end
+  # todo: rename
+  @spec payload_types :: [T.c()]
+  def payload_types(), do: @supported_payload_types
+
+  @spec is_base_type?(T.t()) :: boolean()
+  def is_base_type?(t), do: t in @supported_payload_types
+
+  defguard is_label(t) when is_atom(t) and not is_boolean(t) and not is_nil(t)
 
   defmodule T do
+    @type c ::
+            :atom
+            # todo: figure out what to do when we add tagged sums
+            | :boolean
+            | nil
+            | :number
+            | :binary
+            # todo: make it explicit what string operations are supported
+            | :pid
+            # todo: check to what degree I can actually work with PIDs and REFs
+            # and make the allowed ops explicit somewhere
+            | :ref
+
     @typedoc """
     Represents types that are supported by the Maty typechecker.
     These are primitive types that can be checked directly.
     """
     @type t ::
-            :any
-            # ^ this is a special value
-            | :atom
-            # todo: consider supporting singleton atoms (breaks everything below)
-            | :binary
-            # todo: make it explicit what string operations are supported
-            | :boolean
-            | :date
-            # todo: drop support for dates
-            | nil
-            | :number
+            c()
             | :no_return
             # ^ this is a special value
-            | :pid
-            | :ref
-            # todo: check to what degree I can actually work with PIDs and REFs
-            # and make the allowed ops explicit somewhere
             | {:tuple, [t()]}
             | {:list, t()}
             | {:map_record, %{atom() => t()}}
+            | {:map_dict, {c(), t()}}
+            | {:function, [t()], t()}
             # really these should be S?
             | {:handler, :message, Maty.ST.t()}
             # and S! | h
             # but we don't have unions for this one..
+            # also need to probably add the state type in here
             | {:handler, :init, [t()], Maty.ST.t()}
 
     def role, do: :atom

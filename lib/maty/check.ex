@@ -100,25 +100,6 @@ defmodule Maty.Check do
     end
   end
 
-  # todo: better name
-  @spec chain_4_check([a], [ty], (a, ty -> t(b))) :: t([b]) when a: var, b: var, ty: var
-  def chain_4_check(items, types, fun) do
-    fn env, st ->
-      items
-      |> Enum.zip(types)
-      |> Enum.reduce_while({:ok, [], st, env}, fn {v, ty}, {:ok, acc, st, env} ->
-        case apply_check(fun.(v, ty), env, st) do
-          {:ok, value, st, env} -> {:cont, {:ok, [value | acc], st, env}}
-          {:error, _, _} = err -> {:halt, err}
-        end
-      end)
-      |> case do
-        {:ok, rev, st, env} -> {:ok, Enum.reverse(rev), st, env}
-        {:error, _, _} = err -> err
-      end
-    end
-  end
-
   @spec fan_out([a], (a -> t(b))) :: t([{b, Maty.ST.t()}]) when a: var, b: var
   def fan_out(items, fun) do
     fn env, st ->

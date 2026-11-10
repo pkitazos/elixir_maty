@@ -96,55 +96,57 @@ defmodule Maty.Typechecker.TC do
   """
   @spec synth(Ctx.t(), Check.var_env(), Maty.ST.t(), ast()) :: result()
 
-  # -- Val-BaseLit
-
+  # -- TV-Const
   deftc synth(_ctx, env, st, nil), do: {:ok, nil, st, env}
   deftc synth(_ctx, env, st, value) when is_boolean(value), do: {:ok, :boolean, st, env}
   deftc synth(_ctx, env, st, value) when is_binary(value), do: {:ok, :binary, st, env}
   deftc synth(_ctx, env, st, value) when is_number(value), do: {:ok, :number, st, env}
 
-  # -- Val-EmptyList
+  # -- TV-Nil-Syn
   deftc synth(ctx, env, _st, []) do
-    # ! not sure where to get the meta line from
-    error = Error.TypeInference.cannot_infer_type(ctx.module, [line: 0], :empty_list)
+    error = Error.TypeInference.cannot_infer_type(ctx.module, ctx.meta, :empty_list)
     {:error, error, env}
   end
 
-  # -- Val-Cons
+  # -- TV-Cons-Syn
   # List Construction [v1, v2, ...]
-  # Enforces homogeneity. Preserves session state.
-  deftc synth(ctx, env, st, items) when is_list(items) do
+  deftc synth(ctx, env, st, [v | vs]) do
     tcm env: env, st: st do
-      list_types <- chain(items, &tc(ctx, &1))
+      ty <- syn(ctx, v)
 
-      expect {:ok, type} = Helpers.unify_list_types(list_types),
-        else: Error.TypeMismatch.list_elements_incompatible(ctx.module, ctx.meta, list_types)
+      chain(vs |> Enum.with_index(2), fn {v, i} ->
+        chk(ctx, v, ty) |> with_frame({:list_element, i})
+      end)
 
-      ok({:list, type})
+      ok({:list, ty})
     end
   end
 
-  # -- Val-EmptyTuple
+  # -- TV-Tuple-Syn
   # Empty Tuple Construction
   deftc synth(_ctx, env, st, {:{}, _, []}) do
     {:ok, {:tuple, []}, st, env}
   end
 
-  # -- Val-Tuple
+  # -- TV-Tuple-Syn
   # 2-Tuple Value Construction
   deftc synth(ctx, env, st, {lhs_ast, rhs_ast}) do
     tcm env: env, st: st do
-      lhs_type <- tc(ctx, lhs_ast)
-      rhs_type <- tc(ctx, rhs_ast)
+      lhs_type <- syn(ctx, lhs_ast) |> with_frame({:tuple_element, 1})
+      rhs_type <- syn(ctx, rhs_ast) |> with_frame({:tuple_element, 2})
       ok({:tuple, [lhs_type, rhs_type]})
     end
   end
 
-  # -- Val-Tuple
+  # -- TV-Tuple-Syn
   # n-Tuple Construction {v1, v2, ...}
   deftc synth(ctx, var_env, st_pre, {:{}, _, items}) when is_list(items) do
     tcm env: var_env, st: st_pre do
-      types <- chain(items, &tc(ctx, &1))
+      types <-
+        chain(items |> Enum.with_index(1), fn {item, i} ->
+          syn(ctx, item) |> with_frame({:tuple_element, i})
+        end)
+
       ok({:tuple, types})
     end
   end
@@ -155,30 +157,21 @@ defmodule Maty.Typechecker.TC do
   deftc synth(ctx, env, st, {:%{}, meta, [{:|, _, [map_ast, updates]}]})
         when is_list(updates) do
     tcm env: env, st: st do
-      map_type <- tc(ctx, map_ast)
+      map_type <- syn(ctx, map_ast)
 
       expect {:map_record, fields} = map_type,
         else: Error.TypeMismatch.map_update_not_record(ctx.module, meta, got: map_type)
 
-      chain(updates, fn {key_ast, val_ast} ->
+      chain(updates, fn {k, v_ast} ->
         tcm do
           # keys must be literal atoms, a record's fields are known statically
-          expect is_atom(key_ast),
-            else: Error.PatternMatching.complex_map_key(ctx.module, meta, key_ast)
+          expect is_atom(k),
+            else: Error.PatternMatching.complex_map_key(ctx.module, meta, k)
 
-          key = key_ast
+          expect {:ok, field_type} = Map.fetch(fields, k),
+            else: Error.TypeMismatch.map_update_key_not_found(ctx.module, meta, k, map_type)
 
-          expect {:ok, field_type} = Map.fetch(fields, key),
-            else: Error.TypeMismatch.map_update_key_not_found(ctx.module, meta, key, map_type)
-
-          val_type <- tc(ctx, val_ast)
-
-          expect val_type == field_type,
-            else:
-              Error.TypeMismatch.map_update_value_type_mismatch(ctx.module, meta, key,
-                expected: field_type,
-                got: val_type
-              )
+          chk(ctx, v_ast, field_type) |> with_frame({:record_field, k})
 
           ok()
         end
@@ -188,23 +181,23 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # Map Construction %{k1 => v1, ...} (Val-Map)
+  # -- TV-Dict-Syn (n = 0)
+  # Empty Dict %{}
+  deftc synth(ctx, env, _st, {:%{}, meta, []}) do
+    error = Error.TypeInference.cannot_infer_type(ctx.module, meta, :empty_map)
+    {:error, error, env}
+  end
+
+  # -- TV-Dict-Syn / TV-Record-Syn
+  # Map Construction %{k1 => v1, ...}
+  # an atom-keyed dict has the same shape as a record, so the keys decide:
+  # a record when every key is a label, a dict otherwise (whatever order the keys come in)
+  # a label is a literal atom other than `true`, `false` and `nil`, which TV-Const types as Bool and Nil, not Atom
   deftc synth(ctx, env, st, {:%{}, meta, pairs}) do
-    tcm env: env, st: st do
-      fields <-
-        chain(pairs, fn {key_ast, val_ast} ->
-          tcm do
-            # keys must be literal atoms, a record's fields are known statically
-            expect is_atom(key_ast),
-              else: Error.PatternMatching.complex_map_key(ctx.module, meta, key_ast)
-
-            val_type <- tc(ctx, val_ast)
-
-            ok({key_ast, val_type})
-          end
-        end)
-
-      ok({:map_record, Map.new(fields)})
+    if Enum.all?(pairs, fn {k, _} -> Types.is_label(k) end) do
+      synth_record(ctx, env, st, meta, pairs)
+    else
+      synth_dict(ctx, env, st, meta, pairs)
     end
   end
 
@@ -214,7 +207,7 @@ defmodule Maty.Typechecker.TC do
   deftc synth(ctx, env, st, {{:., meta, [map_ast, key]}, _call_meta, []})
         when not is_atom(map_ast) and is_atom(key) do
     tcm env: env, st: st do
-      map_type <- tc(ctx, map_ast)
+      map_type <- syn(ctx, map_ast)
 
       expect {:map_record, fields} = map_type,
         else: Error.TypeMismatch.field_access_not_record(ctx.module, meta, got: map_type)
@@ -229,7 +222,7 @@ defmodule Maty.Typechecker.TC do
   # -- T-Not
   deftc synth(ctx, env, st, erlang(:not, meta, [operand_ast])) do
     tcm env: env, st: st do
-      res_type <- tc(ctx, operand_ast)
+      res_type <- syn(ctx, operand_ast)
 
       expect res_type == :boolean,
         else:
@@ -247,7 +240,7 @@ defmodule Maty.Typechecker.TC do
   # Unary minus `-x`
   deftc synth(ctx, env, st, erlang(:-, meta, [operand_ast])) do
     tcm env: env, st: st do
-      operand_type <- tc(ctx, operand_ast)
+      operand_type <- syn(ctx, operand_ast)
 
       expect operand_type == :number,
         else:
@@ -268,8 +261,8 @@ defmodule Maty.Typechecker.TC do
     op = Map.get(@source_ops, erlang_op, erlang_op)
 
     tcm env: env, st: st do
-      lhs_type <- tc(ctx, lhs_ast)
-      rhs_type <- tc(ctx, rhs_ast)
+      lhs_type <- syn(ctx, lhs_ast)
+      rhs_type <- syn(ctx, rhs_ast)
 
       expect {:ok, res_type} = Helpers.op_type_rel(op, lhs_type, rhs_type),
         else:
@@ -384,6 +377,7 @@ defmodule Maty.Typechecker.TC do
 
   # Block Scope
   deftc synth(ctx, var_env, st_pre, {:__block__, _, body_asts}) when is_list(body_asts) do
+    # todo: reconsider what to do here..
     tc_expr_list(ctx, var_env, st_pre, body_asts)
   end
 
@@ -392,7 +386,7 @@ defmodule Maty.Typechecker.TC do
   # -- T-Let
   deftc synth(ctx, env, st, {:=, _meta, [pat_ast, expr_ast]}) do
     tcm env: env, st: st do
-      expr_type <- tc(ctx, expr_ast)
+      expr_type <- syn(ctx, expr_ast)
       _ <- match_pattern(ctx, pat_ast, expr_type)
       ok(expr_type)
     end
@@ -402,7 +396,7 @@ defmodule Maty.Typechecker.TC do
   # todo: revisit this
   deftc synth(ctx, env, st, {:case, meta, [scrutinee_ast, [do: clauses_list]]}) do
     tcm env: env, st: st do
-      scrutinee_type <- tc(ctx, scrutinee_ast)
+      scrutinee_type <- syn(ctx, scrutinee_ast)
 
       branch_results <-
         fan_out(Enum.with_index(clauses_list, 1), fn
@@ -410,7 +404,7 @@ defmodule Maty.Typechecker.TC do
             tcm do
               # a literal pattern has no meta of its own, so its errors are reported at the branch
               _ <- match_pattern(%{ctx | meta: branch_meta}, pat_ast, scrutinee_type)
-              tc(ctx, expr_ast)
+              syn(ctx, expr_ast)
             end
             |> with_frame({:case_branch, index, Keyword.take(branch_meta, [:line, :column])})
         end)
@@ -441,7 +435,7 @@ defmodule Maty.Typechecker.TC do
       expect is_atom(literal_label),
         else: Error.TypeMismatch.send_message_not_tuple(ctx.module, meta, got: message_ast)
 
-      actual_payload_type <- tc(ctx, payload_expr_ast)
+      actual_payload_type <- syn(ctx, payload_expr_ast)
 
       # roles must be literal atoms
       expect is_atom(recipient_ast),
@@ -515,12 +509,12 @@ defmodule Maty.Typechecker.TC do
           maty_runtime(:suspend, meta, [handler_ast, state_ast])
         ) do
     tcm env: env, st: st do
-      handler_type <- tc(ctx, handler_ast)
+      handler_type <- syn(ctx, handler_ast)
 
       expect {:handler, :message, handler_st} = handler_type,
         else: Error.TypeMismatch.handler_expected(ctx.module, meta, :message, handler_type)
 
-      state_type <- tc(ctx, state_ast)
+      state_type <- syn(ctx, state_ast)
 
       expect state_type == Types.T.maty_actor_state(),
         else:
@@ -572,7 +566,7 @@ defmodule Maty.Typechecker.TC do
           maty_runtime(:done, meta, [state_ast])
         ) do
     tcm env: env, st: st do
-      state_type <- tc(ctx, state_ast)
+      state_type <- syn(ctx, state_ast)
 
       expect state_type == Types.T.maty_actor_state(),
         else:
@@ -609,7 +603,7 @@ defmodule Maty.Typechecker.TC do
           ])
         ) do
     tcm env: env, st: st do
-      pid_type <- tc(ctx, ap_pid_ast)
+      pid_type <- syn(ctx, ap_pid_ast)
 
       expect pid_type == :pid,
         else:
@@ -628,12 +622,12 @@ defmodule Maty.Typechecker.TC do
       expect role_ast in ctx.roles,
         else: Error.FrameworkUsage.undeclared_role(ctx.module, meta, role_ast, ctx.roles)
 
-      handler_type <- tc(ctx, handler_ast)
+      handler_type <- syn(ctx, handler_ast)
 
       expect {:handler, :init, accepted_arg_types, _st} = handler_type,
         else: Error.TypeMismatch.handler_expected(ctx.module, meta, :init, handler_type)
 
-      args_type <- tc(ctx, args_ast)
+      args_type <- syn(ctx, args_ast)
 
       expect accepted_arg_types == [] or args_type in accepted_arg_types,
         else:
@@ -671,7 +665,7 @@ defmodule Maty.Typechecker.TC do
 
       arg_types <-
         arg_asts
-        |> chain(&tc(ctx, &1))
+        |> chain(&syn(ctx, &1))
         |> with_frame({:call, func_id, Keyword.take(meta, [:line, :column])})
 
       # todo: this accepts the call if the arguments fit *any* clause's spec, but at runtime the
@@ -709,7 +703,7 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
-  # -- Val-BaseLit (I gotta do something about these names..)
+  # -- TV-Const
   # Atom literals
   deftc synth(_ctx, env, st, value) when is_atom(value) and not is_nil(value) do
     {:ok, :atom, st, env}
@@ -722,6 +716,8 @@ defmodule Maty.Typechecker.TC do
     {:error, Error.FrameworkUsage.unsupported_expression(ctx.module, meta, ast), env}
   end
 
+  # -- start of other little bits --------------------------------------------------------------------------------
+
   # types that String.Chars implements
   @interpolatable_types [:atom, :binary, :boolean, :date, :number, nil]
 
@@ -732,7 +728,7 @@ defmodule Maty.Typechecker.TC do
          {:"::", seg_meta, [{{:., _, [String.Chars, :to_string]}, _, [val_ast]}, {:binary, _, _}]}
        ) do
     tcm do
-      val_type <- tc(ctx, val_ast)
+      val_type <- syn(ctx, val_ast)
 
       expect val_type in @interpolatable_types,
         else:
@@ -751,7 +747,7 @@ defmodule Maty.Typechecker.TC do
   # a literal or concatenated operand: `x :: binary`
   defp tc_string_segment(ctx, meta, {:"::", seg_meta, [val_ast, {:binary, _, _}]}) do
     tcm do
-      val_type <- tc(ctx, val_ast)
+      val_type <- syn(ctx, val_ast)
 
       expect val_type == :binary,
         else:
@@ -778,8 +774,8 @@ defmodule Maty.Typechecker.TC do
 
   defp tc_boolean_op(ctx, env, st, op, meta, lhs_ast, rhs_ast) do
     tcm env: env, st: st do
-      lhs_type <- tc(ctx, lhs_ast)
-      rhs_type <- tc(ctx, rhs_ast)
+      lhs_type <- syn(ctx, lhs_ast)
+      rhs_type <- syn(ctx, rhs_ast)
 
       expect {:ok, res_type} = Helpers.op_type_rel(op, lhs_type, rhs_type),
         else:
@@ -795,14 +791,213 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
+  # -- TV-Dict-Syn
+  # Dictionary Construction %{k1 => v1, ...}
+  # only reached when some key is not a label (non-empty, the empty map has its own clause)
+  defp synth_dict(ctx, env, st, meta, [{k, v_ast} | rest]) do
+    tcm env: env, st: st do
+      k_ty <- syn(ctx, k) |> with_frame({:dict_key, 1})
+
+      expect Types.is_base_type?(k_ty),
+        else: Error.TypeMismatch.dict_key_not_base_type(ctx.module, meta, got: k_ty)
+
+      v_ty <- syn(ctx, v_ast) |> with_frame({:dict_value, 1})
+
+      chain(rest |> Enum.with_index(2), fn {{k_i, v_ast_i}, i} ->
+        tcm do
+          chk(ctx, k_i, k_ty) |> with_frame({:dict_key, i})
+          chk(ctx, v_ast_i, v_ty) |> with_frame({:dict_value, i})
+          ok()
+        end
+      end)
+
+      ok({:map_dict, {k_ty, v_ty}})
+    end
+  end
+
+  # -- TV-Record-Syn
+  # Record Construction %{k1: v1, ...}
+  # atom-keyed dict is also inferred as a record
+  # only reached when every key is a label
+  defp synth_record(ctx, env, st, meta, pairs) do
+    tcm env: env, st: st do
+      labels = Enum.map(pairs, fn {k, _} -> k end)
+      duplicates = labels -- Enum.uniq(labels)
+
+      expect duplicates == [],
+        else: Error.TypeMismatch.record_duplicate_label(ctx.module, meta, hd(duplicates))
+
+      fields <-
+        chain(pairs, fn {k, v_ast} ->
+          tcm do
+            v_ty <- syn(ctx, v_ast) |> with_frame({:record_field, k})
+            ok({k, v_ty})
+          end
+        end)
+
+      ok({:map_record, Map.new(fields)})
+    end
+  end
+
   # Processes a list of expressions sequentially using synth.
   # Returns the result of the *last* expression in the list.
   # the only reason this isn't inlined is because it's used in a bunch of places in the wf module
   @spec tc_expr_list(Ctx.t(), Check.var_env(), Maty.ST.t(), [ast()]) :: result()
   def tc_expr_list(ctx, var_env, st_pre, ast_list) do
     tcm env: var_env, st: st_pre do
-      types <- chain(ast_list, &tc(ctx, &1))
+      types <- chain(ast_list, &syn(ctx, &1))
       ok(List.last(types))
+    end
+  end
+
+  # -- end of other little bits --------------------------------------------------------------------------------
+
+  @spec check(Ctx.t(), Check.var_env(), Maty.ST.t(), ast(), Types.T.t()) :: result()
+
+  # -- TV-Tuple-Chk
+  # ? maybe this one is not necessary
+  deftc check(_ctx, env, st, {:{}, _, []}, {:tuple, []} = t), do: {:ok, t, st, env}
+
+  # 2-Tuple Construction
+  deftc check(ctx, env, st, {lhs_ast, rhs_ast}, {:tuple, types} = t) do
+    tcm env: env, st: st do
+      expect [lhs_t, rhs_t] = types,
+        # a 2-tuple literal has no meta of its own
+        else:
+          Error.TypeMismatch.tuple_arity_mismatch(ctx.module, ctx.meta,
+            expected: length(types),
+            got: 2
+          )
+
+      chk(ctx, lhs_ast, lhs_t) |> with_frame({:tuple_element, 1})
+      chk(ctx, rhs_ast, rhs_t) |> with_frame({:tuple_element, 2})
+      ok(t)
+    end
+  end
+
+  # n-Tuple Construction {v1, v2, ...}
+  deftc check(ctx, var_env, st_pre, {:{}, meta, vs}, {:tuple, types} = t)
+        when is_list(vs) do
+    tcm env: var_env, st: st_pre do
+      type_arity = length(types)
+      tuple_arity = length(vs)
+
+      expect type_arity == tuple_arity,
+        else:
+          Error.TypeMismatch.tuple_arity_mismatch(ctx.module, meta,
+            expected: type_arity,
+            got: tuple_arity
+          )
+
+      chain(Enum.zip(vs, types) |> Enum.with_index(1), fn {{v, ty}, i} ->
+        chk(ctx, v, ty) |> with_frame({:tuple_element, i})
+      end)
+
+      ok(t)
+    end
+  end
+
+  # -- TV-Nil
+  deftc check(_ctx, env, st, [], {:list, _ty} = t), do: {:ok, t, st, env}
+
+  # -- TV-Cons-Chk
+  deftc check(ctx, env, st, [v | vs], {:list, ty} = t) do
+    tcm env: env, st: st do
+      chk(ctx, v, ty) |> with_frame({:list_element, 1})
+
+      chain(vs |> Enum.with_index(2), fn {v, i} ->
+        chk(ctx, v, ty) |> with_frame({:list_element, i})
+      end)
+
+      ok(t)
+    end
+  end
+
+  # Map Record Update %{m | k1: v1, ...}
+  # no check rule of its own: synthesise and compare (TV-Switch)
+  # must come before TV-Record-Chk and TV-Dict-Chk, whose heads also match it
+  deftc check(ctx, env, st, {:%{}, _, [{:|, _, [_map_ast, updates]}]} = ast, t)
+        when is_list(updates),
+        do: switch(ctx, env, st, ast, t)
+
+  # -- TV-Record-Chk
+  # Record Construction %{k1: v1, ...}
+  deftc check(ctx, env, st, {:%{}, meta, pairs}, {:map_record, types} = t) do
+    tcm env: env, st: st do
+      # non-atom keys are reported by the `chain` below
+      labels = for {k, _} <- pairs, is_atom(k), do: k
+      duplicates = labels -- Enum.uniq(labels)
+
+      expect duplicates == [],
+        else: Error.TypeMismatch.record_duplicate_label(ctx.module, meta, hd(duplicates))
+
+      chain(pairs, fn {k, v_ast} ->
+        tcm do
+          expect is_atom(k),
+            else: Error.PatternMatching.complex_map_key(ctx.module, meta, k)
+
+          expect {:ok, v_ty} = Map.fetch(types, k),
+            else: Error.TypeMismatch.record_unexpected_field(ctx.module, meta, k, t)
+
+          chk(ctx, v_ast, v_ty) |> with_frame({:record_field, k})
+
+          ok()
+        end
+      end)
+
+      # every label is now known to be one of the type's, so whatever the type has left over is missing
+      missing = types |> Map.drop(labels) |> Map.keys() |> Enum.sort()
+
+      expect missing == [],
+        else: Error.TypeMismatch.record_missing_fields(ctx.module, meta, missing, t)
+
+      ok(t)
+    end
+  end
+
+  # -- TV-Dict-Chk
+  # Dictionary Construction %{k1 => v1, ...}
+  deftc check(ctx, env, st, {:%{}, _meta, pairs}, {:map_dict, {k_ty, v_ty}} = t) do
+    # todo: should probably update the ctx.meta with this meta...
+    tcm env: env, st: st do
+      chain(pairs |> Enum.with_index(1), fn {{k_i, v_ast_i}, i} ->
+        tcm do
+          chk(ctx, k_i, k_ty) |> with_frame({:dict_key, i})
+          chk(ctx, v_ast_i, v_ty) |> with_frame({:dict_value, i})
+          ok()
+        end
+      end)
+
+      ok(t)
+    end
+  end
+
+  # -- TV-Abs
+  # Anonymous Function fn x1, ..., xn -> body end
+  # todo: there is no function type in `Types.T` yet, `{:function, param_types, return_type}` is a placeholder
+  deftc check(
+          ctx,
+          env,
+          st,
+          {:fn, meta, [{:->, _, [params, body_ast]}]},
+          {:function, param_types, return_type} = t
+        )
+        when is_list(params) do
+    # todo: later
+  end
+
+  # -- TV-Switch
+  deftc check(ctx, env, st, ast, t), do: switch(ctx, env, st, ast, t)
+
+  defp switch(ctx, env, st, ast, t) do
+    # todo: clean this up
+    meta = Helpers.extract_meta_from_ast(ast)
+    meta = if Keyword.has_key?(meta, :line), do: meta, else: ctx.meta
+
+    tcm env: env, st: st do
+      t2 <- syn(ctx, ast)
+      expect t2 == t, else: Error.TypeMismatch.expected(ctx.module, meta, expected: t, got: t2)
+      ok(t)
     end
   end
 end

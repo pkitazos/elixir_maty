@@ -44,6 +44,17 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
     }
   end
 
+  # a tuple literal checked against a tuple type has a different number of elements
+  def tuple_arity_mismatch(module, meta, expected: expected, got: got) do
+    %Error{
+      category: :type_mismatch,
+      kind: :tuple_arity_mismatch,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{expected: expected, got: got}
+    }
+  end
+
   def binary_operator_type_mismatch(module, meta, operator, lhs_type, rhs_type) do
     %Error{
       category: :type_mismatch,
@@ -168,17 +179,6 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
     }
   end
 
-  # A record update `%{m | k: v}` gives a key a value whose type is not the record's field type
-  def map_update_value_type_mismatch(module, meta, key, expected: expected, got: got) do
-    %Error{
-      category: :type_mismatch,
-      kind: :map_update_value_type_mismatch,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{key: key, expected: expected, got: got}
-    }
-  end
-
   # A field access `m.k` was applied to a value that is not a map record
   def field_access_not_record(module, meta, got: got) do
     %Error{
@@ -198,6 +198,65 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
       module: module,
       meta: Keyword.take(meta, [:line, :column]),
       details: %{key: key, record: record_type}
+    }
+  end
+
+  # A record literal `%{k1: v1, ...}` gives the same label more than once (labels must be disinct)
+  def record_duplicate_label(module, meta, label) do
+    %Error{
+      category: :type_mismatch,
+      kind: :record_duplicate_label,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{label: label}
+    }
+  end
+
+  # A record literal checked against a record type leaves out some of the type's fields (all fields are required)
+  def record_missing_fields(module, meta, labels, record_type) do
+    %Error{
+      category: :type_mismatch,
+      kind: :record_missing_fields,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{labels: labels, record: record_type}
+    }
+  end
+
+  # A record literal checked against a record type gives a field the type does not have
+  def record_unexpected_field(module, meta, label, record_type) do
+    %Error{
+      category: :type_mismatch,
+      kind: :record_unexpected_field,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{label: label, record: record_type}
+    }
+  end
+
+  # -- dicts
+
+  # a dict key has a type that is not a base type
+  def dict_key_not_base_type(module, meta, got: got) do
+    %Error{
+      category: :type_mismatch,
+      kind: :dict_key_not_base_type,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: got}
+    }
+  end
+
+  # --
+
+  # an expression checked against a type synthesised a different one
+  def expected(module, meta, expected: expected, got: got) do
+    %Error{
+      category: :type_mismatch,
+      kind: :expected,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{expected: expected, got: got}
     }
   end
 end

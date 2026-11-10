@@ -100,6 +100,8 @@ Top-level names are qualified by their module. Inside module $m$, a bare $f$ or 
   }),
 )
 
+Records and record types are considered equal modulo reordering of fields. Labels within a record are pairwise distinct. Labels are atoms other than `true`, `false` and `nil`, which are constants of type $ty("Bool")$ and $ty("Nil")$.
+
 // Throughout, we fix a global signature $Sigma$ and a current module $m$, whose global state type $A_G$ is given by $Sigma(m."on_start")$.
 
 = Typing Rules
@@ -131,10 +133,22 @@ Top-level names are qualified by their module. Inside module $m$, a bare $f$ or 
 #let blank = text(fill: gray)[?]
 #let scaffold(name, conclusion) = trule(name, blank, conclusion)
 
+// === Judgements
+
+// #bnf(
+//   Prod($T$, annot: [Session states], {
+//     Or[$S$][session type]
+//     Or[#nuffin][no session]
+//   }),
+// )
+
+// The session state of a computation is either a session type, or #nuffin for code that runs outside any session: function bodies, $lambda$ bodies and the start callback. No session primitive accepts #nuffin as its pre-state.
+
+
 === Values
 
 #rule-set(
-  trule("TV-Const",
+  trule([TV-Const],
       [c has base type C],
       vty($Gamma$, $c$, $syn C$)
   ),
