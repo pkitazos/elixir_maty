@@ -157,18 +157,20 @@ defmodule Maty.Typechecker.Signatures do
   #
   # Errors:
   #   * more than one spec for the same function
-  #   * the errors of `parse_spec/3`
+  #   * the errors of `parse_spec/2`
   @spec function_signatures(module(), [clause()]) :: result(%{func_id() => function_type()})
   defp function_signatures(module, cs) do
     fs = for c <- cs, match?(:function, c.kind), do: c
 
     fs
     |> Enum.group_by(fn c -> {c.name, c.arity} end)
+    # a function with no spec is skipped, WF-Func reports it (see issues.md §15)
+    |> Enum.reject(fn {_, cs} -> Enum.all?(cs, fn c -> c.specs == [] end) end)
     |> map_m(fn {_, cs} -> function_signature(module, cs) end)
     |> f_map(&Map.new/1)
   end
 
-  # The entry of one function in Σ, from all of its clauses
+  # The entry of one function in Σ, from all of its clauses (at least one of which has a spec)
   @spec function_signature(module(), [clause()]) :: result({func_id(), function_type()})
   defp function_signature(module, [c | _] = cs) do
     func_id = {module, c.name, c.arity}
@@ -181,11 +183,15 @@ defmodule Maty.Typechecker.Signatures do
         |> map_err(fn e -> [localise_err(e, func_id)] end)
         |> f_map(fn ty -> {func_id, ty} end)
 
-      [] ->
-        {:error, [:missing]}
+      specs ->
+        # reported at the function's first clause
+        error =
+          Error.FunctionCall.wrong_number_of_specs(module, [line: c.line], {c.name, c.arity},
+            expected: 1,
+            got: length(specs)
+          )
 
-      _ ->
-        {:error, [:too_many]}
+        {:error, [localise_err(error, func_id)]}
     end
   end
 
@@ -196,35 +202,66 @@ defmodule Maty.Typechecker.Signatures do
   #   * an argument type does not parse (reported with its position)
   #   * the return type does not parse
   @spec parse_spec(func_id(), raw_spec()) :: {:ok, function_type()} | {:error, Error.t()}
-  defp parse_spec({_module, func_name, arity}, raw_spec) do
-    # ? why do I need the module passed here? just for meta?
-    {:spec, {:"::", _meta, [{spec_name, _, args_asts}, ret_ast]}, _module} = raw_spec
+  defp parse_spec({module, func_name, arity}, raw_spec) do
+    {:spec, {:"::", meta, [{spec_name, _, args_asts}, ret_ast]}, _pos} = raw_spec
 
-    with {:name, ^func_name} <- {:name, spec_name},
-         {:arity, ^arity} <- {:arity, length(args_asts)},
+    # the errors name the function without its module
+    # todo: once we go cross-module, this may have to change??
+    func_id = {func_name, arity}
+
+    with {:info, {^func_name, ^arity}} <- {:info, {spec_name, length(args_asts)}},
          {:args, {:ok, args_ty}} <- {:args, parse_spec_args(args_asts)},
          {:ret, {:ok, ret_ty}} <- {:ret, TypeSpecParser.parse(ret_ast)} do
       function_ty = {:function, args_ty, ret_ty}
       {:ok, function_ty}
     else
-      # todo: return actual Error.t() errors
-      {:name, _wrong_name} -> {:error, :bad_name}
-      {:arity, _wrong_number_of_types} -> {:error, :wrong_arity}
-      {:args, {:error, _error, _idx}} -> {:error, :bad_args}
-      {:ret, {:error, _error}} -> {:error, :bad_ret}
+      {:info, spec_id} ->
+        {:error,
+         Error.TypeSpecification.function_spec_info_mismatch(module, meta,
+           spec_id: spec_id,
+           func_id: func_id
+         )}
+
+      {:args, {:error, cause, idx}} ->
+        {:error,
+         Error.TypeSpecification.spec_args_parse_error_at(
+           module,
+           meta,
+           func_id,
+           idx,
+           args_asts,
+           cause
+         )}
+
+      {:ret, {:error, cause}} ->
+        {:error,
+         Error.TypeSpecification.spec_return_not_well_typed(
+           module,
+           meta,
+           spec_name,
+           ret_ast,
+           cause
+         )}
     end
   end
 
   # One error for each plain function that has the name of a handler
   @spec name_clash_errors(module(), [clause()]) :: [located_error()]
-  defp name_clash_errors(_module, cs) do
+  defp name_clash_errors(module, cs) do
     hs = for c <- cs, match?({:handler, _}, c.kind), do: {c.name, c.kind}
     hs = Map.new(hs)
 
     collisions = for c <- cs, match?(:function, c.kind), Map.has_key?(hs, c.name), do: c
 
     for c <- Enum.uniq_by(collisions, fn c -> {c.name, c.arity} end) do
-      {{c.name, c.arity}, :bad_name_error}
+      {:handler, handler_kind} = hs[c.name]
+      func_id = {c.name, c.arity}
+
+      # reported at the function's first clause
+      error =
+        Error.FrameworkUsage.handler_name_clash(module, [line: c.line], func_id, handler_kind)
+
+      {func_id, error}
     end
   end
 
@@ -250,7 +287,6 @@ defmodule Maty.Typechecker.Signatures do
     end
   end
 
-  # idk what to call this, so just calling it whatever
   @spec init_arg_type(module(), clause()) :: result(Type.t())
   defp init_arg_type(module, %{name: name, arity: arity, specs: [spec]}) do
     {:spec,
