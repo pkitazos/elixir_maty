@@ -1,6 +1,7 @@
 defmodule Maty.Typechecker.TypeSpecParser do
   alias Maty.Typechecker.Error
   alias Maty.Types.T, as: Type
+  import Maty.Types, only: [is_label: 1]
 
   @doc """
   Parses a restricted type specification AST into an internal type representation.
@@ -70,16 +71,23 @@ defmodule Maty.Typechecker.TypeSpecParser do
   end
 
   # Case 5: Map record %{k1: t1, ...}
-  # only literal atom keys, each at most once
+  # only valid label keys, each at most once (`true`, `false` and `nil` are atoms but not considered labels)
   # `required(...)`/`optional(...)` and other keys are not supported
   defp do_parse({:%{}, _meta, fields} = map_ast, type_env) when is_list(fields) do
-    atom_keyed? = Enum.all?(fields, &match?({key, _type_ast} when is_atom(key), &1))
+    not_labels = for {key, _type_ast} <- fields, is_atom(key) and not is_label(key), do: key
+    atom_keyed? = Enum.all?(fields, &match?({key, _type_ast} when is_label(key), &1))
 
-    if atom_keyed? and length(Enum.uniq_by(fields, fn {k, _} -> k end)) == length(fields) do
-      parse_map_record_fields(fields, type_env)
-    else
-      error = Error.TypeSpecification.unsupported_type_constructor(map_ast)
-      {:error, error}
+    cond do
+      not_labels != [] ->
+        error = Error.TypeSpecification.invalid_record_label(map_ast, hd(not_labels))
+        {:error, error}
+
+      atom_keyed? and length(Enum.uniq_by(fields, fn {k, _} -> k end)) == length(fields) ->
+        parse_map_record_fields(fields, type_env)
+
+      true ->
+        error = Error.TypeSpecification.unsupported_type_constructor(map_ast)
+        {:error, error}
     end
   end
 

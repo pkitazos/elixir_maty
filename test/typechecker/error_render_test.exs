@@ -30,6 +30,7 @@ defmodule Maty.Typechecker.ErrorRenderTest do
   @cause_constructors [
     {Error.TypeMismatch, :invalid_maty_state_cause},
     {Error.TypeSpecification, :unsupported_type_constructor},
+    {Error.TypeSpecification, :invalid_record_label},
     {Error.TypeSpecification, :unknown_type_constructor},
     {Error.TypeSpecification, :heterogeneous_list_error}
   ]
@@ -180,6 +181,8 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          :missing,
          {:map_record, %{name: :binary}}
        )},
+      {{Error.TypeMismatch, :invalid_record_label},
+       Error.TypeMismatch.invalid_record_label(@m, @meta, true)},
       {{Error.TypeMismatch, :field_access_not_record},
        Error.TypeMismatch.field_access_not_record(@m, @meta, got: :number)},
       {{Error.TypeMismatch, :field_access_key_not_found},

@@ -7,6 +7,7 @@ defmodule Maty.Typechecker.TC do
 
   import Maty.Check
   import Maty.Utils, only: [deftc: 2]
+  import Maty.Types, only: [is_label: 1]
 
   @typedoc """
   Represents Elixir AST nodes that can be typechecked.
@@ -168,6 +169,9 @@ defmodule Maty.Typechecker.TC do
           expect is_atom(k),
             else: Error.PatternMatching.complex_map_key(ctx.module, meta, k)
 
+          expect is_label(k),
+            else: Error.TypeMismatch.invalid_record_label(ctx.module, meta, k)
+
           expect {:ok, field_type} = Map.fetch(fields, k),
             else: Error.TypeMismatch.map_update_key_not_found(ctx.module, meta, k, map_type)
 
@@ -194,7 +198,7 @@ defmodule Maty.Typechecker.TC do
   # a record when every key is a label, a dict otherwise (whatever order the keys come in)
   # a label is a literal atom other than `true`, `false` and `nil`, which TV-Const types as Bool and Nil, not Atom
   deftc synth(ctx, env, st, {:%{}, meta, pairs}) do
-    if Enum.all?(pairs, fn {k, _} -> Types.is_label(k) end) do
+    if Enum.all?(pairs, fn {k, _} -> is_label(k) end) do
       synth_record(ctx, env, st, meta, pairs)
     else
       synth_dict(ctx, env, st, meta, pairs)
@@ -924,8 +928,8 @@ defmodule Maty.Typechecker.TC do
   # Record Construction %{k1: v1, ...}
   deftc check(ctx, env, st, {:%{}, meta, pairs}, {:map_record, types} = t) do
     tcm env: env, st: st do
-      # non-atom keys are reported by the `chain` below
-      labels = for {k, _} <- pairs, is_atom(k), do: k
+      # keys that aren't labels are reported by the `chain` below
+      labels = for {k, _} <- pairs, is_label(k), do: k
       duplicates = labels -- Enum.uniq(labels)
 
       expect duplicates == [],
@@ -935,6 +939,9 @@ defmodule Maty.Typechecker.TC do
         tcm do
           expect is_atom(k),
             else: Error.PatternMatching.complex_map_key(ctx.module, meta, k)
+
+          expect is_label(k),
+            else: Error.TypeMismatch.invalid_record_label(ctx.module, meta, k)
 
           expect {:ok, v_ty} = Map.fetch(types, k),
             else: Error.TypeMismatch.record_unexpected_field(ctx.module, meta, k, t)

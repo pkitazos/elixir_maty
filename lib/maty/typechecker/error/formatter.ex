@@ -418,6 +418,17 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :type_mismatch, kind: :invalid_record_label} = e) do
+    %{label: label} = e.details
+
+    """
+    Type Mismatch Error: Invalid Record Label
+      Label: #{inspect(label)}
+      --
+      `true`, `false` and `nil` cannot be record labels: they are the constants of Bool and Nil.
+    """
+  end
+
   defp render(%Error{category: :type_mismatch, kind: :record_missing_fields} = e) do
     %{labels: labels, record: record} = e.details
 
@@ -1020,6 +1031,11 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render_cause(%Error.Cause{kind: :unsupported_type_constructor, details: %{type_ast: ast}}) do
     {"Unsupported Type Constructor", "Type AST: #{inspect(ast)}",
      "This type specification AST structure is not supported by the typechecker."}
+  end
+
+  defp render_cause(%Error.Cause{kind: :invalid_record_label, details: %{label: label}}) do
+    {"Invalid Record Label", "Label: #{inspect(label)}",
+     "`true`, `false` and `nil` cannot be record labels: they are the constants of Bool and Nil."}
   end
 
   defp render_cause(%Error.Cause{kind: :unknown_type_constructor, details: %{type: type}}) do

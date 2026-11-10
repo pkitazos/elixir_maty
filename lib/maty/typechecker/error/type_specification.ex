@@ -79,6 +79,11 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
     %Error.Cause{kind: :unsupported_type_constructor, details: %{type_ast: type_ast}}
   end
 
+  # a record type uses `true`, `false` or `nil` as a label: they are atoms, but the constants of Bool and Nil
+  def invalid_record_label(type_ast, label) do
+    %Error.Cause{kind: :invalid_record_label, details: %{type_ast: type_ast, label: label}}
+  end
+
   def unknown_type_constructor(type_name) do
     %Error.Cause{kind: :unknown_type_constructor, details: %{type: type_name}}
   end

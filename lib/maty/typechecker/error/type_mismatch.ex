@@ -212,6 +212,17 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
     }
   end
 
+  # A record literal or update uses `true`, `false` or `nil` as a label
+  def invalid_record_label(module, meta, label) do
+    %Error{
+      category: :type_mismatch,
+      kind: :invalid_record_label,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{label: label}
+    }
+  end
+
   # A record literal checked against a record type leaves out some of the type's fields (all fields are required)
   def record_missing_fields(module, meta, labels, record_type) do
     %Error{
