@@ -1,14 +1,14 @@
 defmodule StashQueue.Participants.R do
   use Maty.Actor, protocol: StashQueue.Protocol, roles: [:r]
 
-  global_state %{}
+  global_state nil
   local_state :r, %{}
 
   @st {:install, ~q/+q:{b(number).+q:{b(number).end}}/}
 
   on_start {ap_pid, {n1, n2}} :: {pid(), {number(), number()}} do
     Maty.DSL.register(ap_pid, :r, &install/2, {n1, n2})
-    %{}
+    nil
   end
 
   # the timings set up Q's mailbox as [b(n1), a(n1), a(n2), b(n2)] (see docs/stash-queue.md)

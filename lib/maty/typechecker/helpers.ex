@@ -158,7 +158,7 @@ defmodule Maty.Typechecker.Helpers do
       arg_types =
         ctx.psi
         |> Map.get(func_id, [])
-        |> Enum.map(fn {[arg | _], _} -> arg end)
+        |> Enum.map(fn {:function, [arg | _], _} -> arg end)
         |> Enum.uniq()
         |> Enum.sort()
 

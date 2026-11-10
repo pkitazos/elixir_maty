@@ -1,7 +1,7 @@
 defmodule TwoBuyer.Participants.Buyer1 do
   use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:buyer1]
 
-  global_state %{}
+  global_state nil
   local_state :buyer1, %{}
 
   @st {:install, ~q/+seller:{title(binary).quote_handler}/}
@@ -9,7 +9,7 @@ defmodule TwoBuyer.Participants.Buyer1 do
 
   on_start {ap_pid, title} :: {pid(), binary()} do
     Maty.DSL.register(ap_pid, :buyer1, &install/2, title)
-    %{}
+    nil
   end
 
   defhandler install(title :: binary(), state) do

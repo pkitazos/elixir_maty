@@ -177,7 +177,7 @@ defmodule Maty.Typechecker.Preprocessor do
         with {:info, {^name, ^arity}} <- {:info, {spec_name, length(args_asts)}},
              {:args, {:ok, parsed_arg_types}} <- {:args, parse_spec_args(args_asts)},
              {:return, {:ok, parsed_return_type}} <- {:return, TypeSpecParser.parse(return_ast)} do
-          {:ok, {parsed_arg_types, parsed_return_type}}
+          {:ok, {:function, parsed_arg_types, parsed_return_type}}
         else
           {:info, _} ->
             {:error,

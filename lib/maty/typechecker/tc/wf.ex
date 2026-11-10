@@ -35,7 +35,7 @@ defmodule Maty.Typechecker.TC.WF do
            {:spec, Map.fetch(ctx.psi, func_id)},
          {:count, {:ok, clause_signatures}} <-
            {:count, signatures_per_clause(signatures, clauses)} do
-      for {{spec_args, spec_return}, {meta, arg_pattern_asts, _guards, body_block}} <-
+      for {{:function, spec_args, spec_return}, {meta, arg_pattern_asts, _guards, body_block}} <-
             Enum.zip(clause_signatures, clauses) do
         # errors that have no more precise location of their own are reported at this clause
         ctx = %{ctx | meta: meta}
@@ -127,7 +127,8 @@ defmodule Maty.Typechecker.TC.WF do
            _session_ctx_var_ast
          ], _guards, body_block},
         %ST.SIn{from: expected_role, branches: branches} = st_pre,
-        {[declared_role, {:tuple, [_, payload_type]} = message_type, _state, _session_ctx],
+        {:function,
+         [declared_role, {:tuple, [_, payload_type]} = message_type, _state, _session_ctx],
          _return_type}
       ) do
     ctx = %{ctx | meta: meta}
@@ -208,7 +209,7 @@ defmodule Maty.Typechecker.TC.WF do
         handler_label,
         {meta, [arg_pattern_ast, {state_var, _, _}, _session_ctx_var_ast], _guards, body_block},
         st_pre,
-        {[args_types, _state, _session_ctx], _return_type}
+        {:function, [args_types, _state, _session_ctx], _return_type}
       ) do
     ctx = %{ctx | meta: meta}
 
@@ -232,7 +233,7 @@ defmodule Maty.Typechecker.TC.WF do
   def check_wf_on_start_callback(
         ctx,
         {meta, [arg_pattern_ast], _guards, body_block},
-        {[args_types], _return_type}
+        {:function, [args_types], _return_type}
       ) do
     ctx = %{ctx | meta: meta}
     body = extract_body(body_block)

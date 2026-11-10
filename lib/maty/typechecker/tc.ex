@@ -499,6 +499,7 @@ defmodule Maty.Typechecker.TC do
   end
 
   # Demo only (I really do not like these)
+  # todo: tidy up
 
   deftc synth(ctx, var_env, st_pre, {{:., _, [IO, _]}, _, _} = ast) do
     TC.IO.synth(ctx, var_env, st_pre, ast)
@@ -681,8 +682,10 @@ defmodule Maty.Typechecker.TC do
       # Should instead pick the first clause whose pattern matches the argument types and check against its spec only
       # (this would need access to the clause patterns here, psi currently only has the specs).
       # Same issue in `Helpers.init_handler_arg_types/2` for register
-      expect {_, return_type} =
-               Enum.find(signatures, fn {param_types, _} -> arg_types == param_types end),
+      expect {:function, _, return_type} =
+               Enum.find(signatures, fn {:function, param_types, _} ->
+                 arg_types == param_types
+               end),
              else:
                Error.FunctionCall.no_matching_function_clause(
                  ctx.module,

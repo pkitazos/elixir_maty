@@ -29,7 +29,7 @@ defmodule Maty.Typechecker do
     if not is_nil(is_stub) do
       Module.delete_attribute(env.module, :handler_stub)
       Module.put_attribute(env.module, :handler_stubs, {name, arity})
-      #                                             ^ with an s!
+      #                                             ^ with an s! (todo: give better name)
     else
       if not is_nil(handler) do
         Preprocessor.process_handler_annotation(%{
@@ -178,6 +178,7 @@ defmodule Maty.Typechecker do
       # until a clause sets its own, errors that have no location of their own point at the module
       meta: [line: env.line],
       roles: Module.get_attribute(env.module, :maty_roles),
+      signatures: %{},
       delta_M: delta_m,
       delta_I: delta_i,
       psi: psi
