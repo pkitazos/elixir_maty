@@ -2,708 +2,260 @@ defmodule Maty.Typechecker.TCExprTest do
   use ExUnit.Case
 
   alias Maty.Typechecker.{TC, Ctx, Error}
+
   @st_end %ST.SEnd{}
   @st_out ST.output_one(:server, :msg, :binary, @st_end)
-  @ctx %Ctx{module: nil, meta: [line: 0], roles: [], signatures: %{}}
+  @st_in ST.input_one(:client, :msg, :binary, @st_end)
 
-  # The typechecker operates on expanded AST (from bytecode debug info), not the surface-level AST from `quote`
-  # These helpers produce the correct AST shapes.
+  @ctx %Ctx{
+    module: TestModule,
+    meta: [line: 0],
+    roles: [],
+    signatures: %{
+      {TestModule, :f, 1} => {:function, [:number], :binary},
+      h: {:handler, :message, @st_in},
+      i: {:handler, :init, :number, @st_out}
+    }
+  }
 
-  @meta [line: 0]
+  @person {:map_record, %{name: :binary, age: :number}}
 
-  defp var(name), do: {name, @meta, nil}
-
-  defp erlang_op(op, lhs, rhs), do: {{:., @meta, [:erlang, op]}, @meta, [lhs, rhs]}
-  defp erlang_not(operand), do: {{:., @meta, [:erlang, :not]}, @meta, [operand]}
-  defp map_update(map_ast, updates), do: {:%{}, @meta, [{:|, @meta, [map_ast, updates]}]}
-
-  defp field_access(map_ast, key),
-    do: {{:., @meta, [map_ast, key]}, [no_parens: true] ++ @meta, []}
-
-  defp string_concat(lhs, rhs) do
-    {:<<>>, @meta,
-     [
-       {:"::", @meta, [lhs, {:binary, @meta, nil}]},
-       {:"::", @meta, [rhs, {:binary, @meta, nil}]}
-     ]}
+  # only forms that look the same before and after expansion are tested here,
+  # the ones expansion rewrites (operators, `and` / `or`, strings, `send`) are tested in `compile_error_test.exs`
+  #
+  # variables in code expanded by the normal compilation process have a `nil` context
+  # but `quote` gives them the current module as the context
+  defp expr(quoted) do
+    Macro.prewalk(quoted, fn
+      {name, meta, context} when is_atom(name) and is_atom(context) -> {name, meta, nil}
+      node -> node
+    end)
   end
 
-  # `segments` as they appear after expansion: {:interp, ast} for `#{ast}`, anything else is `ast :: binary`
-  defp string(segments) do
-    {:<<>>, @meta,
-     Enum.map(segments, fn
-       {:interp, ast} ->
-         to_string_call = {{:., @meta, [String.Chars, :to_string]}, @meta, [ast]}
-         {:"::", @meta, [to_string_call, {:binary, @meta, nil}]}
+  defp synth(quoted, env \\ %{}, st \\ @st_end), do: TC.synth(@ctx, env, st, expr(quoted))
+  defp check(quoted, t, env \\ %{}), do: TC.check(@ctx, env, @st_end, expr(quoted), t)
 
-       ast ->
-         {:"::", @meta, [ast, {:binary, @meta, nil}]}
-     end)}
+  defp assert_error(result, kind) do
+    assert {:error, %Error{kind: ^kind} = error, _env} = result
+    error
   end
 
-  defp block(exprs), do: {:__block__, @meta, exprs}
+  # -- TV-Const
 
-  defp match(pattern, expr), do: {:=, @meta, [pattern, expr]}
-
-  defp case_expr(scrutinee, clauses) do
-    branches =
-      Enum.map(clauses, fn {pattern, body} ->
-        {:->, @meta, [[pattern], body]}
-      end)
-
-    {:case, @meta, [scrutinee, [do: branches]]}
+  test "TV-Const" do
+    assert {:ok, :boolean, _, _} = synth(true)
+    assert {:ok, nil, _, _} = synth(nil)
+    assert {:ok, :binary, _, _} = synth("hi")
+    assert {:ok, :number, _, _} = synth(42)
+    assert {:ok, :number, _, _} = synth(3.14)
+    assert {:ok, :atom, _, _} = synth(:hello)
   end
 
-  # --- Literals
+  test "pure expressions leave the session type and env alone" do
+    env = %{x: :number}
 
-  describe "synth/4 literals" do
-    test "boolean true" do
-      assert {:ok, :boolean, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, true)
-    end
-
-    test "boolean false" do
-      assert {:ok, :boolean, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, false)
-    end
-
-    test "nil" do
-      assert {:ok, nil, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, nil)
-    end
-
-    test "binary string" do
-      assert {:ok, :binary, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, "hello")
-    end
-
-    test "number integer" do
-      assert {:ok, :number, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, 42)
-    end
-
-    test "number float" do
-      assert {:ok, :number, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, 3.14)
-    end
-
-    test "literals preserve session state" do
-      assert {:ok, :number, @st_out, %{}} = TC.synth(@ctx, %{}, @st_out, 42)
-      assert {:ok, :binary, @st_out, %{}} = TC.synth(@ctx, %{}, @st_out, "hi")
-      assert {:ok, :boolean, @st_out, %{}} = TC.synth(@ctx, %{}, @st_out, true)
-    end
-
-    test "literals preserve var env" do
-      env = %{x: :number, y: :binary}
-      assert {:ok, :number, @st_end, ^env} = TC.synth(@ctx, env, @st_end, 42)
+    for quoted <- [42, quote(do: x), quote(do: {x, "a"}), quote(do: [x, 1])] do
+      assert {:ok, _type, @st_out, ^env} = synth(quoted, env, @st_out)
     end
   end
 
-  # --- Variables
+  # -- TV-Var
 
-  describe "synth/4 variables" do
-    test "variable lookup succeeds when bound" do
-      env = %{x: :number}
-      assert {:ok, :number, @st_end, ^env} = TC.synth(@ctx, env, @st_end, var(:x))
-    end
+  test "TV-Var" do
+    assert {:ok, :binary, _, _} = synth(quote(do: x), %{x: :binary})
 
-    test "variable lookup returns type from env" do
-      env = %{name: :binary, count: :number, flag: :boolean}
-      assert {:ok, :binary, @st_end, _} = TC.synth(@ctx, env, @st_end, var(:name))
-      assert {:ok, :number, @st_end, _} = TC.synth(@ctx, env, @st_end, var(:count))
-      assert {:ok, :boolean, @st_end, _} = TC.synth(@ctx, env, @st_end, var(:flag))
-    end
-
-    test "unbound variable returns error" do
-      assert {:error, msg, %{}} = TC.synth(@ctx, %{}, @st_end, var(:unknown_var))
-
-      assert %Error{
-               category: :name_resolution,
-               kind: :variable_not_exist,
-               details: %{var: :unknown_var}
-             } = msg
-    end
-
-    test "variable preserves session state" do
-      env = %{x: :number}
-      assert {:ok, :number, @st_out, ^env} = TC.synth(@ctx, env, @st_out, var(:x))
-    end
+    error = assert_error(synth(quote(do: missing)), :variable_not_exist)
+    assert %{var: :missing} = error.details
   end
 
-  # --- Lists
+  # -- TV-Cons-Syn / TV-Nil-Syn
 
-  describe "synth/4 lists" do
-    test "empty list" do
-      assert {:ok, {:list, :any}, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, [])
-    end
+  test "lists" do
+    assert {:ok, {:list, :number}, _, _} = synth([1, 2])
+    assert {:ok, {:list, :number}, _, _} = synth(quote(do: [x, y]), %{x: :number, y: :number})
 
-    test "homogeneous number list" do
-      assert {:ok, {:list, :number}, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, [1, 2, 3])
-    end
+    assert_error(synth([1, "two"]), :expected)
 
-    test "homogeneous binary list" do
-      assert {:ok, {:list, :binary}, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, ["a", "b", "c"])
-    end
-
-    test "homogeneous boolean list" do
-      assert {:ok, {:list, :boolean}, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, [true, false])
-    end
-
-    test "heterogeneous list returns error" do
-      assert {:error, msg, _env} = TC.synth(@ctx, %{}, @st_end, [1, "two"])
-      assert %Error{category: :type_mismatch, kind: :list_elements_incompatible} = msg
-    end
-
-    test "single element list" do
-      assert {:ok, {:list, :number}, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, [42])
-    end
-
-    test "list of variables" do
-      env = %{x: :number, y: :number}
-
-      assert {:ok, {:list, :number}, @st_end, ^env} =
-               TC.synth(@ctx, env, @st_end, [var(:x), var(:y)])
-    end
-
-    test "list preserves session state" do
-      assert {:ok, {:list, :number}, @st_out, %{}} = TC.synth(@ctx, %{}, @st_out, [1, 2])
-    end
+    # an empty list has no element to infer its type from, it can only be checked
+    assert_error(synth([]), :cannot_infer_type)
   end
 
-  # --- Tuples
+  # -- TV-Tuple-Syn
 
-  describe "synth/4 tuples" do
-    test "2-tuple" do
-      ast = {1, "hello"}
+  test "tuples" do
+    assert {:ok, {:tuple, []}, _, _} = synth(quote(do: {}))
+    assert {:ok, {:tuple, [:number, :binary]}, _, _} = synth(quote(do: {1, "a"}))
+    assert {:ok, {:tuple, [:number, :binary, :boolean]}, _, _} = synth(quote(do: {1, "a", true}))
 
-      assert {:ok, {:tuple, [:number, :binary]}, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, ast)
-    end
+    assert {:ok, {:tuple, [:number, {:tuple, [:number, :number]}]}, _, _} =
+             synth(quote(do: {1, {2, 3}}))
 
-    test "3-tuple" do
-      ast = {:{}, @meta, [1, "hello", true]}
-
-      assert {:ok, {:tuple, [:number, :binary, :boolean]}, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, ast)
-    end
-
-    test "nested tuple" do
-      ast = {1, {2, 3}}
-
-      assert {:ok, {:tuple, [:number, {:tuple, [:number, :number]}]}, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, ast)
-    end
-
-    test "empty tuple" do
-      ast = {:{}, @meta, []}
-      assert {:ok, {:tuple, []}, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, ast)
-    end
-
-    test "tuple with variables" do
-      env = %{x: :number, y: :binary}
-      ast = {var(:x), var(:y)}
-
-      assert {:ok, {:tuple, [:number, :binary]}, @st_end, ^env} =
-               TC.synth(@ctx, env, @st_end, ast)
-    end
-
-    test "tuple preserves session state" do
-      assert {:ok, {:tuple, [:number, :number]}, @st_out, %{}} =
-               TC.synth(@ctx, %{}, @st_out, {1, 2})
-    end
+    assert {:ok, {:tuple, [:number, :binary]}, _, _} =
+             synth(quote(do: {x, y}), %{x: :number, y: :binary})
   end
 
-  # --- Maps
+  # -- TV-Dict-Syn / TV-Record-Syn
 
-  describe "synth/4 maps" do
-    test "empty map" do
-      ast = {:%{}, @meta, []}
-      assert {:ok, {:map_record, %{}}, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, ast)
-    end
+  test "maps" do
+    assert {:ok, @person, _, _} = synth(quote(do: %{name: "alice", age: 42}))
+    assert {:ok, {:map_dict, {:binary, :number}}, _, _} = synth(quote(do: %{"a" => 1}))
 
-    test "map with atom keys" do
-      ast = {:%{}, @meta, [name: "alice", age: 42]}
-
-      assert {:ok, {:map_record, %{name: :binary, age: :number}}, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, ast)
-    end
-
-    test "map preserves session state" do
-      ast = {:%{}, @meta, [x: 1]}
-
-      assert {:ok, {:map_record, %{x: :number}}, @st_out, %{}} =
-               TC.synth(@ctx, %{}, @st_out, ast)
-    end
+    # an empty map has no entry to infer its type from, it can only be checked
+    assert_error(synth(quote(do: %{})), :cannot_infer_type)
   end
 
-  describe "synth/4 map record field access" do
-    @person {:map_record, %{name: :binary, age: :number}}
+  test "field access" do
+    assert {:ok, :binary, _, _} = synth(quote(do: p.name), %{p: @person})
 
-    test "accessing a field has the field's type" do
-      ast = field_access(var(:p), :name)
+    user = {:map_record, %{address: {:map_record, %{city: :binary}}}}
+    assert {:ok, :binary, _, _} = synth(quote(do: u.address.city), %{u: user})
 
-      assert {:ok, :binary, @st_end, %{p: @person}} =
-               TC.synth(@ctx, %{p: @person}, @st_end, ast)
-    end
+    assert_error(synth(quote(do: n.name), %{n: :number}), :field_access_not_record)
 
-    test "nested field access" do
-      user = {:map_record, %{address: {:map_record, %{city: :binary}}}}
-      ast = field_access(field_access(var(:u), :address), :city)
-
-      assert {:ok, :binary, @st_end, _env} = TC.synth(@ctx, %{u: user}, @st_end, ast)
-    end
-
-    test "field access preserves session state" do
-      ast = field_access(var(:p), :age)
-
-      assert {:ok, :number, @st_out, _env} = TC.synth(@ctx, %{p: @person}, @st_out, ast)
-    end
-
-    test "accessing a field of a value that is not a map record" do
-      ast = field_access(var(:n), :name)
-
-      assert {:error, %Error{kind: :field_access_not_record}, _env} =
-               TC.synth(@ctx, %{n: :number}, @st_end, ast)
-    end
-
-    test "accessing a key the record does not have" do
-      ast = field_access(var(:p), :email)
-
-      assert {:error, %Error{kind: :field_access_key_not_found, details: %{key: :email}}, _env} =
-               TC.synth(@ctx, %{p: @person}, @st_end, ast)
-    end
+    error = assert_error(synth(quote(do: p.email), %{p: @person}), :field_access_key_not_found)
+    assert %{key: :email} = error.details
   end
 
-  describe "synth/4 map record update" do
-    @person {:map_record, %{name: :binary, age: :number}}
+  test "record update" do
+    env = %{p: @person, n: :number}
 
-    test "updating existing keys keeps the record's type" do
-      ast = map_update(var(:p), name: "bob", age: 30)
+    assert {:ok, @person, _, _} = synth(quote(do: %{p | name: "bob", age: 30}), env)
 
-      assert {:ok, @person, @st_end, %{p: @person}} =
-               TC.synth(@ctx, %{p: @person}, @st_end, ast)
-    end
+    assert_error(synth(quote(do: %{n | age: 30}), env), :map_update_not_record)
 
-    test "update preserves session state" do
-      ast = map_update(var(:p), age: 30)
+    error =
+      assert_error(
+        synth(quote(do: %{p | email: "bob@example.com"}), env),
+        :map_update_key_not_found
+      )
 
-      assert {:ok, @person, @st_out, _env} = TC.synth(@ctx, %{p: @person}, @st_out, ast)
-    end
+    assert %{key: :email} = error.details
 
-    test "updating a value that is not a map record" do
-      ast = map_update(var(:n), age: 30)
-
-      assert {:error, %Error{kind: :map_update_not_record}, _env} =
-               TC.synth(@ctx, %{n: :number}, @st_end, ast)
-    end
-
-    test "updating a key the record does not have" do
-      ast = map_update(var(:p), email: "bob@example.com")
-
-      assert {:error, %Error{kind: :map_update_key_not_found, details: %{key: :email}}, _env} =
-               TC.synth(@ctx, %{p: @person}, @st_end, ast)
-    end
-
-    test "updating a key with a value of a different type" do
-      ast = map_update(var(:p), age: "thirty")
-
-      assert {:error,
-              %Error{
-                kind: :expected,
-                details: %{expected: :number, got: :binary},
-                trace: [record_field: :age]
-              }, _env} = TC.synth(@ctx, %{p: @person}, @st_end, ast)
-    end
+    error = assert_error(synth(quote(do: %{p | age: "thirty"}), env), :expected)
+    assert %{expected: :number, got: :binary} = error.details
+    assert [record_field: :age] = error.trace
   end
 
-  # --- Binary operators (expanded erlang form)
+  # -- T-Let
 
-  describe "synth/4 arithmetic operators" do
-    test "addition of numbers" do
-      assert {:ok, :number, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, erlang_op(:+, 1, 2))
-    end
+  test "T-Let" do
+    assert {:ok, :number, _, %{x: :number}} = synth(quote(do: x = 42))
 
-    test "subtraction of numbers" do
-      assert {:ok, :number, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, erlang_op(:-, 5, 3))
-    end
+    # an existing binding is shadowed
+    assert {:ok, :number, _, %{x: :number}} = synth(quote(do: x = 42), %{x: :binary})
 
-    test "multiplication" do
-      assert {:ok, :number, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, erlang_op(:*, 4, 3))
-    end
+    pair = {:tuple, [:number, :binary]}
 
-    test "division" do
-      assert {:ok, :number, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, erlang_op(:/, 10, 2))
-    end
-
-    test "arithmetic with variables" do
-      env = %{x: :number, y: :number}
-
-      assert {:ok, :number, @st_end, ^env} =
-               TC.synth(@ctx, env, @st_end, erlang_op(:+, var(:x), var(:y)))
-    end
-
-    test "arithmetic type error: number + binary" do
-      env = %{x: :number, y: :binary}
-
-      assert {:error, msg, _env} =
-               TC.synth(@ctx, env, @st_end, erlang_op(:+, var(:x), var(:y)))
-
-      assert %Error{category: :type_mismatch, kind: :binary_operator_type_mismatch} = msg
-    end
-
-    test "arithmetic preserves session state" do
-      assert {:ok, :number, @st_out, %{}} =
-               TC.synth(@ctx, %{}, @st_out, erlang_op(:+, 1, 2))
-    end
+    assert {:ok, ^pair, _, %{a: :number, b: :binary}} =
+             synth(quote(do: {a, b} = pair), %{pair: pair})
   end
 
-  describe "synth/4 comparison operators" do
-    test "less than" do
-      assert {:ok, :boolean, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, erlang_op(:<, 1, 2))
-    end
+  test "blocks" do
+    block =
+      quote do
+        x = 42
+        y = "hello"
+        {x, y}
+      end
 
-    test "greater than" do
-      assert {:ok, :boolean, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, erlang_op(:>, 5, 3))
-    end
-
-    test "less than or equal" do
-      assert {:ok, :boolean, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, erlang_op(:"=<", 1, 2))
-    end
-
-    test "greater than or equal" do
-      assert {:ok, :boolean, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, erlang_op(:>=, 5, 3))
-    end
-
-    test "equality" do
-      assert {:ok, :boolean, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, erlang_op(:==, 1, 1))
-    end
-
-    test "inequality" do
-      assert {:ok, :boolean, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, erlang_op(:"/=", 1, 2))
-    end
-
-    test "comparison type error: number < binary" do
-      env = %{x: :number, y: :binary}
-
-      assert {:error, msg, _env} =
-               TC.synth(@ctx, env, @st_end, erlang_op(:<, var(:x), var(:y)))
-
-      assert %Error{category: :type_mismatch, kind: :binary_operator_type_mismatch} = msg
-    end
-
-    test "equality type error: different types" do
-      env = %{x: :number, y: :binary}
-
-      assert {:error, msg, _env} =
-               TC.synth(@ctx, env, @st_end, erlang_op(:==, var(:x), var(:y)))
-
-      assert %Error{category: :type_mismatch, kind: :binary_operator_type_mismatch} = msg
-    end
+    assert {:ok, {:tuple, [:number, :binary]}, _, %{x: :number, y: :binary}} = synth(block)
   end
 
-  describe "synth/4 not operator" do
-    test "not boolean" do
-      assert {:ok, :boolean, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, erlang_not(true))
-    end
+  # -- T-Case
 
-    test "not variable" do
-      env = %{flag: :boolean}
+  test "T-Case" do
+    env = %{x: :number}
 
-      assert {:ok, :boolean, @st_end, _env} =
-               TC.synth(@ctx, env, @st_end, erlang_not(var(:flag)))
-    end
+    consistent =
+      quote do
+        case x do
+          1 -> "one"
+          2 -> "two"
+        end
+      end
 
-    test "not type error: not number" do
-      env = %{x: :number}
+    assert {:ok, :binary, _, _} = synth(consistent, env)
 
-      assert {:error, msg, _env} =
-               TC.synth(@ctx, env, @st_end, erlang_not(var(:x)))
+    # a pattern's variables are bound in its branch
+    binding =
+      quote do
+        case x do
+          n -> n
+        end
+      end
 
-      assert %Error{category: :type_mismatch, kind: :logical_operator_requires_boolean} = msg
-    end
+    assert {:ok, :number, _, _} = synth(binding, env)
+
+    inconsistent =
+      quote do
+        case x do
+          1 -> "one"
+          2 -> 42
+        end
+      end
+
+    assert_error(synth(inconsistent, env), :case_branches_incompatible)
   end
 
-  # --- String concatenation
+  # -- TV-Tuple-Chk, TV-Nil, TV-Cons-Chk, TV-Record-Chk, TV-Dict-Chk, TV-Switch
 
-  describe "synth/4 string concatenation" do
-    test "binary <> binary" do
-      assert {:ok, :binary, @st_end, %{}} =
-               TC.synth(@ctx, %{}, @st_end, string_concat("hello", " world"))
-    end
+  test "check mode" do
+    assert {:ok, _, _, _} = check([], {:list, :number})
+    assert {:ok, _, _, _} = check([1, 2], {:list, :number})
+    assert {:ok, _, _, _} = check(quote(do: %{}), {:map_dict, {:atom, :number}})
+    assert {:ok, _, _, _} = check(quote(do: %{name: "a", age: 1}), @person)
+    assert {:ok, _, _, _} = check(quote(do: {1, "a"}), {:tuple, [:number, :binary]})
 
-    test "binary <> variable" do
-      env = %{suffix: :binary}
+    assert {:error, _, _} = check([1, "two"], {:list, :number})
+    assert {:error, _, _} = check(quote(do: %{name: "a"}), @person)
+    assert {:error, _, _} = check(quote(do: {1, "a", 2}), {:tuple, [:number, :binary]})
 
-      assert {:ok, :binary, @st_end, _env} =
-               TC.synth(@ctx, env, @st_end, string_concat("hello", var(:suffix)))
-    end
-
-    test "string concat type error: number <> binary" do
-      env = %{x: :number}
-
-      assert {:error, msg, _env} =
-               TC.synth(@ctx, env, @st_end, string_concat(var(:x), "world"))
-
-      assert %Error{
-               category: :type_mismatch,
-               kind: :string_segment_type_mismatch,
-               details: %{segment: :concatenation, got: :number}
-             } = msg
-    end
-
-    test "more than two operands" do
-      env = %{middle: :binary}
-
-      assert {:ok, :binary, @st_end, _env} =
-               TC.synth(@ctx, env, @st_end, string(["a", var(:middle), "c"]))
-    end
+    # TV-Switch
+    assert_error(check(42, :binary), :expected)
   end
 
-  # --- String interpolation
+  # -- TV-MsgHandler, TV-InitHandler, function captures
 
-  describe "synth/4 string interpolation" do
-    test "interpolating each supported type" do
-      env = %{a: :atom, b: :binary, c: :boolean, d: :date, n: :number, z: nil}
-      segments = for name <- [:a, :b, :c, :d, :n, :z], do: {:interp, var(name)}
+  test "captures" do
+    assert {:ok, {:handler, :message, @st_in}, _, _} = synth(quote(do: &h/3))
+    assert {:ok, {:handler, :init, :number, @st_out}, _, _} = synth(quote(do: &i/2))
+    assert {:ok, {:function, [:number], :binary}, _, _} = synth(quote(do: &f/1))
 
-      assert {:ok, :binary, @st_end, _env} = TC.synth(@ctx, env, @st_end, string(segments))
-    end
-
-    test "interpolation mixed with literal text" do
-      env = %{n: :number}
-
-      assert {:ok, :binary, @st_end, _env} =
-               TC.synth(@ctx, env, @st_end, string(["n=", {:interp, var(:n)}, "!"]))
-    end
-
-    test "interpolating a type String.Chars does not implement is an error" do
-      env = %{p: :pid}
-
-      assert {:error, msg, _env} =
-               TC.synth(@ctx, env, @st_end, string(["p=", {:interp, var(:p)}]))
-
-      assert %Error{
-               category: :type_mismatch,
-               kind: :string_segment_type_mismatch,
-               details: %{segment: :interpolation, got: :pid}
-             } = msg
-    end
-
-    test "an unbound variable inside an interpolation is reported as unbound" do
-      assert {:error, msg, _env} =
-               TC.synth(@ctx, %{}, @st_end, string([{:interp, var(:missing)}]))
-
-      assert %Error{category: :name_resolution, kind: :variable_not_exist} = msg
-    end
-
-    test "other bitstring syntax is unsupported" do
-      ast = {:<<>>, @meta, [{:"::", @meta, [1, 8]}]}
-
-      assert {:error, msg, _env} = TC.synth(@ctx, %{}, @st_end, ast)
-      assert %Error{category: :framework_usage, kind: :unsupported_bitstring} = msg
-    end
+    assert_error(synth(quote(do: &h/2)), :handler_ref_wrong_arity)
+    assert_error(synth(quote(do: &i/3)), :handler_ref_wrong_arity)
+    assert_error(synth(quote(do: &nope/1)), :function_not_exist)
   end
 
-  # --- Match / let binding
+  test "rejected expressions" do
+    assert_error(synth(quote(do: fn x -> x end)), :unsupported_anonymous_function)
 
-  describe "synth/4 match operator" do
-    test "simple variable binding" do
-      ast = match(var(:x), 42)
-      assert {:ok, :number, @st_end, env} = TC.synth(@ctx, %{}, @st_end, ast)
-      assert env[:x] == :number
-    end
+    receive_ast =
+      quote do
+        receive do
+          msg -> msg
+        end
+      end
 
-    test "rebinding a variable" do
-      initial_env = %{x: :binary}
-      ast = match(var(:x), 42)
-      assert {:ok, :number, @st_end, env} = TC.synth(@ctx, initial_env, @st_end, ast)
-      assert env[:x] == :number
-    end
+    assert_error(synth(receive_ast), :no_native_receive)
 
-    test "tuple destructuring" do
-      env = %{pair: {:tuple, [:number, :binary]}}
-      pattern = {var(:a), var(:b)}
-      ast = match(pattern, var(:pair))
+    with_ast =
+      quote do
+        with {:ok, x} <- y, do: x
+      end
 
-      assert {:ok, {:tuple, [:number, :binary]}, @st_end, result_env} =
-               TC.synth(@ctx, env, @st_end, ast)
-
-      assert result_env[:a] == :number
-      assert result_env[:b] == :binary
-    end
-
-    test "wildcard pattern" do
-      ast = match({:_, @meta, nil}, 42)
-      assert {:ok, :number, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, ast)
-    end
+    assert_error(synth(with_ast, %{y: :number}), :unsupported_expression)
   end
 
-  # --- Block expressions
+  # -- TV-Abs
 
-  describe "synth/4 blocks" do
-    test "block returns type of last expression" do
-      ast =
-        block([
-          match(var(:x), 42),
-          match(var(:y), "hello"),
-          var(:y)
-        ])
-
-      assert {:ok, :binary, @st_end, env} = TC.synth(@ctx, %{}, @st_end, ast)
-      assert env[:x] == :number
-      assert env[:y] == :binary
-    end
-
-    test "block threads variable environment" do
-      ast =
-        block([
-          match(var(:x), 1),
-          match(var(:y), 2),
-          erlang_op(:+, var(:x), var(:y))
-        ])
-
-      assert {:ok, :number, @st_end, env} = TC.synth(@ctx, %{}, @st_end, ast)
-      assert env[:x] == :number
-      assert env[:y] == :number
-    end
-
-    test "single expression block" do
-      ast = block([42])
-      assert {:ok, :number, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, ast)
-    end
+  # todo: fails until TV-Abs is implemented (its clause in `tc.ex` is a stub)
+  test "TV-Abs" do
+    fun_type = {:function, [:number], :number}
+    assert {:ok, ^fun_type, _, _} = check(quote(do: fn x -> x end), fun_type)
   end
 
-  # --- Case expression
-
-  describe "synth/4 case" do
-    test "case with consistent branch types" do
-      env = %{x: :number}
-
-      ast =
-        case_expr(var(:x), [
-          {1, "one"},
-          {2, "two"}
-        ])
-
-      assert {:ok, :binary, @st_end, _env} = TC.synth(@ctx, env, @st_end, ast)
-    end
-
-    test "case with inconsistent branch types returns error" do
-      env = %{x: :number}
-
-      ast =
-        case_expr(var(:x), [
-          {1, "one"},
-          {2, 42}
-        ])
-
-      assert {:error, msg, _env} = TC.synth(@ctx, env, @st_end, ast)
-      assert %Error{category: :type_mismatch, kind: :case_branches_incompatible} = msg
-    end
-
-    test "case with variable binding in patterns" do
-      env = %{x: :number}
-
-      ast =
-        case_expr(var(:x), [
-          {var(:n), var(:n)}
-        ])
-
-      assert {:ok, :number, @st_end, _env} = TC.synth(@ctx, env, @st_end, ast)
-    end
-
-    test "case with wildcard pattern" do
-      env = %{x: :number}
-
-      ast =
-        case_expr(var(:x), [
-          {1, "one"},
-          {{:_, @meta, nil}, "other"}
-        ])
-
-      assert {:ok, :binary, @st_end, _env} = TC.synth(@ctx, env, @st_end, ast)
-    end
-  end
-
-  # --- Anonymous functions and captures are rejected
-
-  describe "synth/4 anonymous functions and captures" do
-    test "fn is rejected" do
-      ast = {:fn, @meta, [{:->, @meta, [[var(:x)], var(:x)]}]}
-      assert {:error, msg, _env} = TC.synth(@ctx, %{}, @st_end, ast)
-      assert %Error{category: :framework_usage, kind: :unsupported_anonymous_function} = msg
-    end
-
-    test "local function capture &fun/arity is rejected" do
-      ast = {:&, @meta, [{:/, @meta, [:my_fun, 2]}]}
-      assert {:error, msg, _env} = TC.synth(@ctx, %{}, @st_end, ast)
-      assert %Error{category: :framework_usage, kind: :unsupported_anonymous_function} = msg
-    end
-  end
-
-  # --- Raw send/receive are disallowed
-
-  describe "synth/4 raw communication disallowed" do
-    test "raw receive is rejected" do
-      ast = {:receive, @meta, [[do: [{:->, @meta, [[var(:msg)], var(:msg)]}]]]}
-      assert {:error, msg, _env} = TC.synth(@ctx, %{}, @st_end, ast)
-      assert %Error{category: :framework_usage, kind: :no_native_receive} = msg
-    end
-
-    test "raw erlang send is rejected" do
-      ast = {{:., @meta, [:erlang, :send]}, @meta, [var(:pid), "message"]}
-      env = %{pid: :pid}
-      assert {:error, msg, _env} = TC.synth(@ctx, env, @st_end, ast)
-      assert %Error{category: :framework_usage, kind: :no_native_send} = msg
-    end
-  end
-
-  # --- Atom literals
-
-  describe "synth/4 atom literals" do
-    test "plain atom without handler match" do
-      assert {:ok, :atom, @st_end, %{}} = TC.synth(@ctx, %{}, @st_end, :some_atom)
-    end
-
-    test "atom preserves session state" do
-      assert {:ok, :atom, @st_out, %{}} = TC.synth(@ctx, %{}, @st_out, :hello)
-    end
-  end
-
-  # --- Session state threading
-
-  describe "session state preservation" do
-    test "pure expressions don't alter session state" do
-      st = ST.output_one(:client, :request, :binary, @st_end)
-
-      assert {:ok, :number, ^st, _} = TC.synth(@ctx, %{}, st, 42)
-      assert {:ok, :binary, ^st, _} = TC.synth(@ctx, %{}, st, "hello")
-      assert {:ok, :boolean, ^st, _} = TC.synth(@ctx, %{}, st, true)
-      assert {:ok, {:list, :number}, ^st, _} = TC.synth(@ctx, %{}, st, [1, 2, 3])
-    end
-
-    test "variable lookup preserves session state" do
-      st = ST.input_one(:client, :request, :binary, @st_end)
-      env = %{x: :number}
-      assert {:ok, :number, ^st, _} = TC.synth(@ctx, env, st, var(:x))
-    end
-
-    test "arithmetic preserves session state" do
-      st = ST.output_one(:client, :request, :binary, @st_end)
-      assert {:ok, :number, ^st, _} = TC.synth(@ctx, %{}, st, erlang_op(:+, 1, 2))
-    end
-
-    test "match preserves session state" do
-      st = ST.output_one(:client, :request, :binary, @st_end)
-      ast = match(var(:x), 42)
-      assert {:ok, :number, ^st, _} = TC.synth(@ctx, %{}, st, ast)
-    end
+  # todo: fails until a function value can be called
+  test "calling a function value" do
+    assert {:ok, :binary, _, _} = synth(quote(do: g.(1)), %{g: {:function, [:number], :binary}})
   end
 end
