@@ -65,15 +65,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          got: :name,
          expected: [:title]
        )},
-      {{Error.ProtocolViolation, :incorrect_incoming_payload_type},
-       Error.ProtocolViolation.incorrect_incoming_payload_type(
-         @m,
-         @meta,
-         :title_handler,
-         @st_in,
-         got: :number,
-         expected: :binary
-       )},
       {{Error.ProtocolViolation, :incorrect_target_participant},
        Error.ProtocolViolation.incorrect_target_participant(@m, @meta, @st_out,
          got: :buyer2,
@@ -139,8 +130,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.TypeMismatch.binary_operator_type_mismatch(@m, @meta, :+, :number, :binary)},
       {{Error.TypeMismatch, :logical_operator_type_mismatch},
        Error.TypeMismatch.logical_operator_type_mismatch(@m, @meta, :and, :boolean, :number)},
-      {{Error.TypeMismatch, :list_elements_incompatible},
-       Error.TypeMismatch.list_elements_incompatible(@m, @meta, [:number, :binary])},
       {{Error.TypeMismatch, :case_branches_incompatible},
        Error.TypeMismatch.case_branches_incompatible(@m, @meta,
          t1: :number,
@@ -182,6 +171,26 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        )},
       {{Error.TypeMismatch, :invalid_record_label},
        Error.TypeMismatch.invalid_record_label(@m, @meta, true)},
+      {{Error.TypeMismatch, :record_duplicate_label},
+       Error.TypeMismatch.record_duplicate_label(@m, @meta, :name)},
+      {{Error.TypeMismatch, :record_missing_fields},
+       Error.TypeMismatch.record_missing_fields(
+         @m,
+         @meta,
+         [:age],
+         {:map_record, %{name: :binary, age: :number}}
+       )},
+      {{Error.TypeMismatch, :record_unexpected_field},
+       Error.TypeMismatch.record_unexpected_field(
+         @m,
+         @meta,
+         :email,
+         {:map_record, %{name: :binary}}
+       )},
+      {{Error.TypeMismatch, :tuple_arity_mismatch},
+       Error.TypeMismatch.tuple_arity_mismatch(@m, @meta, expected: 2, got: 3)},
+      {{Error.TypeMismatch, :expected},
+       Error.TypeMismatch.expected(@m, @meta, expected: :number, got: :binary)},
       {{Error.TypeMismatch, :field_access_not_record},
        Error.TypeMismatch.field_access_not_record(@m, @meta, got: :number)},
       {{Error.TypeMismatch, :field_access_key_not_found},
@@ -241,8 +250,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FunctionCall.function_not_exist(@m, @meta, {:f, 1})},
       {{Error.FunctionCall, :handler_called_directly},
        Error.FunctionCall.handler_called_directly(@m, @meta, {:install, 3}, :init)},
-      {{Error.FunctionCall, :arity_mismatch},
-       Error.FunctionCall.arity_mismatch(@m, @meta, {:f, 1}, expected: 1, got: 2)},
       {{Error.FunctionCall, :application_arity_mismatch},
        Error.FunctionCall.application_arity_mismatch(@m, @meta, expected: 1, got: 2)},
       {{Error.FunctionCall, :no_matching_function_clause},
@@ -250,9 +257,9 @@ defmodule Maty.Typechecker.ErrorRenderTest do
       {{Error.FunctionCall, :function_altered_session_state},
        Error.FunctionCall.function_altered_session_state(@m, @meta, {:f, 1}, @st_out)},
       {{Error.FunctionCall, :wrong_number_of_clauses},
-       Error.FunctionCall.wrong_number_of_clauses(@m, @meta, {:on_link, 2}, expected: 1, got: 2)},
+       Error.FunctionCall.wrong_number_of_clauses(@m, @meta, {:on_start, 1}, expected: 1, got: 2)},
       {{Error.FunctionCall, :wrong_number_of_specs},
-       Error.FunctionCall.wrong_number_of_specs(@m, @meta, {:f, 1}, expected: [1, 3], got: 2)},
+       Error.FunctionCall.wrong_number_of_specs(@m, @meta, {:f, 1}, expected: 1, got: 2)},
 
       # :type_specification
       {{Error.TypeSpecification, :spec_return_not_well_typed},
@@ -355,12 +362,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          expected: :number,
          got: :binary
        )},
-      {{Error.FrameworkUsage, :unsupported_capture},
-       Error.FrameworkUsage.unsupported_capture(
-         @m,
-         @meta,
-         {:&, [], [{:/, [], [{:helper, [], nil}, 1]}]}
-       )},
       {{Error.FrameworkUsage, :handler_ref_wrong_arity},
        Error.FrameworkUsage.handler_ref_wrong_arity(@m, @meta, :install, 3, 2)},
 
@@ -382,9 +383,10 @@ defmodule Maty.Typechecker.ErrorRenderTest do
           do: {mod, name}
 
     covered = MapSet.new(errors(), fn {constructor, _error} -> constructor end)
+    missing = Enum.reject(constructors, &MapSet.member?(covered, &1))
 
-    assert Enum.reject(constructors, &MapSet.member?(covered, &1)) == [],
-           "add the constructors above to errors/0 in this test"
+    assert missing == [],
+           "add these constructors to errors/0 in this test: #{inspect(missing)}"
   end
 
   test "every error renders" do
@@ -400,5 +402,25 @@ defmodule Maty.Typechecker.ErrorRenderTest do
 
       assert String.trim(rendered) != "", "#{inspect(constructor)} rendered nothing"
     end
+  end
+
+  test "trace frames are appended after the error body" do
+    error = %{
+      Error.ProtocolViolation.incorrect_recipient_participant(@m, @meta, :title_handler, @st_in,
+        received: :buyer2,
+        expected: :buyer1
+      )
+      | trace: [
+          {:call, {:process_title, 2}, [line: 40]},
+          {:clause, {:title_handler, 4}, 1}
+        ]
+    }
+
+    rendered = Formatter.format(error)
+
+    assert rendered =~ "  Trace:\n"
+    assert rendered =~ "    via process_title/2 (line 40)\n"
+    assert rendered =~ "    in clause #1 of title_handler/4"
+    assert rendered =~ ~r/Session Type: .*\n  Trace:/s
   end
 end
