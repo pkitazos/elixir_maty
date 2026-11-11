@@ -13,6 +13,7 @@ defmodule Maty.Typechecker.TypeSpecParser do
   - {:{}, _, elements} (n-tuple)
   - {:%{}, _, fields}  (map record with literal atom keys, e.g. %{name: binary()})
   - {:%{}, _, [{k, v}]} (map dictionary with a base key type, e.g. %{atom() => binary()})
+  - [{:->, _, [args, ret]}] (function, e.g. (number(), atom() -> binary()))
   """
   @spec parse(type_ast :: Macro.t()) :: {:ok, Type.t()} | {:error, Error.Cause.t()}
   def parse(type_ast) do
@@ -112,23 +113,40 @@ defmodule Maty.Typechecker.TypeSpecParser do
     end
   end
 
+  # Case 7: Function (t1, ..., tn -> t)
+  # the parentheses make it a one-element list holding the arrow
+  # (`(a -> b; c -> d)` has several arrows and is not supported)
+  defp do_parse([{:->, _meta, [arg_asts, return_ast]}], type_env) when is_list(arg_asts) do
+    with {:ok, arg_types} <- parse_all(arg_asts, type_env),
+         {:ok, return_type} <- do_parse(return_ast, type_env) do
+      {:ok, {:function, arg_types, return_type}}
+    end
+  end
+
   # Catch-all for unsupported AST formats
   defp do_parse(other_ast, _type_env) do
     error = Error.TypeSpecification.unsupported_type_constructor(other_ast)
     {:error, error}
   end
 
-  defp parse_tuple_elements(element_asts, type_env) do
-    element_asts
-    |> Enum.reduce_while({:ok, []}, fn elem_ast, {:ok, acc} ->
-      case do_parse(elem_ast, type_env) do
+  # parses each type in order, stopping at the first that fails
+  defp parse_all(asts, type_env) do
+    asts
+    |> Enum.reduce_while({:ok, []}, fn ast, {:ok, acc} ->
+      case do_parse(ast, type_env) do
         {:ok, parsed_type} -> {:cont, {:ok, [parsed_type | acc]}}
         {:error, _} = err -> {:halt, err}
       end
     end)
     |> case do
-      {:ok, types_reversed} -> {:ok, {:tuple, Enum.reverse(types_reversed)}}
+      {:ok, types_reversed} -> {:ok, Enum.reverse(types_reversed)}
       {:error, _} = err -> err
+    end
+  end
+
+  defp parse_tuple_elements(element_asts, type_env) do
+    with {:ok, types} <- parse_all(element_asts, type_env) do
+      {:ok, {:tuple, types}}
     end
   end
 

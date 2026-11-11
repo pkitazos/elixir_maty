@@ -68,13 +68,15 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
 
   # -- Function types
 
-  # todo: fails until the parser has a `->` case
   test "function types" do
     assert {:ok, {:function, [], :binary}} = TSP.parse(quote(do: (-> binary())))
     assert {:ok, {:function, [:number], :binary}} = TSP.parse(quote(do: (number() -> binary())))
 
     assert {:ok, {:function, [:number, :atom], :binary}} =
              TSP.parse(quote(do: (number(), atom() -> binary())))
+
+    assert {:ok, {:function, [{:function, [:number], :binary}], :atom}} =
+             TSP.parse(quote(do: ((number() -> binary()) -> atom())))
   end
 
   # -- Error cases
@@ -97,6 +99,17 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
     # no num literals
     assert {:error, %Cause{kind: :unsupported_type_constructor}} =
              TSP.parse(123)
+
+    # a function type has a single arrow
+    assert {:error, %Cause{kind: :unsupported_type_constructor}} =
+             TSP.parse(
+               quote(
+                 do: (
+                   number() -> binary()
+                   atom() -> binary()
+                 )
+               )
+             )
 
     # no heterogeneous lists
     assert {:error, %Cause{kind: :heterogeneous_list}} =
