@@ -7,7 +7,7 @@ defmodule Maty.Typechecker do
   """
 
   alias Maty.Utils
-  alias Maty.Typechecker.{Ctx, Delta, TC, Error, Preprocessor, Signatures}
+  alias Maty.Typechecker.{Ctx, TC, Error, Preprocessor, Signatures}
   alias Maty.Typechecker.Error.Formatter
 
   require Logger
@@ -42,13 +42,7 @@ defmodule Maty.Typechecker do
   Called by Hook at `@before_compile`.
   """
   def handle_before_compile(env) do
-    # todo: potentially reverse the type_specs here
-
     customise_logger()
-
-    if @debug do
-      Logger.debug(format_function_signatures(env.module))
-    end
 
     {state_types, state_errors} =
       case Preprocessor.process_state_declarations(env) do
@@ -62,23 +56,25 @@ defmodule Maty.Typechecker do
         unknown_role_errors(env) ++
         state_errors
 
-    # we fail here, before the bodies are checked in `handle_after_compile`, on purpose:
-    # a spec or handler annotation that did not validate leaves psi and delta incomplete,
-    # so checking bodies against them would only pile follow-on errors on top of the real one
+    # we fail here, before the bodies are checked in `handle_after_compile`, on purpose.
+    # an issue with a spec annotation or handler declaration leaves Σ incomplete and
+    # checking bodies against it would only pile follow-on errors on top of the real one
     if errors != [] do
       raise_type_errors!(env, errors)
     end
 
     Module.put_attribute(env.module, :state_types, state_types)
 
-    # Σ is built next to the old environments for now
-    # the checks above stay the ones that report, so an error here is one only `Signatures` finds
     clauses = Module.get_attribute(env.module, :maty_clauses) |> Enum.reverse()
     session_types = Utils.Env.get_map(env.module, :st)
 
     case Signatures.build(env.module, clauses, session_types) do
       {:ok, signatures} -> Module.put_attribute(env.module, :maty_signatures, signatures)
       {:error, errors} -> raise_type_errors!(env, errors)
+    end
+
+    if @debug do
+      Logger.debug(format_function_signatures(env.module))
     end
   end
 
@@ -138,19 +134,19 @@ defmodule Maty.Typechecker do
           errs =
             cond do
               match?({:handler, :message, _}, ctx.signatures[name]) ->
-                deal_with_message_handler(ctx, name, cs)
+                message_handler_errors(ctx, func_id, cs)
 
               # next we check to see if the function we're type-checking is an init_handler
               match?({:handler, :init, _, _}, ctx.signatures[name]) ->
-                deal_with_init_handler(ctx, name, cs)
+                init_handler_errors(ctx, func_id, cs)
 
-              # the next thing we check is whether the function we're type-checking is the on_link callback
+              # the next thing we check is whether the function we're type-checking is the `on_start` callback
               func_id == {:on_start, 1} ->
-                deal_with_on_start(ctx, func_id, cs)
+                on_start_errors(ctx, func_id, cs)
 
               # otherwise, this is just a regular function which we still need to check is well-formed
               true ->
-                deal_with_function(ctx, func_id, cs)
+                function_errors(ctx, func_id, cs)
             end
 
           errs ++ acc
@@ -168,29 +164,26 @@ defmodule Maty.Typechecker do
     end
   end
 
-  defp deal_with_message_handler(ctx, handler, cs) do
+  defp message_handler_errors(ctx, {handler, 4} = func_id, cs) do
     {:handler, :message, st} = ctx.signatures[handler]
-    check_message_handler(ctx, handler, cs, st)
+    message_handler_errors(ctx, func_id, cs, st)
   end
 
-  defp check_message_handler(ctx, handler, cs, %ST.SIn{} = st) do
-    func_id = {handler, 4}
-
+  defp message_handler_errors(ctx, {handler, 4} = func_id, cs, %ST.SIn{} = st) do
     # because we may have multiple handler clauses, we need to iterate over
-    # all definitions and their associated type signatures and check if they are well-formed
-    # we typecheck each clause exactly once, and derive both the per-clause errors
-    # and the visited session branches from these results
+    # all definitions and check if they are well-formed
+    # we typecheck each clause exactly once and keep its errors
     errs =
-      collect_clauses_errs(
+      clause_errors(
         func_id,
         cs,
         &TC.WF.check_wf_message_handler_clause(ctx, handler, &1, st)
       )
 
-    # we need to explicitly keep track of all the visited branches
+    # we need to explicitly keep track of all the branches named by each clause
     # to ensure we sufficiently cover/support the annotated session type
     # and we create a set containing the branches we covered
-    visited_labels = MapSet.new(cs, &extract_label/1)
+    visited_labels = MapSet.new(cs, &message_label/1)
 
     # we check to see if we've covered all branches or not
     missing_branches = Enum.reject(st.branches, &MapSet.member?(visited_labels, &1.label))
@@ -211,53 +204,44 @@ defmodule Maty.Typechecker do
     end
   end
 
-  defp check_message_handler(ctx, handler, _cs, st) do
+  defp message_handler_errors(ctx, {handler, 4} = func_id, _cs, st) do
     error = Error.ProtocolViolation.message_handler_not_receive(ctx.module, ctx.meta, handler, st)
-    [{{handler, 4}, error}]
+    [{func_id, error}]
   end
 
-  defp deal_with_init_handler(ctx, handler, cs) do
+  defp init_handler_errors(ctx, {handler, 3} = func_id, cs) do
     {:handler, :init, args_ty, st} = ctx.signatures[handler]
 
-    collect_clauses_errs(
-      {handler, 3},
+    clause_errors(
+      func_id,
       cs,
       &TC.WF.check_wf_init_handler_clause(ctx, handler, &1, st, args_ty)
     )
   end
 
-  # ? does it even make sense to extract this out?
-  defp collect_clauses_errs(func_id, cs, f) do
+  defp clause_errors(func_id, cs, f) do
     for {c, i} <- Enum.with_index(cs, 1),
         {:error, e} <- [with_clause_frame(f.(c), func_id, i, length(cs))],
         do: {func_id, e}
   end
 
-  defp extract_label(clause) do
+  defp message_label(clause) do
     {_meta, [_role, {label, _payload}, _state, _session_ctx], _guards, _block} = clause
     label
   end
 
-  defp deal_with_on_start(ctx, {name, arity} = func_id, cs) do
-    # here we unpack pattern match on our function clauses
-    # to make sure we have only defined a single on_link function clause
+  defp on_start_errors(ctx, {name, arity} = func_id, cs) do
+    sigma_key = {ctx.module, name, arity}
+
     with {:clause, [clause]} <- {:clause, cs},
          # Σ keys functions by their module too, and has no entry for one without a spec
-         {:spec, {:ok, ty}} <- {:spec, Map.fetch(ctx.signatures, {ctx.module, name, arity})},
+         {:spec, {:ok, ty}} <- {:spec, Map.fetch(ctx.signatures, sigma_key)},
          :ok <- TC.WF.check_wf_on_start_callback(ctx, clause, ty) do
       []
     else
       {:spec, :error} ->
-        # reported at the clause since the spec belongs to the function as a whole
-        {first_clause_meta, _, _, _} = hd(cs)
-
-        err =
-          Error.TypeSpecification.no_spec_for_function(
-            ctx.module,
-            first_clause_meta,
-            {ctx.module, name, arity}
-          )
-
+        # reported at the definition since the spec belongs to the function as a whole
+        err = Error.TypeSpecification.no_spec_for_function(ctx.module, ctx.meta, sigma_key)
         [{func_id, err}]
 
       {:clause, got} ->
@@ -274,14 +258,14 @@ defmodule Maty.Typechecker do
     end
   end
 
-  defp deal_with_function(ctx, func_id, cs) do
+  defp function_errors(ctx, func_id, cs) do
     case TC.WF.check_wf_function(ctx, func_id, cs) do
       # a problem with the function as a whole, reported once and without a clause frame
       {:error, error} ->
         [{func_id, error}]
 
       rs ->
-        collect_clauses_errs(
+        clause_errors(
           func_id,
           rs,
           & &1
@@ -354,7 +338,7 @@ defmodule Maty.Typechecker do
 
     display =
       module
-      |> Module.get_attribute(:psi)
+      |> Module.get_attribute(:maty_signatures)
       |> Enum.map_join("\n\n", fn {k, v} -> "#{inspect(k)} --> \n#{inspect(v)}" end)
 
     "\n" <> module_header <> "\n" <> display <> "\n"
