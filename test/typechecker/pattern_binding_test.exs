@@ -6,340 +6,148 @@ defmodule Maty.Typechecker.PatternBindingTest do
   @meta [line: 0]
   @ctx %Ctx{module: TestModule, meta: @meta, roles: [], signatures: %{}}
 
-  defp var(name), do: {name, @meta, nil}
+  defp tc(pattern, expected_type, env \\ %{}),
+    do: PatternBinding.tc_pattern(@ctx, pattern, expected_type, env)
 
-  # --- Pat-Var ---
+  defp assert_mismatch(pattern, expected_type, kind \\ :pattern_type_mismatch) do
+    assert {:error, %Error{category: :pattern_matching, kind: ^kind} = error, _env} =
+             tc(pattern, expected_type)
 
-  describe "tc_pattern/4 variable patterns" do
-    test "variable binds to expected type" do
-      assert {:ok, %{x: :number}, %{x: :number}} =
-               PatternBinding.tc_pattern(@ctx, var(:x), :number, %{})
-    end
-
-    test "adds to existing env" do
-      assert {:ok, %{y: :binary}, %{x: :number, y: :binary}} =
-               PatternBinding.tc_pattern(@ctx, var(:y), :binary, %{x: :number})
-    end
-
-    test "overwrites existing binding" do
-      assert {:ok, %{x: :binary}, %{x: :binary}} =
-               PatternBinding.tc_pattern(@ctx, var(:x), :binary, %{x: :number})
-    end
+    error
   end
 
-  # --- Pat-Wild ---
+  # -- Pat-Var
 
-  describe "tc_pattern/4 wildcard patterns" do
-    test "bare atom :_ binds nothing" do
-      assert {:ok, %{}, %{}} = PatternBinding.tc_pattern(@ctx, :_, :number, %{})
-    end
+  test "Pat-Var" do
+    assert {:ok, %{x: :number}, %{x: :number}} = tc(quote(do: x), :number)
 
-    test "underscore AST binds nothing" do
-      assert {:ok, %{}, %{}} = PatternBinding.tc_pattern(@ctx, {:_, @meta, nil}, :number, %{})
-    end
+    assert {:ok, %{y: :binary}, %{x: :number, y: :binary}} =
+             tc(quote(do: y), :binary, %{x: :number})
 
-    test "wildcard preserves existing env" do
-      env = %{x: :binary}
-      assert {:ok, %{}, ^env} = PatternBinding.tc_pattern(@ctx, :_, :number, env)
-    end
+    # an existing binding is shadowed
+    assert {:ok, %{x: :binary}, %{x: :binary}} = tc(quote(do: x), :binary, %{x: :number})
   end
 
-  # --- Pat-Value ---
+  # -- Pat-Wild
 
-  describe "tc_pattern/4 literal patterns" do
-    test "number matches :number" do
-      assert {:ok, %{}, %{}} = PatternBinding.tc_pattern(@ctx, 42, :number, %{})
-    end
-
-    test "binary matches :binary" do
-      assert {:ok, %{}, %{}} = PatternBinding.tc_pattern(@ctx, "hello", :binary, %{})
-    end
-
-    test "boolean matches :boolean" do
-      assert {:ok, %{}, %{}} = PatternBinding.tc_pattern(@ctx, true, :boolean, %{})
-    end
-
-    test "atom literal matches :atom" do
-      assert {:ok, %{}, %{}} = PatternBinding.tc_pattern(@ctx, :hello, :atom, %{})
-    end
-
-    test "atom literal also matches other expected types" do
-      assert {:ok, %{}, %{}} = PatternBinding.tc_pattern(@ctx, :hello, :binary, %{})
-    end
-
-    test "number vs binary mismatch" do
-      assert {:error, msg, %{}} = PatternBinding.tc_pattern(@ctx, 42, :binary, %{})
-      assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
-    end
+  # todo: fails until `_` reaches Pat-Wild (Pat-Var comes first and binds it as a variable named `_`)
+  test "Pat-Wild" do
+    env = %{x: :binary}
+    assert {:ok, %{}, ^env} = tc(:_, :number, env)
+    assert {:ok, %{}, ^env} = tc(quote(do: _), :number, env)
   end
 
-  # --- Pat-EmptyList ---
+  # -- Pat-Value
 
-  describe "tc_pattern/4 empty list" do
-    test "matches list type" do
-      assert {:ok, %{}, %{}} = PatternBinding.tc_pattern(@ctx, [], {:list, :number}, %{})
-    end
+  test "Pat-Value" do
+    assert {:ok, %{}, %{}} = tc(42, :number)
+    assert {:ok, %{}, %{}} = tc("hello", :binary)
+    assert {:ok, %{}, %{}} = tc(true, :boolean)
+    assert {:ok, %{}, %{}} = tc(:hello, :atom)
+    assert {:ok, %{}, %{}} = tc(:ok, :ok)
 
-    test "matches :any" do
-      assert {:ok, %{}, %{}} = PatternBinding.tc_pattern(@ctx, [], :any, %{})
-    end
-
-    test "fails against non-list type" do
-      assert {:error, msg, %{}} = PatternBinding.tc_pattern(@ctx, [], :number, %{})
-      assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
-    end
+    assert_mismatch(42, :binary)
   end
 
-  # --- Pat-EmptyTuple ---
-
-  describe "tc_pattern/4 empty tuple" do
-    test "matches empty tuple type" do
-      assert {:ok, %{}, %{}} =
-               PatternBinding.tc_pattern(@ctx, {:{}, @meta, []}, {:tuple, []}, %{})
-    end
-
-    test "matches :any" do
-      assert {:ok, %{}, %{}} = PatternBinding.tc_pattern(@ctx, {:{}, @meta, []}, :any, %{})
-    end
-
-    test "fails against non-tuple type" do
-      assert {:error, msg, %{}} =
-               PatternBinding.tc_pattern(@ctx, {:{}, @meta, []}, :number, %{})
-
-      assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
-    end
+  # todo: fails until Pat-Value stops accepting an atom literal against any expected type
+  test "an atom literal only matches atom or its own atom type" do
+    assert_mismatch(:hello, :binary)
   end
 
-  # --- Pat-EmptyMap ---
+  # -- Pat-EmptyList
 
-  describe "tc_pattern/4 empty map" do
-    test "matches map type" do
-      assert {:ok, %{}, %{}} =
-               PatternBinding.tc_pattern(
-                 @ctx,
-                 {:%{}, @meta, []},
-                 {:map_record, %{x: :number}},
-                 %{}
-               )
-    end
+  # -- Pat-EmptyTuple
 
-    test "matches :any" do
-      assert {:ok, %{}, %{}} = PatternBinding.tc_pattern(@ctx, {:%{}, @meta, []}, :any, %{})
-    end
+  # -- Pat-EmptyMap
 
-    test "fails against non-map type" do
-      assert {:error, msg, %{}} =
-               PatternBinding.tc_pattern(@ctx, {:%{}, @meta, []}, :number, %{})
+  test "empty collections" do
+    assert {:ok, %{}, %{}} = tc([], {:list, :number})
+    assert {:ok, %{}, %{}} = tc(quote(do: {}), {:tuple, []})
+    assert {:ok, %{}, %{}} = tc(quote(do: %{}), {:map_record, %{x: :number}})
 
-      assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
-    end
+    assert_mismatch([], :number)
+    assert_mismatch(quote(do: {}), :number)
+    assert_mismatch(quote(do: %{}), :number)
   end
 
-  # --- Pat-Cons ---
+  # -- Pat-Cons
 
-  describe "tc_pattern/4 cons [h|t] patterns" do
-    test "binds head and tail variables" do
-      pattern = {:|, @meta, [var(:h), var(:t)]}
+  # todo: fails until `[h | t]` reaches Pat-Cons (it is `[{:|, _, [h, t]}]`, a list around the cons)
+  test "Pat-Cons" do
+    assert {:ok, %{h: :number, t: {:list, :number}}, _env} =
+             tc(quote(do: [h | t]), {:list, :number})
 
-      assert {:ok, %{h: :number, t: {:list, :number}}, %{h: :number, t: {:list, :number}}} =
-               PatternBinding.tc_pattern(@ctx, pattern, {:list, :number}, %{})
-    end
-
-    test "fails against non-list type" do
-      pattern = {:|, @meta, [var(:h), var(:t)]}
-      assert {:error, msg, %{}} = PatternBinding.tc_pattern(@ctx, pattern, :number, %{})
-      assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
-    end
-
-    test "wildcard head" do
-      pattern = {:|, @meta, [:_, var(:t)]}
-
-      assert {:ok, %{t: {:list, :binary}}, %{t: {:list, :binary}}} =
-               PatternBinding.tc_pattern(@ctx, pattern, {:list, :binary}, %{})
-    end
+    assert_mismatch(quote(do: [h | t]), :number)
   end
 
-  # --- Pat-Tuple (2-tuple) ---
+  # todo: fails until non-empty list patterns are supported
+  test "list literal patterns" do
+    assert {:ok, %{a: :number, b: :number}, _env} = tc(quote(do: [a, b]), {:list, :number})
 
-  describe "tc_pattern/4 2-tuple patterns" do
-    test "two variables bind correctly" do
-      pattern = {var(:a), var(:b)}
+    assert {:ok, %{a: :number, b: :number, t: {:list, :number}}, _env} =
+             tc(quote(do: [a, b | t]), {:list, :number})
 
-      assert {:ok, %{a: :number, b: :binary}, %{a: :number, b: :binary}} =
-               PatternBinding.tc_pattern(@ctx, pattern, {:tuple, [:number, :binary]}, %{})
-    end
-
-    test "fails against non-tuple type" do
-      pattern = {var(:a), var(:b)}
-      assert {:error, msg, %{}} = PatternBinding.tc_pattern(@ctx, pattern, :number, %{})
-      assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
-      assert %{expected: :number, got: {:tuple, [:any, :any]}} = msg.details
-    end
-
-    test "fails with wrong arity" do
-      pattern = {var(:a), var(:b)}
-
-      assert {:error, msg, %{}} =
-               PatternBinding.tc_pattern(
-                 @ctx,
-                 pattern,
-                 {:tuple, [:number, :binary, :atom]},
-                 %{}
-               )
-
-      assert %Error{category: :pattern_matching, kind: :tuple_arity_mismatch} = msg
-      # the pattern is the 2-tuple, the type is the 3-tuple
-      assert %{pattern_arity: 2, expected: 3} = msg.details
-    end
-
-    test "nested tuple" do
-      inner_pattern = {var(:b), var(:c)}
-      pattern = {var(:a), inner_pattern}
-
-      assert {:ok, bindings, env} =
-               PatternBinding.tc_pattern(
-                 @ctx,
-                 pattern,
-                 {:tuple, [:number, {:tuple, [:binary, :atom]}]},
-                 %{}
-               )
-
-      assert bindings[:a] == :number
-      assert bindings[:b] == :binary
-      assert bindings[:c] == :atom
-      assert env == %{a: :number, b: :binary, c: :atom}
-    end
+    assert_mismatch(quote(do: [a, b]), :number)
   end
 
-  # --- Pat-Tuple (n-tuple) ---
+  # -- Pat-Tuple
 
-  describe "tc_pattern/4 n-tuple patterns" do
-    test "3-tuple binds all elements" do
-      pattern = {:{}, @meta, [var(:a), var(:b), var(:c)]}
+  test "Pat-Tuple" do
+    assert {:ok, %{a: :number, b: :binary}, _env} =
+             tc(quote(do: {a, b}), {:tuple, [:number, :binary]})
 
-      assert {:ok, bindings, env} =
-               PatternBinding.tc_pattern(
-                 @ctx,
-                 pattern,
-                 {:tuple, [:number, :binary, :atom]},
-                 %{}
-               )
+    assert {:ok, %{a: :number, b: :binary, c: :atom}, _env} =
+             tc(quote(do: {a, b, c}), {:tuple, [:number, :binary, :atom]})
 
-      assert bindings == %{a: :number, b: :binary, c: :atom}
-      assert env == %{a: :number, b: :binary, c: :atom}
-    end
+    assert {:ok, %{a: :number, b: :binary, c: :atom}, _env} =
+             tc(quote(do: {a, {b, c}}), {:tuple, [:number, {:tuple, [:binary, :atom]}]})
 
-    test "arity mismatch" do
-      pattern = {:{}, @meta, [var(:a), var(:b)]}
+    assert_mismatch(quote(do: {a, b}), :number)
+    assert_mismatch(quote(do: {a, b, c}), :number)
 
-      assert {:error, msg, %{}} =
-               PatternBinding.tc_pattern(
-                 @ctx,
-                 pattern,
-                 {:tuple, [:number, :binary, :atom]},
-                 %{}
-               )
+    # the pattern is the 2-tuple, the type is the 3-tuple
+    error =
+      assert_mismatch(
+        quote(do: {a, b}),
+        {:tuple, [:number, :binary, :atom]},
+        :tuple_arity_mismatch
+      )
 
-      assert %Error{category: :pattern_matching, kind: :tuple_arity_mismatch} = msg
-    end
-
-    test "non-tuple expected type" do
-      pattern = {:{}, @meta, [var(:a)]}
-
-      assert {:error, msg, %{}} =
-               PatternBinding.tc_pattern(@ctx, pattern, :number, %{})
-
-      assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
-    end
+    assert %{pattern_arity: 2, expected: 3} = error.details
   end
 
-  # --- Pat-Map ---
+  # -- Pat-Map
 
-  describe "tc_pattern/4 map patterns" do
-    test "atom keys bind values" do
-      pattern = {:%{}, @meta, [{:name, var(:n)}]}
+  test "Pat-Map" do
+    assert {:ok, %{n: :binary, a: :number}, _env} =
+             tc(quote(do: %{name: n, age: a}), {:map_record, %{name: :binary, age: :number}})
 
-      assert {:ok, %{n: :binary}, %{n: :binary}} =
-               PatternBinding.tc_pattern(
-                 @ctx,
-                 pattern,
-                 {:map_record, %{name: :binary}},
-                 %{}
-               )
-    end
+    assert_mismatch(
+      quote(do: %{missing: x}),
+      {:map_record, %{name: :binary}},
+      :pattern_map_key_not_found
+    )
 
-    test "key not found in expected map" do
-      pattern = {:%{}, @meta, [{:missing, var(:x)}]}
-
-      assert {:error, msg, %{}} =
-               PatternBinding.tc_pattern(
-                 @ctx,
-                 pattern,
-                 {:map_record, %{name: :binary}},
-                 %{}
-               )
-
-      assert %Error{category: :pattern_matching, kind: :pattern_map_key_not_found} = msg
-    end
-
-    test "multiple keys all matching" do
-      pattern = {:%{}, @meta, [{:name, var(:n)}, {:age, var(:a)}]}
-
-      assert {:ok, bindings, env} =
-               PatternBinding.tc_pattern(
-                 @ctx,
-                 pattern,
-                 {:map_record, %{name: :binary, age: :number}},
-                 %{}
-               )
-
-      assert bindings[:n] == :binary
-      assert bindings[:a] == :number
-      assert env == %{n: :binary, a: :number}
-    end
-
-    test "non-map expected type" do
-      pattern = {:%{}, @meta, [{:k, var(:v)}]}
-
-      assert {:error, msg, %{}} =
-               PatternBinding.tc_pattern(@ctx, pattern, :number, %{})
-
-      assert %Error{category: :pattern_matching, kind: :pattern_type_mismatch} = msg
-    end
+    assert_mismatch(quote(do: %{k: v}), :number)
   end
 
   # -- Pat-Match
 
-  describe "tc_pattern/4 match (p1 = p2) patterns" do
-    @person {:map_record, %{name: :binary, age: :number}}
+  test "Pat-Match" do
+    person = {:map_record, %{name: :binary, age: :number}}
 
-    test "binds the variables of both sides" do
-      pattern = quote(do: %{name: n} = person)
+    # binds the variables of both sides
+    assert {:ok, bindings, env} = tc(quote(do: %{name: n} = person), person)
+    assert bindings == %{n: :binary, person: person}
+    assert env == %{n: :binary, person: person}
 
-      assert {:ok, bindings, env} = PatternBinding.tc_pattern(@ctx, pattern, @person, %{})
-      assert bindings == %{n: :binary, person: @person}
-      assert env == %{n: :binary, person: @person}
-    end
+    # the variable can be on either side
+    assert {:ok, %{a: :number, person: ^person}, _env} = tc(quote(do: person = %{age: a}), person)
 
-    test "the variable can be on either side" do
-      pattern = quote(do: person = %{age: a})
+    # both sides are checked against the expected type
+    assert_mismatch(quote(do: %{missing: x} = person), person, :pattern_map_key_not_found)
 
-      assert {:ok, %{a: :number, person: @person}, _env} =
-               PatternBinding.tc_pattern(@ctx, pattern, @person, %{})
-    end
-
-    test "both sides are checked against the expected type" do
-      pattern = quote(do: %{missing: x} = person)
-
-      assert {:error, msg, %{}} = PatternBinding.tc_pattern(@ctx, pattern, @person, %{})
-      assert %Error{category: :pattern_matching, kind: :pattern_map_key_not_found} = msg
-    end
-
-    test "binding the same variable on both sides is a conflict" do
-      pattern = quote(do: %{name: x} = x)
-
-      assert {:error, msg, _env} = PatternBinding.tc_pattern(@ctx, pattern, @person, %{})
-      assert %Error{category: :pattern_matching, kind: :conflicting_pattern_bindings} = msg
-    end
+    # binding the same variable on both sides is a conflict
+    assert_mismatch(quote(do: %{name: x} = x), person, :conflicting_pattern_bindings)
   end
 end

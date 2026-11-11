@@ -50,8 +50,6 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
   # -- Map record types
 
   test "map records" do
-    assert {:ok, {:map_record, %{}}} = TSP.parse(quote(do: %{}))
-
     assert {:ok, {:map_record, %{name: :binary, age: :number}}} =
              TSP.parse(quote(do: %{name: binary(), age: number()}))
 
@@ -59,7 +57,31 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
              TSP.parse(quote(do: %{user: %{name: binary()}}))
   end
 
-  # todo: add Map dictionary types here
+  # todo: fails until `%{}` is rejected, since a record needs at least one field
+  test "an empty map record is rejected" do
+    assert {:error, %Cause{}} = TSP.parse(quote(do: %{}))
+  end
+
+  # -- Map dictionary types
+
+  # todo: fails until the parser reads a key type as a dictionary
+  test "map dictionaries" do
+    assert {:ok, {:map_dict, {:atom, :binary}}} = TSP.parse(quote(do: %{atom() => binary()}))
+
+    assert {:ok, {:map_dict, {:binary, {:list, :number}}}} =
+             TSP.parse(quote(do: %{binary() => list(number())}))
+  end
+
+  # -- Function types
+
+  # todo: fails until the parser has a `->` case
+  test "function types" do
+    assert {:ok, {:function, [], :binary}} = TSP.parse(quote(do: (-> binary())))
+    assert {:ok, {:function, [:number], :binary}} = TSP.parse(quote(do: (number() -> binary())))
+
+    assert {:ok, {:function, [:number, :atom], :binary}} =
+             TSP.parse(quote(do: (number(), atom() -> binary())))
+  end
 
   # -- Error cases
 
@@ -91,7 +113,6 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
           quote(do: %{required(:name) => binary()}),
           quote(do: %{optional(:name) => binary()}),
           quote(do: %{"name" => binary()}),
-          quote(do: %{atom() => binary()}),
           quote(do: %{name: binary(), name: number()})
         ] do
       assert {:error, %Cause{kind: :unsupported_type_constructor}} = TSP.parse(ast)
