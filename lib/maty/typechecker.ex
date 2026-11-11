@@ -7,7 +7,7 @@ defmodule Maty.Typechecker do
   """
 
   alias Maty.Utils
-  alias Maty.Typechecker.{Ctx, Delta, TC, Error, Preprocessor}
+  alias Maty.Typechecker.{Ctx, Delta, TC, Error, Preprocessor, Signatures}
   alias Maty.Typechecker.Error.Formatter
 
   require Logger
@@ -22,46 +22,19 @@ defmodule Maty.Typechecker do
   def handle_on_definition(env, _kind, name, args, _guards, _body) do
     arity = length(args)
 
-    session_types = Utils.Env.get_map(env.module, :st)
-    handler = Module.get_attribute(env.module, :handler)
-    is_stub = Module.get_attribute(env.module, :handler_stub)
+    clause =
+      Signatures.clause(name, arity, env.line, %{
+        handler: Module.get_attribute(env.module, :handler),
+        init_handler: Module.get_attribute(env.module, :init_handler),
+        handler_stub: Module.get_attribute(env.module, :handler_stub),
+        spec: Module.get_attribute(env.module, :spec)
+      })
 
-    if not is_nil(is_stub) do
-      Module.delete_attribute(env.module, :handler_stub)
-      Module.put_attribute(env.module, :handler_stubs, {name, arity})
-      #                                             ^ with an s! (todo: give better name)
-    else
-      if not is_nil(handler) do
-        Preprocessor.process_handler_annotation(%{
-          module: env.module,
-          function: {name, arity},
-          handler_label: handler,
-          session_types: session_types,
-          store: :delta_M,
-          kind: :handler,
-          meta: [line: env.line]
-        })
-      end
+    Module.put_attribute(env.module, :maty_clauses, clause)
 
-      init_handler = Module.get_attribute(env.module, :init_handler)
-
-      if not is_nil(init_handler) do
-        Preprocessor.process_handler_annotation(%{
-          module: env.module,
-          function: {name, arity},
-          handler_label: init_handler,
-          session_types: session_types,
-          store: :delta_I,
-          kind: :init_handler,
-          meta: [line: env.line]
-        })
-      end
-
-      if is_nil(handler) and is_nil(init_handler) do
-        Module.put_attribute(env.module, :non_handler_defs, {name, arity, env.line})
-      end
-
-      Preprocessor.process_type_annotation(%{module: env.module, function: {name, args}})
+    # the annotations belong to this clause only, so they must not be seen by the next one
+    for annotation <- [:handler, :init_handler, :handler_stub, :spec] do
+      Module.delete_attribute(env.module, annotation)
     end
   end
 
@@ -85,8 +58,7 @@ defmodule Maty.Typechecker do
       end
 
     errors =
-      Module.get_attribute(env.module, :spec_errors) ++
-        Module.get_attribute(env.module, :handler_errors) ++
+      Module.get_attribute(env.module, :handler_errors) ++
         unknown_role_errors(env) ++
         handler_name_clash_errors(env) ++
         state_errors
@@ -99,6 +71,16 @@ defmodule Maty.Typechecker do
     end
 
     Module.put_attribute(env.module, :state_types, state_types)
+
+    # Σ is built next to the old environments for now
+    # the checks above stay the ones that report, so an error here is one only `Signatures` finds
+    clauses = Module.get_attribute(env.module, :maty_clauses) |> Enum.reverse()
+    session_types = Utils.Env.get_map(env.module, :st)
+
+    case Signatures.build(env.module, clauses, session_types) do
+      {:ok, signatures} -> Module.put_attribute(env.module, :maty_signatures, signatures)
+      {:error, errors} -> raise_type_errors!(env, errors)
+    end
   end
 
   @spec handler_name_clash_errors(Macro.Env.t()) :: [{{atom(), arity()}, Error.t()}]
@@ -178,7 +160,7 @@ defmodule Maty.Typechecker do
       # until a clause sets its own, errors that have no location of their own point at the module
       meta: [line: env.line],
       roles: Module.get_attribute(env.module, :maty_roles),
-      signatures: %{},
+      signatures: Module.get_attribute(env.module, :maty_signatures),
       delta_M: delta_m,
       delta_I: delta_i,
       psi: psi
@@ -227,8 +209,7 @@ defmodule Maty.Typechecker do
                     ctx,
                     handler_name,
                     clause,
-                    handler_M.st,
-                    type_signature
+                    handler_M.st
                   )
                   |> with_clause_frame(func_id, index, length(func_clauses))
                 end

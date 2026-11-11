@@ -54,7 +54,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
       {{Error.ProtocolViolation, :incorrect_recipient_participant},
        Error.ProtocolViolation.incorrect_recipient_participant(@m, @meta, :title_handler, @st_in,
          received: :buyer2,
-         declared: :buyer1,
          expected: :buyer1
        )},
       {{Error.ProtocolViolation, :incorrect_incoming_message_label},
@@ -132,7 +131,7 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          @m,
          @meta,
          :message,
-         {:handler, :init, [:binary], @st_out}
+         {:handler, :init, :binary, @st_out}
        )},
       {{Error.TypeMismatch, :return_type_mismatch},
        Error.TypeMismatch.return_type_mismatch(@m, @meta, expected: :number, got: :binary)},
@@ -159,7 +158,7 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.TypeMismatch.send_message_not_tuple(@m, @meta, got: {:title, [], nil})},
       {{Error.TypeMismatch, :register_arg_type_mismatch},
        Error.TypeMismatch.register_arg_type_mismatch(@m, @meta, :init_handler_args,
-         expected: [:binary, :pid],
+         expected: :binary,
          got: :number
        )},
       {{Error.TypeMismatch, :string_segment_type_mismatch},

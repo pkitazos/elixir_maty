@@ -110,7 +110,7 @@ defmodule Maty.Types do
             # and S! | h
             # but we don't have unions for this one..
             # also need to probably add the state type in here
-            | {:handler, :init, [t()], Maty.ST.t()}
+            | {:handler, :init, t(), Maty.ST.t()}
 
     def role, do: :atom
 

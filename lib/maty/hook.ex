@@ -23,6 +23,9 @@ defmodule Maty.Hook do
       Utils.Env.setup(__MODULE__, :global_state_type)
       Utils.Env.setup(__MODULE__, :local_state_type)
 
+      # one record per clause, which beocmes the input to `Signatures.build/3` @before_compile
+      Module.register_attribute(__MODULE__, :maty_clauses, accumulate: true, persist: false)
+
       @compile :debug_info
 
       @on_definition Maty.Hook

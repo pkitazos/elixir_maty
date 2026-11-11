@@ -56,12 +56,11 @@ defmodule Maty.Typechecker.Error.Formatter do
   end
 
   defp render(%Error{category: :protocol_violation, kind: :incorrect_recipient_participant} = e) do
-    %{received: received, declared: declared, expected: expected} = e.details
+    %{received: received, expected: expected} = e.details
 
     """
     Protocol Violation: Incorrect Incoming Participant
       Received role (handler arg): #{render_atom(received)}
-      Declared role (@spec): #{render_atom(declared)}
       Expected role (session type): #{render_atom(expected)}
       --
       Session Type: #{Maty.ST.repr(e.st)}
@@ -1106,10 +1105,9 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render_type({:handler, :message, st}),
     do: "message handler for #{Maty.ST.repr(st)}"
 
-  # an init handler accepts the argument types of any of its clauses
-  defp render_type({:handler, :init, arg_types, st}),
-    do:
-      "init handler taking #{Enum.map_join(arg_types, " or ", &render_type/1)} for #{Maty.ST.repr(st)}"
+  # an init handler has one argument type, the same for all of its clauses
+  defp render_type({:handler, :init, arg_type, st}),
+    do: "init handler taking #{render_type(arg_type)} for #{Maty.ST.repr(st)}"
 
   defp render_type(type), do: "#{inspect(type)}"
 
@@ -1117,12 +1115,7 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render_expected(description) when is_binary(description), do: description
   defp render_expected(type), do: render_type(type)
 
-  # init handler args can match any one of the handler's clause signatures
-  defp render_register_expected(:init_handler_args, [type]), do: render_type(type)
-
-  defp render_register_expected(:init_handler_args, types),
-    do: "one of: " <> Enum.map_join(types, ", ", &render_type/1)
-
+  # init handler args are checked against the handler's one argument type
   defp render_register_expected(_argument, expected), do: render_expected(expected)
 
   defp render_state_declaration(:global), do: "global_state"

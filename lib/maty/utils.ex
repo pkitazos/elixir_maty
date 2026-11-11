@@ -5,6 +5,8 @@ defmodule Maty.Utils do
   # this should probably move, change and be renamed,
   # but it's good that it exists somewhere
   def to_func({name, arity}), do: "#{name}/#{arity}"
+  # a function id that names its module, as Σ keys functions
+  def to_func({module, name, arity}), do: "#{inspect(module)}.#{name}/#{arity}"
   def to_func(name: name, arity: arity), do: "#{name}/#{arity}"
 
   # this whole module needs some tlc

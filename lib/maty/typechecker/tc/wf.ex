@@ -8,6 +8,7 @@ defmodule Maty.Typechecker.TC.WF do
   """
 
   alias Maty.ST.SBottom
+  alias Maty.Types
   alias Maty.Types.T, as: Type
   alias Maty.Typechecker.{TC, Error, Ctx, Helpers}
 
@@ -24,78 +25,29 @@ defmodule Maty.Typechecker.TC.WF do
   or a single `{:error, error}` (not in a list) when the problem is with the function as a
   whole (no spec, or a spec count that does not fit its clauses), so it is reported once.
   """
-  @spec check_wf_function(
-          ctx :: Ctx.t(),
-          func_id :: {atom(), non_neg_integer()},
-          clauses :: [clause()]
-        ) ::
+  # todo: use `func_id()`
+  @spec check_wf_function(Ctx.t(), {atom(), non_neg_integer()}, [clause()]) ::
           [{:ok, Type.t()} | {:error, Error.t()}] | {:error, Error.t()}
-  def check_wf_function(ctx, {_name, arity} = func_id, clauses) do
-    with {:spec, {:ok, signatures}} when is_list(signatures) <-
-           {:spec, Map.fetch(ctx.psi, func_id)},
-         {:count, {:ok, clause_signatures}} <-
-           {:count, signatures_per_clause(signatures, clauses)} do
-      for {{:function, spec_args, spec_return}, {meta, arg_pattern_asts, _guards, body_block}} <-
-            Enum.zip(clause_signatures, clauses) do
+  def check_wf_function(ctx, {name, arity}, clauses) do
+    func_id = {ctx.module, name, arity}
+
+    with {:ok, {:function, args_ty, ret_ty}} <- Map.fetch(ctx.signatures, func_id) do
+      for {meta, arg_pattern_asts, _guards, block} <- clauses do
         # errors that have no more precise location of their own are reported at this clause
         ctx = %{ctx | meta: meta}
 
-        with :ok <- check_clause_arity(ctx, meta, func_id, arity, spec_args),
-             {:ok, env} <-
-               check_argument_patterns(
-                 ctx,
-                 meta,
-                 arg_pattern_asts,
-                 spec_args
-               ),
-             {:ok, {return_type, st}} <- check_function_body(ctx, env, body_block),
-             :ok <- check_final_session_state(ctx, meta, func_id, st),
-             :ok <-
-               check_return_type(
-                 ctx,
-                 meta,
-                 return_type,
-                 spec_return
-               ) do
-          {:ok, return_type}
-        else
-          {:error, error_msg} -> {:error, error_msg}
+        with {:ok, env} <- check_argument_patterns(ctx, meta, arg_pattern_asts, args_ty),
+             :ok <- typecheck_function(ctx, meta, func_id, env, block, ret_ty) do
+          {:ok, ret_ty}
         end
       end
     else
-      {:spec, :error} ->
+      :error ->
         # reported at the first clause since the spec belongs to the function as a whole
         {first_clause_meta, _, _, _} = hd(clauses)
 
-        error =
-          Error.TypeSpecification.no_spec_for_function(ctx.module, first_clause_meta, func_id)
-
-        {:error, error}
-
-      {:count, {:error, spec_count}} ->
-        {first_clause_meta, _, _, _} = hd(clauses)
-
-        error =
-          Error.FunctionCall.wrong_number_of_specs(ctx.module, first_clause_meta, func_id,
-            expected: [1, length(clauses)],
-            got: spec_count
-          )
-
-        {:error, error}
-    end
-  end
-
-  # Pairs every clause with the spec it is checked against
-  # A function either has one spec covering every clause or one spec per clause
-  # Any other count would leave clauses without a spec so it is an error
-  defp signatures_per_clause(signatures, clauses) do
-    # psi holds the specs newest first, so we put them back in source order
-    in_order = Enum.reverse(signatures)
-
-    cond do
-      length(in_order) == length(clauses) -> {:ok, in_order}
-      length(in_order) == 1 -> {:ok, List.duplicate(hd(in_order), length(clauses))}
-      true -> {:error, length(in_order)}
+        {:error,
+         Error.TypeSpecification.no_spec_for_function(ctx.module, first_clause_meta, func_id)}
     end
   end
 
@@ -109,70 +61,57 @@ defmodule Maty.Typechecker.TC.WF do
   Returns `{:ok, {label, role}}` if well-formed, identifying the session
   branch handled. Otherwise returns `{:error, error}`.
   """
-  @spec check_wf_message_handler_clause(
-          ctx :: Ctx.t(),
-          handler_label :: atom(),
-          handler_ast_clause :: clause(),
-          st_pre :: ST.t(),
-          type_signature :: tuple()
-        ) :: {:ok, ST.SBranch.t()} | {:error, Error.t()}
+  @spec check_wf_message_handler_clause(Ctx.t(), Types.handler_label(), clause(), ST.t()) ::
+          {:ok, ST.SBranch.t()} | {:error, Error.t()}
   def check_wf_message_handler_clause(
         ctx,
-        handler_label,
-        {meta,
-         [
-           received_role,
-           {label, _} = message_pattern_ast,
-           {state_var, _, _},
-           _session_ctx_var_ast
-         ], _guards, body_block},
-        %ST.SIn{from: expected_role, branches: branches} = st_pre,
-        {:function,
-         [declared_role, {:tuple, [_, payload_type]} = message_type, _state, _session_ctx],
-         _return_type}
+        handler,
+        {meta, [role, {label, payload}, state, _session_ctx], _, block},
+        %ST.SIn{} = st
       ) do
     ctx = %{ctx | meta: meta}
 
-    with nil,
-         # check handler and session type roles align
-         :ok <-
-           check_handler_roles(
-             ctx,
-             handler_label,
-             st_pre,
-             received_role,
-             declared_role,
-             expected_role
-           ),
-         # check there is a matching branch for this label + payload
-         {:ok, handler_branch} <-
-           match_handler_branch(ctx, handler_label, st_pre, branches, label, payload_type),
-         # typecheck received role is an atom
-         {:ok, :atom, ^st_pre, env} <- TC.synth(ctx, %{}, st_pre, received_role),
-         # bind variables from the message pattern
-         {:ok, _bindings, env} <- tc_pattern(ctx, message_pattern_ast, message_type, env),
-         # extend env with state variable binding
-         env = Map.put(env, state_var, Type.maty_actor_state()),
-         # typecheck the handler body
-         {:ok, return_type, final_st, _} <-
-           TC.tc_expr_list(ctx, env, handler_branch.continue_as, extract_body(body_block)),
-         # body must terminate with :no_return and exhausted session
-         :ok <- check_handler_termination(meta, handler_label, return_type, final_st) do
-      {:ok, handler_branch}
+    with {:role, true, _} <- {:role, st.from == role, st.from},
+         {:branch, %ST.SBranch{} = b} <- {:branch, Enum.find(st.branches, &(&1.label == label))},
+         #
+         {:ok, _bindings, env} <- tc_pattern(ctx, payload, b.payload, %{}),
+         {:ok, _bindings, env} <- tc_pattern(ctx, state, Type.maty_actor_state(), env),
+         #
+         # the body starts from the continuation of the branch this clause handles
+         :ok <- typecheck_handler_body(ctx, env, meta, handler, b.continue_as, block) do
+      {:ok, b}
     else
+      {:role, false, from} ->
+        {:error,
+         Error.ProtocolViolation.incorrect_recipient_participant(
+           ctx.module,
+           ctx.meta,
+           handler,
+           st,
+           received: role,
+           expected: from
+         )}
+
+      {:branch, nil} ->
+        {:error,
+         Error.ProtocolViolation.incorrect_incoming_message_label(
+           ctx.module,
+           ctx.meta,
+           handler,
+           st,
+           got: label,
+           expected: Enum.map(st.branches, & &1.label)
+         )}
+
       {:error, msg, _env} ->
         {:error, msg}
 
       {:error, msg} ->
         {:error, msg}
-
-      other ->
-        {:error,
-         Error.internal_error("unexpected result in message handler check: #{inspect(other)}")}
     end
   end
 
-  def check_wf_message_handler_clause(ctx, handler_label, {meta, _, _, _}, st_pre, _) do
+  def check_wf_message_handler_clause(ctx, handler_label, {meta, _, _, _}, st_pre) do
     {:error,
      Error.ProtocolViolation.message_handler_not_receive(ctx.module, meta, handler_label, st_pre)}
   end
@@ -187,60 +126,46 @@ defmodule Maty.Typechecker.TC.WF do
   Returns `{:ok, handler_label}` if well-formed. Otherwise returns `{:error, error}`.
   """
   @spec check_wf_init_handler_clause(
-          ctx :: Ctx.t(),
-          handler_label :: atom(),
-          handler_ast_clause :: clause(),
-          st_pre :: ST.t(),
-          type_signature :: tuple()
+          Ctx.t(),
+          Types.handler_label(),
+          clause(),
+          ST.t(),
+          Type.t()
         ) ::
           :ok | {:error, Error.t()}
-  def check_wf_init_handler_clause(ctx, handler_label, {meta, _, _, _}, %ST.SIn{} = st_pre, _) do
+  def check_wf_init_handler_clause(ctx, handler, {meta, _, _, _}, %ST.SIn{} = st, _) do
     {:error,
-     Error.ProtocolViolation.init_handler_starts_with_receive(
-       ctx.module,
-       meta,
-       handler_label,
-       st_pre
-     )}
+     Error.ProtocolViolation.init_handler_starts_with_receive(ctx.module, meta, handler, st)}
   end
 
   def check_wf_init_handler_clause(
         ctx,
-        handler_label,
-        {meta, [arg_pattern_ast, {state_var, _, _}, _session_ctx_var_ast], _guards, body_block},
-        st_pre,
-        {:function, [args_types, _state, _session_ctx], _return_type}
+        handler,
+        {meta, [arg_pattern_ast, state, _session_ctx], _guards, block},
+        st,
+        args_ty
       ) do
     ctx = %{ctx | meta: meta}
 
-    with nil,
-         # bind variables from the argument pattern
-         {:ok, _bindings, env} <- tc_pattern(ctx, arg_pattern_ast, args_types, %{}),
-         # extend env with state variable binding
-         env = Map.put(env, state_var, Type.maty_actor_state()),
-         # typecheck the handler body
-         {:ok, return_type, st, _} <-
-           TC.tc_expr_list(ctx, env, st_pre, extract_body(body_block)),
-         # body must terminate with :no_return and exhausted session
-         :ok <- check_handler_termination(meta, handler_label, return_type, st) do
+    with {:ok, _bindings, env} <- tc_pattern(ctx, arg_pattern_ast, args_ty, %{}),
+         {:ok, _bindings, env} <- tc_pattern(ctx, state, Type.maty_actor_state(), env),
+         :ok <- typecheck_handler_body(ctx, env, meta, handler, st, block) do
       :ok
     else
-      {:error, msg, _env} -> {:error, msg}
-      {:error, msg} -> {:error, msg}
+      {:error, err, _env} -> {:error, err}
+      {:error, err} -> {:error, err}
     end
   end
 
   def check_wf_on_start_callback(
         ctx,
-        {meta, [arg_pattern_ast], _guards, body_block},
+        {meta, [arg_pattern_ast], _guards, block},
         {:function, [args_types], _return_type}
       ) do
     ctx = %{ctx | meta: meta}
-    body = extract_body(body_block)
+    body = extract_body(block)
 
-    with nil,
-         # bind variables from the function signature
-         {:ok, _bindings, env} <- tc_pattern(ctx, arg_pattern_ast, args_types, %{}),
+    with {:ok, _bindings, env} <- tc_pattern(ctx, arg_pattern_ast, args_types, %{}),
          # typecheck the body (calls to register etc.)
          {:ok, return_type, final_st, _env} <- TC.tc_expr_list(ctx, env, %ST.SEnd{}, body),
          # session state must not change
@@ -254,70 +179,12 @@ defmodule Maty.Typechecker.TC.WF do
          :ok <- check_on_start_return_type(ctx, return_type) do
       :ok
     else
-      {:error, msg, _env} -> {:error, msg}
-      {:error, msg} -> {:error, msg}
+      {:error, err, _env} -> {:error, err}
+      {:error, err} -> {:error, err}
     end
   end
 
   # --- Private helpers ---
-
-  defp check_handler_roles(ctx, handler_label, st, received_role, declared_role, expected_role) do
-    if received_role == expected_role and declared_role == expected_role do
-      :ok
-    else
-      {:error,
-       Error.ProtocolViolation.incorrect_recipient_participant(
-         ctx.module,
-         ctx.meta,
-         handler_label,
-         st,
-         received: received_role,
-         declared: declared_role,
-         expected: expected_role
-       )}
-    end
-  end
-
-  defp match_handler_branch(ctx, handler_label, st, branches, label, payload_type) do
-    case Helpers.try_get_matching_branch(branches, label, payload_type) do
-      {:ok, branch} ->
-        {:ok, branch}
-
-      {:error, :label_mismatch} ->
-        {:error,
-         Error.ProtocolViolation.incorrect_incoming_message_label(
-           ctx.module,
-           ctx.meta,
-           handler_label,
-           st,
-           got: label,
-           expected: Enum.map(branches, & &1.label)
-         )}
-
-      {:error, :payload_mismatch, branch} ->
-        {:error,
-         Error.ProtocolViolation.incorrect_incoming_payload_type(
-           ctx.module,
-           ctx.meta,
-           handler_label,
-           st,
-           got: payload_type,
-           expected: branch.payload
-         )}
-    end
-  end
-
-  defp check_handler_termination(_meta, _handler_label, :no_return, %SBottom{}), do: :ok
-
-  defp check_handler_termination(meta, handler_label, return_type, final_st) do
-    {:error,
-     Error.ProtocolViolation.handler_body_wrong_termination(
-       meta,
-       handler_label,
-       return_type,
-       final_st
-     )}
-  end
 
   defp check_on_start_session_state(_ctx, %ST.SEnd{}), do: :ok
 
@@ -336,58 +203,51 @@ defmodule Maty.Typechecker.TC.WF do
     :ok
   end
 
-  defp check_function_body(ctx, body_var_env, body_block) do
-    body_asts = extract_body(body_block)
-    initial_st = %ST.SEnd{}
+  # body of a function clause must leave the session untouched and have the spec's return type
+  defp typecheck_function(ctx, meta, func_id, env, block, ret_ty) do
+    with {:ok, actual, final_st, _} <-
+           TC.tc_expr_list(ctx, env, %ST.SEnd{}, extract_body(block)),
+         {:st, %ST.SEnd{}} <- {:st, final_st},
+         {:ret, ^ret_ty} <- {:ret, actual} do
+      :ok
+    else
+      {:st, st} ->
+        {:error, Error.FunctionCall.function_altered_session_state(ctx.module, meta, func_id, st)}
 
-    case TC.tc_expr_list(ctx, body_var_env, initial_st, body_asts) do
-      {:ok, return_type, final_st, _final_env} -> {:ok, {return_type, final_st}}
-      {:error, msg, _env} -> {:error, msg}
+      {:ret, actual} ->
+        {:error,
+         Error.TypeMismatch.return_type_mismatch(ctx.module, meta,
+           expected: ret_ty,
+           got: actual
+         )}
+
+      {:error, err, _} ->
+        {:error, err}
+    end
+  end
+
+  # body of a handler clause must end in `suspend` / `done` with the session used up
+  defp typecheck_handler_body(ctx, env, meta, handler, st, block) do
+    case TC.tc_expr_list(ctx, env, st, extract_body(block)) do
+      {:ok, :no_return, %SBottom{}, _} ->
+        :ok
+
+      {:ok, ret_ty, final_st, _} ->
+        {:error,
+         Error.ProtocolViolation.handler_body_wrong_termination(meta, handler, ret_ty, final_st)}
+
+      {:error, err, _env} ->
+        {:error, err}
     end
   end
 
   @spec extract_body(Macro.t()) :: [Macro.t()]
-
   defp extract_body({:__block__, _, block}), do: block
-
-  defp extract_body({:try, _, [[do: body_block, catch: _]]}),
-    do: extract_body(body_block)
-
+  defp extract_body({:try, _, [[do: body_block, catch: _]]}), do: extract_body(body_block)
   defp extract_body(expr) when not is_list(expr), do: [expr]
 
   # --- Private helpers ---
   # todo: figure out what stays and what moves
-
-  defp check_clause_arity(ctx, meta, func_id, arity, spec_args_types) do
-    if arity == length(spec_args_types) do
-      :ok
-    else
-      {:error,
-       Error.FunctionCall.arity_mismatch(ctx.module, meta, func_id,
-         expected: length(spec_args_types),
-         got: arity
-       )}
-    end
-  end
-
-  defp check_final_session_state(_ctx, _meta, _func_id, %ST.SEnd{}), do: :ok
-
-  defp check_final_session_state(ctx, meta, func_id, other_st) do
-    error = Error.FunctionCall.function_altered_session_state(ctx.module, meta, func_id, other_st)
-    {:error, error}
-  end
-
-  defp check_return_type(ctx, meta, actual_return_type, spec_return_type) do
-    if actual_return_type == spec_return_type do
-      :ok
-    else
-      {:error,
-       Error.TypeMismatch.return_type_mismatch(ctx.module, meta,
-         expected: spec_return_type,
-         got: actual_return_type
-       )}
-    end
-  end
 
   defp check_argument_patterns(ctx, meta, arg_pattern_asts, spec_args_types) do
     initial_arg_env = %{}

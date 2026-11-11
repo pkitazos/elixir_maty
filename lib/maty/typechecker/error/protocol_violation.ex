@@ -57,7 +57,6 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
 
   def incorrect_recipient_participant(module, meta, handler, st,
         received: received,
-        declared: declared,
         expected: expected
       ) do
     %Error{
@@ -66,7 +65,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
       module: module,
       meta: Keyword.take(meta, [:line, :column]),
       handler: handler,
-      details: %{received: received, declared: declared, expected: expected},
+      details: %{received: received, expected: expected},
       st: st
     }
   end

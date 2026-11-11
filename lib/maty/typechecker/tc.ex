@@ -340,27 +340,34 @@ defmodule Maty.Typechecker.TC do
   end
 
   # Function capture: &fun/arity
-  deftc synth(ctx, env, st, {:&, meta, [{:/, _, [{name, _, context}, arity]}]} = capture_ast)
+  deftc synth(ctx, env, st, {:&, meta, [{:/, _, [{name, _, context}, arity]}]})
         when is_atom(name) and is_atom(context) and is_integer(arity) do
     tcm env: env, st: st do
-      cond do
+      # a handler is in Σ under its name, a function under `{module, name, arity}`
+      case {Map.get(ctx.signatures, name), arity} do
         # TV-MsgHandler
-        Map.has_key?(ctx.delta_M, name) and arity == 3 ->
-          ok({:handler, :message, ctx.delta_M[name].st})
+        {{:handler, :message, _} = handler_type, 3} ->
+          ok(handler_type)
 
-        Map.has_key?(ctx.delta_M, name) ->
+        {{:handler, :message, _}, _} ->
           fail(Error.FrameworkUsage.handler_ref_wrong_arity(ctx.module, meta, name, arity, 3))
 
         # TV-InitHandler
-        Map.has_key?(ctx.delta_I, name) and arity == 2 ->
-          {:ok, arg_types} = Helpers.init_handler_arg_types(ctx, name)
-          ok({:handler, :init, arg_types, ctx.delta_I[name].st})
+        {{:handler, :init, _, _} = handler_type, 2} ->
+          ok(handler_type)
 
-        Map.has_key?(ctx.delta_I, name) ->
+        {{:handler, :init, _, _}, _} ->
           fail(Error.FrameworkUsage.handler_ref_wrong_arity(ctx.module, meta, name, arity, 2))
 
-        true ->
-          fail(Error.FrameworkUsage.unsupported_capture(ctx.module, meta, capture_ast))
+        _ ->
+          tcm do
+            f = {ctx.module, name, arity}
+
+            expect {:ok, ty} = Map.fetch(ctx.signatures, f),
+              else: Error.FunctionCall.function_not_exist(ctx.module, meta, f)
+
+            ok(ty)
+          end
       end
     end
   end
@@ -370,11 +377,18 @@ defmodule Maty.Typechecker.TC do
   deftc synth(
           ctx,
           env,
-          _st,
-          {:&, meta, [{:/, _, [{{:., _, [mod, fun]}, _, []}, arity]}]} = capture_ast
+          st,
+          {:&, meta, [{:/, _, [{{:., _, [mod, fun]}, _, []}, arity]}]}
         )
         when is_atom(mod) and is_atom(fun) and is_integer(arity) do
-    {:error, Error.FrameworkUsage.unsupported_capture(ctx.module, meta, capture_ast), env}
+    tcm env: env, st: st do
+      f = {mod, fun, arity}
+
+      expect {:ok, func_type} = Map.fetch(ctx.signatures, f),
+        else: Error.FunctionCall.function_not_exist(ctx.module, meta, f)
+
+      ok(func_type)
+    end
   end
 
   # Anonymus Function capture: &(&1 + 1)
@@ -632,18 +646,18 @@ defmodule Maty.Typechecker.TC do
 
       handler_type <- syn(ctx, handler_ast)
 
-      expect {:handler, :init, accepted_arg_types, _st} = handler_type,
+      expect {:handler, :init, arg_type, _st} = handler_type,
         else: Error.TypeMismatch.handler_expected(ctx.module, meta, :init, handler_type)
 
       args_type <- syn(ctx, args_ast)
 
-      expect accepted_arg_types == [] or args_type in accepted_arg_types,
+      expect args_type == arg_type,
         else:
           Error.TypeMismatch.register_arg_type_mismatch(
             ctx.module,
             meta,
             :init_handler_args,
-            expected: accepted_arg_types,
+            expected: arg_type,
             got: args_type
           )
 
@@ -659,40 +673,30 @@ defmodule Maty.Typechecker.TC do
     func_id = {func_name, length(arg_asts)}
 
     tcm env: env, st: st do
-      expect not Map.has_key?(ctx.delta_M, func_name),
+      expect not match?({:handler, :message, _}, ctx.signatures[func_name]),
         else: Error.FunctionCall.handler_called_directly(ctx.module, meta, func_id, :message)
 
-      expect not Map.has_key?(ctx.delta_I, func_name),
+      expect not match?({:handler, :init, _, _}, ctx.signatures[func_name]),
         else: Error.FunctionCall.handler_called_directly(ctx.module, meta, func_id, :init)
 
-      expect {:ok, signatures} = Map.fetch(ctx.psi, func_id),
-        else: Error.FunctionCall.function_not_exist(ctx.module, meta, func_id)
-
-      expect signatures != [],
-        else: Error.FunctionCall.function_not_exist(ctx.module, meta, func_id)
+      # a function has one signature, under `{module, name, arity}` in Σ
+      expect {:ok, {:function, param_types, return_type}} =
+               Map.fetch(ctx.signatures, {ctx.module, func_name, length(arg_asts)}),
+             else: Error.FunctionCall.function_not_exist(ctx.module, meta, func_id)
 
       arg_types <-
         arg_asts
         |> chain(&syn(ctx, &1))
         |> with_frame({:call, func_id, Keyword.take(meta, [:line, :column])})
 
-      # todo: this accepts the call if the arguments fit *any* clause's spec, but at runtime the
-      # first clause whose *pattern* matches is the one that runs. With overlapping patterns and
-      # different specs, a call can be accepted against one clause and run another.
-      # Should instead pick the first clause whose pattern matches the argument types and check against its spec only
-      # (this would need access to the clause patterns here, psi currently only has the specs).
-      # Same issue in `Helpers.init_handler_arg_types/2` for register
-      expect {:function, _, return_type} =
-               Enum.find(signatures, fn {:function, param_types, _} ->
-                 arg_types == param_types
-               end),
-             else:
-               Error.FunctionCall.no_matching_function_clause(
-                 ctx.module,
-                 meta,
-                 func_id,
-                 arg_types
-               )
+      expect arg_types == param_types,
+        else:
+          Error.FunctionCall.no_matching_function_clause(
+            ctx.module,
+            meta,
+            func_id,
+            arg_types
+          )
 
       ok(return_type)
     end
@@ -703,13 +707,13 @@ defmodule Maty.Typechecker.TC do
   # a variable's context is `nil`
   # variables introduced by some macro would have an atom context, currently Γ is keyed by name only,
   # so looking those up could pick up the user's variable of the same name so they are left to the catch-all below
-  deftc synth(ctx, env, st, {var_name, meta, nil}) when is_atom(var_name) do
-    case Map.fetch(env, var_name) do
+  deftc synth(ctx, env, st, {x, meta, nil}) when is_atom(x) do
+    case Map.fetch(env, x) do
       {:ok, type} ->
         {:ok, type, st, env}
 
       :error ->
-        {:error, Error.NameResolution.variable_not_exist(ctx.module, meta, var_name), env}
+        {:error, Error.NameResolution.variable_not_exist(ctx.module, meta, x), env}
     end
   end
 
