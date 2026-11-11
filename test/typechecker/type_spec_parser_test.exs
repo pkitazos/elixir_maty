@@ -1,183 +1,100 @@
 defmodule Maty.Typechecker.TypeSpecParserTest do
   use ExUnit.Case
 
-  alias Maty.Typechecker.TypeSpecParser
+  alias Maty.Typechecker.TypeSpecParser, as: TSP
+  alias Maty.Typechecker.Error.Cause
   alias Maty.Types.T, as: Type
 
   @meta [line: 0]
 
   defp type_ast(name), do: {name, @meta, []}
 
-  # --- Literal types ---
+  # -- Literal types
 
-  describe "parse/1 literals" do
-    test "nil" do
-      assert {:ok, nil} = TypeSpecParser.parse(nil)
-    end
-
-    test "atom :ok" do
-      assert {:ok, :ok} = TypeSpecParser.parse(:ok)
-    end
-
-    test "atom :error" do
-      assert {:ok, :error} = TypeSpecParser.parse(:error)
-    end
+  test "literals" do
+    assert {:ok, nil} = TSP.parse(nil)
+    assert {:ok, :ok} = TSP.parse(:ok)
+    assert {:ok, :error} = TSP.parse(:error)
   end
 
-  # --- Zero-arity known types ---
-
-  describe "parse/1 zero-arity types" do
-    test "atom" do
-      assert {:ok, :atom} = TypeSpecParser.parse(type_ast(:atom))
+  test "basic types" do
+    for t <- [:atom, :number, :binary, :boolean, :pid, :ref, :no_return] do
+      assert {:ok, ^t} = TSP.parse(type_ast(t))
     end
 
-    test "number" do
-      assert {:ok, :number} = TypeSpecParser.parse(type_ast(:number))
-    end
+    date_ast = {{:., @meta, [{:__aliases__, @meta, [:Date]}, :t]}, @meta, []}
+    assert {:ok, :date} = TSP.parse(date_ast)
 
-    test "binary" do
-      assert {:ok, :binary} = TypeSpecParser.parse(type_ast(:binary))
-    end
+    state = Type.maty_actor_state()
+    assert {:ok, ^state} = TSP.parse(type_ast(:maty_actor_state))
 
-    test "boolean" do
-      assert {:ok, :boolean} = TypeSpecParser.parse(type_ast(:boolean))
-    end
-
-    test "pid" do
-      assert {:ok, :pid} = TypeSpecParser.parse(type_ast(:pid))
-    end
-
-    test "ref" do
-      assert {:ok, :ref} = TypeSpecParser.parse(type_ast(:ref))
-    end
-
-    test "no_return" do
-      assert {:ok, :no_return} = TypeSpecParser.parse(type_ast(:no_return))
-    end
-
-    test "any" do
-      assert {:ok, :any} = TypeSpecParser.parse(type_ast(:any))
-    end
-
-    test "map" do
-      assert {:ok, :map} = TypeSpecParser.parse(type_ast(:map))
-    end
+    session_ctx = Type.session_ctx()
+    assert {:ok, ^session_ctx} = TSP.parse(type_ast(:session_ctx))
   end
 
-  # --- Error cases ---
+  test "tuples" do
+    assert {:ok, {:tuple, [:number, :binary]}} =
+             TSP.parse(quote(do: {number(), binary()}))
 
-  describe "parse/1 errors" do
-    test "unknown type constructor" do
-      assert {:error, %Maty.Typechecker.Error.Cause{kind: :unknown_type_constructor}} =
-               TypeSpecParser.parse(type_ast(:foo))
-    end
+    assert {:ok, {:tuple, [:number, :binary, :atom]}} =
+             TSP.parse(quote(do: {number(), binary(), atom()}))
 
-    test "unsupported AST format" do
-      assert {:error, %Maty.Typechecker.Error.Cause{kind: :unsupported_type_constructor}} =
-               TypeSpecParser.parse(123)
-    end
+    assert {:ok, {:tuple, [:number, {:tuple, [:binary, :atom]}]}} =
+             TSP.parse(quote(do: {number(), {binary(), atom()}}))
   end
 
-  # --- Tuple types ---
-
-  describe "parse/1 tuples" do
-    test "2-tuple" do
-      ast = {type_ast(:number), type_ast(:binary)}
-      assert {:ok, {:tuple, [:number, :binary]}} = TypeSpecParser.parse(ast)
-    end
-
-    test "n-tuple (3-tuple)" do
-      ast = {:{}, @meta, [type_ast(:number), type_ast(:binary), type_ast(:atom)]}
-      assert {:ok, {:tuple, [:number, :binary, :atom]}} = TypeSpecParser.parse(ast)
-    end
-
-    test "nested tuple" do
-      inner = {type_ast(:binary), type_ast(:atom)}
-      ast = {type_ast(:number), inner}
-      assert {:ok, {:tuple, [:number, {:tuple, [:binary, :atom]}]}} = TypeSpecParser.parse(ast)
-    end
-  end
-
-  # --- List types ---
-
-  describe "parse/1 lists" do
-    test "homogeneous list" do
-      ast = {:list, @meta, [type_ast(:number)]}
-      assert {:ok, {:list, :number}} = TypeSpecParser.parse(ast)
-    end
-
-    test "heterogeneous list returns error" do
-      ast = {:list, @meta, [type_ast(:number), type_ast(:binary)]}
-
-      assert {:error, %Maty.Typechecker.Error.Cause{kind: :heterogeneous_list}} =
-               TypeSpecParser.parse(ast)
-    end
+  test "lists" do
+    assert {:ok, {:list, :number}} = TSP.parse(quote(do: list(number())))
   end
 
   # -- Map record types
 
-  describe "parse/1 map records" do
-    test "empty map" do
-      assert {:ok, {:map_record, %{}}} = TypeSpecParser.parse(quote(do: %{}))
-    end
+  test "map records" do
+    assert {:ok, {:map_record, %{}}} = TSP.parse(quote(do: %{}))
 
-    test "map with atom keys" do
-      ast = quote(do: %{name: binary(), age: number()})
-      assert {:ok, {:map_record, %{name: :binary, age: :number}}} = TypeSpecParser.parse(ast)
-    end
+    assert {:ok, {:map_record, %{name: :binary, age: :number}}} =
+             TSP.parse(quote(do: %{name: binary(), age: number()}))
 
-    test "nested map record" do
-      ast = quote(do: %{user: %{name: binary()}, pair: {number(), atom()}})
-
-      assert {:ok,
-              {:map_record,
-               %{user: {:map_record, %{name: :binary}}, pair: {:tuple, [:number, :atom]}}}} =
-               TypeSpecParser.parse(ast)
-    end
-
-    test "an unknown field type is reported" do
-      assert {:error, %Maty.Typechecker.Error.Cause{kind: :unknown_type_constructor}} =
-               TypeSpecParser.parse(quote(do: %{name: wat()}))
-    end
-
-    test "required/optional keys are not supported" do
-      assert {:error, %Maty.Typechecker.Error.Cause{kind: :unsupported_type_constructor}} =
-               TypeSpecParser.parse(quote(do: %{required(:name) => binary()}))
-
-      assert {:error, %Maty.Typechecker.Error.Cause{kind: :unsupported_type_constructor}} =
-               TypeSpecParser.parse(quote(do: %{optional(:name) => binary()}))
-    end
-
-    test "non-atom keys are not supported" do
-      assert {:error, %Maty.Typechecker.Error.Cause{kind: :unsupported_type_constructor}} =
-               TypeSpecParser.parse(quote(do: %{"name" => binary()}))
-
-      assert {:error, %Maty.Typechecker.Error.Cause{kind: :unsupported_type_constructor}} =
-               TypeSpecParser.parse(quote(do: %{atom() => binary()}))
-    end
-
-    test "duplicate keys are not supported" do
-      assert {:error, %Maty.Typechecker.Error.Cause{kind: :unsupported_type_constructor}} =
-               TypeSpecParser.parse(quote(do: %{name: binary(), name: number()}))
-    end
+    assert {:ok, {:map_record, %{user: {:map_record, %{name: :binary}}}}} =
+             TSP.parse(quote(do: %{user: %{name: binary()}}))
   end
 
-  # --- Special types ---
+  # todo: add Map dictionary types here
 
-  describe "parse/1 special types" do
-    test "Date.t()" do
-      ast = {{:., @meta, [{:__aliases__, @meta, [:Date]}, :t]}, @meta, []}
-      assert {:ok, :date} = TypeSpecParser.parse(ast)
+  # -- Error cases
+
+  test "unsupported specs are rejected" do
+    # `any()` and `map()` are not types, since there is no subtyping
+    for ast <- [
+          quote(do: foo()),
+          quote(do: any()),
+          quote(do: map()),
+          quote(do: list()),
+          # ^ should not be allowed
+          quote(do: function()),
+          # ^ should not be allowed
+          quote(do: %{name: wat()})
+        ] do
+      assert {:error, %Cause{kind: :unknown_type_constructor}} = TSP.parse(ast)
     end
 
-    test "maty_actor_state" do
-      expected = Type.maty_actor_state()
-      assert {:ok, ^expected} = TypeSpecParser.parse(type_ast(:maty_actor_state))
-    end
+    # no num literals
+    assert {:error, %Cause{kind: :unsupported_type_constructor}} =
+             TSP.parse(123)
 
-    test "session_ctx" do
-      expected = Type.session_ctx()
-      assert {:ok, ^expected} = TypeSpecParser.parse(type_ast(:session_ctx))
+    # no heterogeneous lists
+    assert {:error, %Cause{kind: :heterogeneous_list}} =
+             TSP.parse(quote(do: list(number(), binary())))
+
+    # map records only take literal atom keys, each at most once
+    for ast <- [
+          quote(do: %{required(:name) => binary()}),
+          quote(do: %{optional(:name) => binary()}),
+          quote(do: %{"name" => binary()}),
+          quote(do: %{atom() => binary()}),
+          quote(do: %{name: binary(), name: number()})
+        ] do
+      assert {:error, %Cause{kind: :unsupported_type_constructor}} = TSP.parse(ast)
     end
   end
 end
