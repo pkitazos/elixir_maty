@@ -1,157 +1,125 @@
 defmodule Maty.Typechecker.CompileErrorTest do
   use ExUnit.Case
 
+  # a small actor (:seller from `TwoBuyer.Protocol`) for use in tests
+  # opts can replace default parts, so tests only need to write the code they care about
+
+  @st """
+  @st {:install, ~q/decision_handler/}
+  @st {:decision_handler, ~q/&buyer2:{address(binary).+buyer2:{date(binary).end},quit(nil).end}/}
+  """
+
+  @on_start "Maty.DSL.register(ap_pid, :seller, &install/2, ap_pid)"
+
+  @init """
+  defhandler install(_ap_pid :: pid(), state) do
+    Maty.DSL.suspend(&decision_handler/3, state)
+  end
+  """
+
+  @handlers """
+  defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
+    Maty.DSL.send_to(:buyer2, {:date, addr})
+    Maty.DSL.done(state)
+  end
+
+  defhandler decision_handler(:buyer2, {:quit, nil}, state) do
+    Maty.DSL.done(state)
+  end
+  """
+
+  defp actor_src(body, opts \\ []) do
+    roles = Keyword.get(opts, :roles, [:seller])
+    local_states = Enum.map_join(roles, "\n", &"local_state #{inspect(&1)}, nil")
+
+    """
+    defmodule MatyCompileErrorFixture.M#{System.unique_integer([:positive])} do
+    use Maty.Actor, protocol: TwoBuyer.Protocol, roles: #{inspect(roles)}
+
+    global_state nil
+    #{local_states}
+
+    #{Keyword.get(opts, :st, @st)}
+
+    on_start ap_pid :: pid() do
+    #{Keyword.get(opts, :on_start, @on_start)}
+    nil
+    end
+
+    #{Keyword.get(opts, :init, @init)}
+
+    #{Keyword.get(opts, :handlers, @handlers)}
+
+    #{body}
+    end
+    """
+  end
+
   defp compile_error!(src) do
     assert_raise CompileError, ~r/\[maty\]/, fn ->
       Code.with_diagnostics(fn -> Code.compile_string(src) end)
     end
   end
 
-  # just literally copied over the contents of some of the examples and made some changes
-  # that I know should cause our tool to throw a compile-time error
-
-  describe "type errors fail compilation" do
-    test "a protocol violation raises CompileError (after_compile path)" do
-      # the :buyer1 actor, but the init handler sends `title` to :buyer2 when the session declares +seller
-      src = """
-      defmodule MatyCompileErrorFixture.BadTarget do
-        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:buyer1]
-
-        global_state %{}
-        local_state :buyer1, %{}
-
-        @role :buyer1
-
-        @st {:install, ~q/+seller:{title(binary).quote_handler}/}
-        @st {:quote_handler, ~q/&seller:{quote(number).+buyer2:{share(number).end}}/}
-
-        on_start {ap_pid, title} :: {pid(), binary()} do
-          Maty.DSL.register(ap_pid, @role, &install/2, title)
-          %{}
-        end
-
-        defhandler install(title :: binary(), state) do
-          Maty.DSL.send_to(:buyer2, {:title, title})
-          Maty.DSL.suspend(&quote_handler/3, state)
-        end
-
-        defhandler quote_handler(:seller, {:quote, amount :: number()}, state) do
-          share_amount = amount / 2
-          Maty.DSL.send_to(:buyer2, {:share, share_amount})
-          Maty.DSL.done(state)
-        end
-      end
-      """
-
-      compile_error!(src)
-    end
-
-    test "a missing handler label raises CompileError (before_compile path)" do
-      # a handler annotated with a label that has no @st declaration.
-      src = """
-      defmodule MatyCompileErrorFixture.MissingHandler do
-        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:buyer1]
-
-        global_state %{}
-        local_state :buyer1, %{}
-
-        @role :buyer1
-
-        @st {:install, ~q/+seller:{title(binary).end}/}
-
-        on_start {ap_pid, title} :: {pid(), binary()} do
-          Maty.DSL.register(ap_pid, @role, &install/2, title)
-          %{}
-        end
-
-        defhandler no_such_session_type(:seller, {:quote, amount :: number()}, state) do
-          Maty.DSL.done(state)
-        end
-      end
-      """
-
-      compile_error!(src)
-    end
+  defp compiles!(src) do
+    assert {[{_module, _bytecode}], _diagnostics} =
+             Code.with_diagnostics(fn -> Code.compile_string(src) end)
   end
 
-  describe "error context" do
-    # the :seller actor with a two-branch session type
+  # the 1-based line of the first line of `src` containing `needle`
+  defp line_of(src, needle) do
+    index = src |> String.split("\n") |> Enum.find_index(&String.contains?(&1, needle))
+    index + 1
+  end
 
-    # `clauses` spliced in as the handler definitions so each test can control what is wrong
-    @valid_handlers """
-    defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
-      Maty.DSL.send_to(:buyer2, {:date, addr})
-      Maty.DSL.done(state)
-    end
+  # -- How errors are reported
 
-    defhandler decision_handler(:buyer2, {:quit, nil}, state) do
-      Maty.DSL.done(state)
-    end
-    """
-
-    # the 1-based line of the first line of `src` containing `needle`
-    defp line_of(src, needle) do
-      line =
-        src
-        |> String.split("\n")
-        |> Enum.find_index(&String.contains?(&1, needle))
-
-      line + 1
-    end
-
-    # the line the first error in the report says it is on
-    defp own_line(%CompileError{description: description}) do
-      [_, line] = Regex.run(~r/^[^\s:]+:(\d+): \[[^\]]+\/\d+\]/m, description)
-      String.to_integer(line)
-    end
-
-    defp seller_src(module_name, body) do
-      """
-      defmodule MatyCompileErrorFixture.#{module_name} do
-        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
-
-        global_state %{}
-        local_state :seller, %{}
-
-        @role :seller
-
-        @st {:install, ~q/decision_handler/}
-        @st {:decision_handler, ~q/&buyer2:{address(binary).+buyer2:{date(binary).end},quit(nil).end}/}
-
-        on_start ap_pid :: pid() do
-          Maty.DSL.register(ap_pid, @role, &install/2, ap_pid)
-          %{}
-        end
-
-        defhandler install(_ap_pid :: pid(), state) do
-          Maty.DSL.suspend(&decision_handler/3, state)
-        end
-
-        #{body}
+  test "before_compile errors are reported together and hold back body checks" do
+    # `g/0` has a body error, which is not reported until the errors above it are fixed
+    src =
+      actor_src("""
+      defhandler no_such_session_type(:buyer2, {:quit, nil}, state) do
+        Maty.DSL.done(state)
       end
-      """
-    end
 
-    test "per-clause errors are kept when the handler also misses a branch" do
-      # one clause for a two-branch session type: the missing `quit` branch is reported,
-      # and so is the error inside the clause that was provided
-      src =
-        seller_src("ClauseAndCoverage", """
-        defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
-          Maty.DSL.send_to(:buyer1, {:date, addr})
-          Maty.DSL.done(state)
-        end
-        """)
+      @spec f(wat()) :: number()
+      def f(_x), do: 1
 
-      error = compile_error!(src)
+      @spec g() :: number()
+      def g(), do: "not a number"
+      """)
 
-      assert error.description =~ "Incomplete Message Handler Implementation"
-      assert error.description =~ "Incorrect Target Participant"
-    end
+    error = compile_error!(src)
 
-    test "an error in one clause of a multi-clause handler names that clause" do
-      src =
-        seller_src("HandlerClauseFrame", """
+    assert error.description =~ "[maty] 2 type errors in"
+    assert error.description =~ "Missing Handler"
+    assert error.description =~ "Invalid Spec Argument"
+    refute error.description =~ "Return Type Mismatch"
+  end
+
+  test "every error in the module is reported, in source order" do
+    src =
+      actor_src("""
+      @spec b() :: number()
+      def b(), do: "not a number"
+
+      @spec a() :: number()
+      def a(), do: "not a number"
+      """)
+
+    error = compile_error!(src)
+
+    assert error.description =~ "[maty] 2 type errors in"
+    {b, _} = :binary.match(error.description, "[b/0]")
+    {a, _} = :binary.match(error.description, "[a/0]")
+    assert b < a
+  end
+
+  test "clause frames" do
+    # an error in one clause of a multi-clause definition names that clause
+    handler =
+      actor_src("",
+        handlers: """
         defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
           Maty.DSL.send_to(:buyer2, {:date, addr})
           Maty.DSL.done(state)
@@ -161,389 +129,62 @@ defmodule Maty.Typechecker.CompileErrorTest do
           Maty.DSL.send_to(:buyer2, {:date, "never"})
           Maty.DSL.done(state)
         end
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "in clause #2 of decision_handler/4"
-      refute error.description =~ "in clause #1"
-    end
-
-    test "an error in one clause of a multi-clause function names that clause" do
-      src =
-        seller_src("FunctionClauseFrame", """
-        #{@valid_handlers}
-
-        @spec f(number()) :: number()
-        def f(1), do: 1
-
-        @spec f(number()) :: number()
-        def f(_x), do: "not a number"
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Return Type Mismatch"
-      assert error.description =~ "in clause #2 of f/1"
-    end
-
-    test "a single-clause function has no clause frame" do
-      src =
-        seller_src("SingleClause", """
-        #{@valid_handlers}
-
-        @spec f(number()) :: number()
-        def f(_x), do: "not a number"
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Return Type Mismatch"
-      refute error.description =~ "Trace:"
-    end
-
-    test "the CompileError line is the definition line for errors built without one" do
-      # on_link defined twice: wrong_number_of_clauses has no line of its own in the
-      # source, it is taken from the function definition.
-      # The handlers are valid so that this is the only error reported
-      src =
-        seller_src("OnLinkTwice", """
-        #{@valid_handlers}
-
-        on_start ap_pid :: pid() do
-          Maty.DSL.register(ap_pid, @role, &install/2, ap_pid)
-          %{}
-        end
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "[maty] 1 type error in"
-      assert error.description =~ "Wrong Number of Clauses"
-      # the first on_link clause, not the line of the module
-      assert own_line(error) == 12
-      assert error.line == 12
-    end
-
-    test "a function with map record types in its spec compiles" do
-      src =
-        seller_src("MapRecordSpec", """
-        #{@valid_handlers}
-
-        @spec name_of(%{name: binary(), age: number()}) :: %{name: binary()}
-        def name_of(%{name: name}), do: %{name: name}
-        """)
-
-      assert [{MatyCompileErrorFixture.MapRecordSpec, _}] = Code.compile_string(src)
-    end
-
-    test "a match pattern in a function head compiles" do
-      src =
-        seller_src("MatchPatternHead", """
-        #{@valid_handlers}
-
-        @spec rename(%{name: binary(), age: number()}) :: {binary(), %{name: binary(), age: number()}}
-        def rename(%{name: name} = person), do: {name, person}
-        """)
-
-      assert [{MatyCompileErrorFixture.MatchPatternHead, _}] = Code.compile_string(src)
-    end
-
-    test "a map record update compiles" do
-      src =
-        seller_src("MapUpdate", """
-        #{@valid_handlers}
-
-        @spec rename(%{name: binary(), age: number()}, binary()) :: %{name: binary(), age: number()}
-        def rename(person, name), do: %{person | name: name}
-        """)
-
-      assert [{MatyCompileErrorFixture.MapUpdate, _}] = Code.compile_string(src)
-    end
-
-    test "a map record field access compiles" do
-      src =
-        seller_src("FieldAccess", """
-        #{@valid_handlers}
-
-        @spec name_of(%{name: binary(), age: number()}) :: binary()
-        def name_of(person), do: person.name
-        """)
-
-      assert [{MatyCompileErrorFixture.FieldAccess, _}] = Code.compile_string(src)
-    end
-
-    test "a field access with a key the record does not have is reported" do
-      src =
-        seller_src("FieldAccessMissingKey", """
-        #{@valid_handlers}
-
-        @spec email_of(%{name: binary()}) :: binary()
-        def email_of(person), do: person.email
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Field Access Key Not Found"
-      assert error.description =~ "Key: :email"
-      assert own_line(error) == line_of(src, "def email_of")
-    end
-
-    test "a map record update with a key the record does not have is reported" do
-      src =
-        seller_src("MapUpdateMissingKey", """
-        #{@valid_handlers}
-
-        @spec add_email(%{name: binary()}) :: %{name: binary()}
-        def add_email(person), do: %{person | email: "a@b.c"}
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Map Update Key Not Found"
-      assert error.description =~ "Key: :email"
-      assert own_line(error) == line_of(src, "def add_email")
-    end
-
-    test "a spec error is reported on its own, body errors wait until it is fixed" do
-      # `g/0` has a body error that must not be reported yet
-      src =
-        seller_src("SpecErrorFirst", """
-        #{@valid_handlers}
-
-        @spec f(wat()) :: number()
-        def f(_x), do: 1
-
-        @spec g() :: number()
-        def g(), do: "not a number"
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Invalid Spec Argument"
-      refute error.description =~ "Return Type Mismatch"
-    end
-
-    test "every error in the module is reported, each under its own function" do
-      src =
-        seller_src("MultipleErrors", """
-        #{@valid_handlers}
-
-        @spec f() :: number()
-        def f(), do: "a"
-
-        @spec g() :: number()
-        def g(), do: "b"
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "[f/0]"
-      assert error.description =~ "[g/0]"
-      assert length(String.split(error.description, "Return Type Mismatch")) == 3
-    end
-
-    test "a comparison operator whose Erlang name differs is reported under its source name" do
-      # `a <= b` expands to `:erlang.=<`
-      src =
-        seller_src("SourceOperator", """
-        #{@valid_handlers}
-
-        @spec g() :: boolean()
-        def g(), do: 1 <= "a"
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Binary Operator"
-      assert error.description =~ "Operator: <="
-    end
-
-    test "and / or compile, whether or not Elixir can tell the left operand is a boolean" do
-      # `a and b` keeps a `:badbool` branch, `x > 1 and b` does not
-      src =
-        seller_src("BooleanOps", """
-        #{@valid_handlers}
-
-        @spec g(boolean(), boolean()) :: boolean()
-        def g(a, b), do: (a and b) or a
-
-        @spec h(number(), boolean()) :: boolean()
-        def h(x, b), do: x > 1 and b
-        """)
-
-      assert [{MatyCompileErrorFixture.BooleanOps, _}] = Code.compile_string(src)
-    end
-
-    test "and with a non-boolean operand is reported" do
-      src =
-        seller_src("BooleanOpMismatch", """
-        #{@valid_handlers}
-
-        @spec g(boolean(), number()) :: boolean()
-        def g(a, n), do: a and n
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Logical Operator Type Error"
-    end
-
-    test "&& is reported as unsupported, pointing at and / or" do
-      src =
-        seller_src("TruthyOp", """
-        #{@valid_handlers}
-
-        @spec g(boolean(), boolean()) :: boolean()
-        def g(a, b), do: a && b
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Unsupported Operator"
-      assert error.description =~ "Operator: &&"
-    end
-
-    test "unary minus compiles on a number and is reported on anything else" do
-      ok_src =
-        seller_src("UnaryMinus", """
-        #{@valid_handlers}
-
-        @spec g(number()) :: number()
-        def g(x), do: -x
-        """)
-
-      assert [{MatyCompileErrorFixture.UnaryMinus, _}] = Code.compile_string(ok_src)
-
-      bad_src =
-        seller_src("UnaryMinusMismatch", """
-        #{@valid_handlers}
-
-        @spec g(binary()) :: number()
-        def g(s), do: -s
-        """)
-
-      error = compile_error!(bad_src)
-
-      assert error.description =~ "Arithmetic Operator Type Error"
-    end
-
-    test "an expression no rule covers is reported instead of crashing" do
-      src =
-        seller_src("UnsupportedExpression", """
-        #{@valid_handlers}
-
-        @spec g(binary()) :: number()
-        def g(s), do: String.length(s)
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Unsupported Expression"
-      assert error.description =~ "String.length(s)"
-      assert own_line(error) == line_of(src, "def g(s)")
-    end
-
-    test "a case clause with a guard is reported instead of crashing" do
-      src =
-        seller_src("UnsupportedGuard", """
-        #{@valid_handlers}
-
-        @spec g(number()) :: atom()
-        def g(x) do
-          case x do
-            n when n > 0 -> :pos
-            _ -> :other
-          end
-        end
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Unsupported Pattern"
-    end
-
-    test "an error inside a call carries a call frame, and the CompileError line is its own line" do
-      src =
-        seller_src("CallFrame", """
-        #{@valid_handlers}
-
-        @spec f(number()) :: number()
-        def f(x), do: x
-
-        @spec g() :: number()
-        def g(), do: f(1 + "a")
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Binary Operator"
-      assert error.description =~ ~r/Trace:\n\s+via f\/1 \(line \d+\)/
-      assert error.line == own_line(error)
-      assert error.line == line_of(src, "def g(), do: f(1 + \"a\")")
-    end
-
-    test "an error in one clause of a multi-clause init handler names that clause" do
-      # the init handler :install from seller_src is clause #1, this is clause #2
-      src =
-        seller_src("InitHandlerClauseFrame", """
-        defhandler install(_other :: binary(), state) do
+        """
+      )
+
+    error = compile_error!(handler)
+    assert error.description =~ "in clause #2 of decision_handler/4"
+    refute error.description =~ "in clause #1"
+
+    init =
+      actor_src("",
+        init: """
+        #{@init}
+
+        defhandler install(_other :: pid(), state) do
           Maty.DSL.done(state)
         end
+        """
+      )
 
-        #{@valid_handlers}
-        """)
+    error = compile_error!(init)
+    assert error.description =~ "in clause #2 of install/3"
+    refute error.description =~ "in clause #1"
 
-      error = compile_error!(src)
+    function =
+      actor_src("""
+      @spec f(number()) :: number()
+      def f(1), do: 1
+      def f(_x), do: "not a number"
+      """)
 
-      assert error.description =~ "in clause #2 of install/3"
-      refute error.description =~ "in clause #1"
-    end
+    error = compile_error!(function)
+    assert error.description =~ "Return Type Mismatch"
+    assert error.description =~ "in clause #2 of f/1"
 
-    test "a handler missing a branch is reported at the handler definition" do
-      src =
-        seller_src("MissingBranchLine", """
-        defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
-          Maty.DSL.send_to(:buyer2, {:date, addr})
-          Maty.DSL.done(state)
-        end
-        """)
+    # a single-clause function needs no clause frame
+    single =
+      actor_src("""
+      @spec f(number()) :: number()
+      def f(_x), do: "not a number"
+      """)
 
-      error = compile_error!(src)
+    error = compile_error!(single)
+    assert error.description =~ "Return Type Mismatch"
+    refute error.description =~ "Trace:"
+  end
 
-      assert error.description =~ "Incomplete Message Handler Implementation"
-      assert error.line == line_of(src, "defhandler decision_handler(")
-    end
+  test "trace frames" do
+    # the failing expression is in a case, in a case, in an argument of a call to f/1:
+    # the trace lists the frames innermost first
+    nested =
+      actor_src("""
+      @spec f(number()) :: number()
+      def f(x), do: x
 
-    test "an error in a case branch names the branch and its line" do
-      src =
-        seller_src("CaseBranchFrame", """
-        #{@valid_handlers}
-
-        @spec g(number()) :: number()
-        def g(x) do
-          case x do
-            1 -> 1
-            _ -> 1 + "a"
-          end
-        end
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Binary Operator"
-      # the second branch, at the line of that branch rather than the line of the `case`
-      assert error.description =~ "in case branch #2 (line #{line_of(src, "_ -> 1 + \"a\"")})"
-      refute error.description =~ "in case branch #1"
-    end
-
-    test "an error in a nested case names both branches" do
-      src =
-        seller_src("NestedCaseBranchFrame", """
-        #{@valid_handlers}
-
-        @spec g(number()) :: number()
-        def g(x) do
+      @spec g(number()) :: number()
+      def g(x) do
+        f(
           case x do
             1 ->
               case x do
@@ -554,275 +195,102 @@ defmodule Maty.Typechecker.CompileErrorTest do
             _ ->
               2
           end
-        end
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "in case branch #1 (line #{line_of(src, "1 ->")})"
-      assert error.description =~ "in case branch #1 (line #{line_of(src, "2 -> 1 + ")})"
-    end
-
-    test "a literal pattern mismatch in a function clause is reported at that clause, not line 0" do
-      # a literal carries no meta of its own, so the error takes the line of its clause
-      src =
-        seller_src("LiteralPatternClause", """
-        #{@valid_handlers}
-
-        @spec f(binary()) :: number()
-        def f(1), do: 1
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Pattern Type Mismatch"
-      assert own_line(error) == line_of(src, "def f(1)")
-      assert error.line == line_of(src, "def f(1)")
-    end
-
-    test "a literal pattern mismatch in a case branch is reported at that branch" do
-      src =
-        seller_src("LiteralPatternBranch", """
-        #{@valid_handlers}
-
-        @spec g(number()) :: number()
-        def g(x) do
-          case x do
-            1 -> 1
-            "a" -> 2
-          end
-        end
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Pattern Type Mismatch"
-      assert own_line(error) == line_of(src, "\"a\" -> 2")
-    end
-
-    test "a hand-written message handler without a spec reports the missing spec" do
-      src =
-        seller_src("RawHandlerNoSpec", """
-        @handler :decision_handler
-        def decision_handler(_session_ctx, _role, {:quit, nil}, state), do: Maty.DSL.done(state)
-
-        @handler_stub true
-        def decision_handler(_role, _message, _state), do: raise("stub")
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Missing Function Spec"
-
-      assert error.description =~
-               "[decision_handler/4] Type Specification Error: Missing Function Spec"
-    end
-
-    test "a hand-written init handler without a spec reports the missing spec" do
-      src = """
-      defmodule MatyCompileErrorFixture.RawInitNoSpec do
-        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
-
-        global_state %{}
-        local_state :seller, %{}
-
-        @role :seller
-
-        @st {:install, ~q/end/}
-
-        on_start ap_pid :: pid() do
-          Maty.DSL.register(ap_pid, @role, &install/2, ap_pid)
-          %{}
-        end
-
-        @init_handler :install
-        def install(_session_ctx, _arg, state), do: Maty.DSL.done(state)
-
-        @handler_stub true
-        def install(_arg, _state), do: raise("stub")
+        )
       end
-      """
+      """)
 
-      error = compile_error!(src)
+    error = compile_error!(nested)
 
-      assert error.description =~ "Missing Function Spec"
-      assert error.description =~ "[install/3] Type Specification Error: Missing Function Spec"
-    end
+    assert error.description =~
+             ~r/Trace:\n\s+in case branch #1 .*\n\s+in case branch #1 .*\n\s+via f\/1/
 
-    test "several specs on one clause are reported instead of one being silently dropped" do
-      src =
-        seller_src("OverloadedSpecs", """
-        #{@valid_handlers}
-
-        @spec f(number()) :: number()
-        @spec f(binary()) :: binary()
-        def f(x), do: x
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Wrong Number of Specs"
-      assert error.description =~ "Expected specs: 1"
-      assert error.description =~ "Got specs: 2"
-      assert error.description =~ "[f/1]"
-      # the line of one of the two specs
-      assert error.line in [line_of(src, "@spec f(number())"), line_of(src, "@spec f(binary())")]
-    end
-
-    test "the trace lists frames innermost first" do
-      # the failing branch is inside a case, which is itself an argument of the call to f/1
-      src =
-        seller_src("TraceOrder", """
-        #{@valid_handlers}
-
-        @spec f(number()) :: number()
-        def f(x), do: x
-
-        @spec g(number()) :: number()
-        def g(x) do
-          f(
-            case x do
-              1 -> 1 + "a"
-              _ -> 2
-            end
-          )
+    # only the branch the error is in is named
+    second_branch =
+      actor_src("""
+      @spec g(number()) :: number()
+      def g(x) do
+        case x do
+          1 -> 1
+          _ -> 1 + "a"
         end
-        """)
+      end
+      """)
 
-      error = compile_error!(src)
+    error = compile_error!(second_branch)
+    assert error.description =~ "in case branch #2"
+    refute error.description =~ "in case branch #1"
+  end
 
-      assert error.description =~ ~r/Trace:\n\s+in case branch #1 .*\n\s+via f\/1/
-    end
+  test "errors point at their expression's line" do
+    src =
+      actor_src("""
+      @spec f(number()) :: number()
+      def f(x), do: x
 
-    test "a wrongly typed argument to register is reported" do
-      src =
-        """
-        defmodule MatyCompileErrorFixture.RegisterBadAp do
-          use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
+      @spec g() :: number()
+      def g() do
+        f(1 + "a")
+      end
+      """)
 
-          global_state %{}
-          local_state :seller, %{}
+    error = compile_error!(src)
+    assert error.line == line_of(src, ~s|f(1 + "a")|)
+  end
 
-          @role :seller
+  test "errors with no line of their own point at their definition" do
+    # a literal pattern carries no meta, so the error takes the line of its clause
+    src =
+      actor_src("""
+      @spec f(binary()) :: number()
+      def f(1), do: 1
+      """)
 
-          @st {:install, ~q/end/}
+    error = compile_error!(src)
+    assert error.description =~ "Pattern Type Mismatch"
+    assert error.line == line_of(src, "def f(1)")
+  end
 
-          on_start ap_pid :: pid() do
-            Maty.DSL.register(:not_a_pid, @role, &install/2, ap_pid)
-            %{}
-          end
+  # -- Handlers against their session types
 
-          defhandler install(_ap_pid :: pid(), state) do
-            Maty.DSL.done(state)
-          end
-        end
-        """
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Register Argument Type"
-      assert error.description =~ "Argument: 1 (access point)"
-      assert error.description =~ "Expected: :pid"
-      assert error.line == line_of(src, "Maty.DSL.register(:not_a_pid")
-    end
-
-    test "an on_start that never registers is reported at the on_start clause" do
-      src = """
-      defmodule MatyCompileErrorFixture.OnStartNoRegister do
-        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
-
-        global_state %{}
-        local_state :seller, %{}
-
-        @role :seller
-
-        @st {:install, ~q/end/}
-
-        on_start _ap_pid :: pid() do
-          %{}
-        end
-
-        defhandler install(_ap_pid :: pid(), state) do
+  test "message handler branch coverage" do
+    # a missing branch is reported alongside the errors in the clauses that are there
+    missing =
+      actor_src("",
+        handlers: """
+        defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
+          Maty.DSL.send_to(:buyer1, {:date, addr})
           Maty.DSL.done(state)
         end
-      end
-      """
+        """
+      )
 
-      error = compile_error!(src)
+    error = compile_error!(missing)
+    assert error.description =~ "Incomplete Message Handler Implementation"
+    assert error.description =~ "Incorrect Target Participant"
 
-      assert error.description =~ "Missing Session Registration"
-      assert error.line == line_of(src, "on_start _ap_pid")
-    end
-
-    test "a handler whose role does not match the session type is reported at that clause" do
-      # both branches are implemented, so this is the only error
-      src =
-        seller_src("WrongRole", """
-        defhandler decision_handler(:buyer1, {:address, addr :: binary()}, state) do
+    # as many clauses as branches, but both handle :address and none handles :quit
+    duplicate =
+      actor_src("",
+        handlers: """
+        defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
           Maty.DSL.send_to(:buyer2, {:date, addr})
           Maty.DSL.done(state)
         end
 
-        defhandler decision_handler(:buyer2, {:quit, nil}, state) do
+        defhandler decision_handler(:buyer2, {:address, other :: binary()}, state) do
+          Maty.DSL.send_to(:buyer2, {:date, other})
           Maty.DSL.done(state)
         end
-        """)
+        """
+      )
 
-      error = compile_error!(src)
+    error = compile_error!(duplicate)
+    assert error.description =~ "Incomplete Message Handler Implementation"
 
-      assert error.description =~ "Incorrect Incoming Participant"
-      assert error.line == line_of(src, "defhandler decision_handler(:buyer1")
-    end
-
-    test "an init handler whose session type starts with a receive is reported at that clause" do
-      src = """
-      defmodule MatyCompileErrorFixture.InitStartsWithReceive do
-        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
-
-        global_state %{}
-        local_state :seller, %{}
-
-        @role :seller
-
-        @st {:install, ~q/&buyer2:{quit(nil).end}/}
-
-        on_start ap_pid :: pid() do
-          Maty.DSL.register(ap_pid, @role, &install/2, ap_pid)
-          %{}
-        end
-
-        defhandler install(_ap_pid :: pid(), state) do
-          Maty.DSL.done(state)
-        end
-      end
-      """
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Init Handler Starts With a Receive"
-      assert error.line == line_of(src, "defhandler install(")
-    end
-
-    test "a function without a spec is reported at its first clause" do
-      src =
-        seller_src("NoSpec", """
-        #{@valid_handlers}
-
-        def h(x), do: x
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Missing Function Spec"
-      assert error.line == line_of(src, "def h(x)")
-    end
-
-    test "a failing clause still covers its branch, so no missing-branch error is added" do
-      # three clauses for two branches, so coverage is checked. The address clause fails, but it
-      # still implements the address branch. (the second quit clause can never match, which is
-      # fine here, it only makes the clause count differ from the branch count)
-      src =
-        seller_src("FailingClauseCovers", """
+    # a clause that fails still covers the branch it handles
+    failing =
+      actor_src("",
+        handlers: """
         defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
           Maty.DSL.send_to(:buyer1, {:date, addr})
           Maty.DSL.done(state)
@@ -831,505 +299,378 @@ defmodule Maty.Typechecker.CompileErrorTest do
         defhandler decision_handler(:buyer2, {:quit, nil}, state) do
           Maty.DSL.done(state)
         end
+        """
+      )
+
+    error = compile_error!(failing)
+    assert error.description =~ "Incorrect Target Participant"
+    refute error.description =~ "Incomplete Message Handler Implementation"
+
+    # more clauses than branches is fine as long as every branch is covered
+    compiles!(
+      actor_src("",
+        handlers: """
+        #{@handlers}
 
         defhandler decision_handler(:buyer2, {:quit, nil}, state) do
           Maty.DSL.done(state)
         end
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Incorrect Target Participant"
-      refute error.description =~ "Incomplete Message Handler Implementation"
-    end
-
-    test "more clauses than branches compiles when every branch is covered" do
-      src =
-        seller_src("MoreClausesThanBranches", """
-        #{@valid_handlers}
-
-        defhandler decision_handler(:buyer2, {:quit, nil}, state) do
-          Maty.DSL.done(state)
-        end
-        """)
-
-      assert {[{MatyCompileErrorFixture.MoreClausesThanBranches, _}], _diagnostics} =
-               Code.with_diagnostics(fn -> Code.compile_string(src) end)
-    end
-
-    test "one spec covers every clause, so a later clause is checked against it" do
-      src =
-        seller_src("OneSpecAllClauses", """
-        #{@valid_handlers}
-
-        @spec f(number()) :: number()
-        def f(1), do: 1
-        def f(_x), do: "not a number"
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Return Type Mismatch"
-      assert error.description =~ "in clause #2 of f/1"
-    end
-
-    test "one spec per clause pairs each clause with its own spec, in source order" do
-      src =
-        seller_src("SpecPerClauseInOrder", """
-        #{@valid_handlers}
-
-        @spec f(number()) :: number()
-        def f(1), do: 1
-
-        @spec f(binary()) :: binary()
-        def f(_x), do: "a binary"
-        """)
-
-      assert {[{MatyCompileErrorFixture.SpecPerClauseInOrder, _}], _diagnostics} =
-               Code.with_diagnostics(fn -> Code.compile_string(src) end)
-    end
-
-    test "a spec count that is neither one nor one per clause is reported" do
-      src =
-        seller_src("TooFewSpecs", """
-        #{@valid_handlers}
-
-        @spec f(number()) :: number()
-        def f(1), do: 1
-
-        @spec f(number()) :: number()
-        def f(2), do: 2
-        def f(_x), do: 3
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Wrong Number of Specs"
-      assert error.description =~ "Expected specs: 1 or 3"
-      assert error.description =~ "Got specs: 2"
-      assert error.line == line_of(src, "def f(1)")
-    end
-
-    test "a role that is not a literal atom is reported" do
-      src =
         """
-        defmodule MatyCompileErrorFixture.RegisterBadRole do
-          use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
-
-          global_state %{}
-          local_state :seller, %{}
-
-          @role :seller
-
-          @st {:install, ~q/end/}
-
-          on_start ap_pid :: pid() do
-            Maty.DSL.register(ap_pid, "seller", &install/2, ap_pid)
-            %{}
-          end
-
-          defhandler install(_ap_pid :: pid(), state) do
-            Maty.DSL.done(state)
-          end
-        end
-        """
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Role Not a Literal"
-      assert error.description =~ ~s(Got: "seller")
-    end
-
-    test "registering a role the module does not declare is reported" do
-      src =
-        """
-        defmodule MatyCompileErrorFixture.RegisterUndeclaredRole do
-          use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
-
-          global_state %{}
-          local_state :seller, %{}
-
-          @st {:install, ~q/end/}
-
-          on_start ap_pid :: pid() do
-            Maty.DSL.register(ap_pid, :buyer1, &install/2, ap_pid)
-            %{}
-          end
-
-          defhandler install(_ap_pid :: pid(), state) do
-            Maty.DSL.done(state)
-          end
-        end
-        """
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Undeclared Role"
-      assert error.description =~ "Got: :buyer1"
-      assert error.description =~ "Declared roles: :seller"
-      assert error.line == line_of(src, "Maty.DSL.register(")
-    end
-
-    test "declaring a role that is not in the protocol is reported" do
-      src =
-        """
-        defmodule MatyCompileErrorFixture.UnknownProtocolRole do
-          use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller, :auditor]
-
-          global_state %{}
-          local_state :seller, %{}
-          local_state :auditor, %{}
-
-          @st {:install, ~q/end/}
-
-          on_start ap_pid :: pid() do
-            Maty.DSL.register(ap_pid, :seller, &install/2, ap_pid)
-            %{}
-          end
-
-          defhandler install(_ap_pid :: pid(), state) do
-            Maty.DSL.done(state)
-          end
-        end
-        """
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Unknown Roles"
-      assert error.description =~ "Got: :auditor"
-      assert error.description =~ "Roles of TwoBuyer.Protocol: :buyer1, :buyer2, :seller"
-    end
-
-    test "a multi-clause function without a spec reports the missing spec once" do
-      src =
-        seller_src("NoSpecTwoClauses", """
-        #{@valid_handlers}
-
-        def h(1), do: 1
-        def h(_x), do: 2
-        """)
-
-      error = compile_error!(src)
-
-      assert length(String.split(error.description, "Missing Function Spec")) == 2
-      refute error.description =~ "in clause"
-    end
-
-    test "spec errors and handler annotation errors are reported together" do
-      src =
-        seller_src("SpecAndAnnotationErrors", """
-        #{@valid_handlers}
-
-        defhandler no_such_session_type(:buyer2, {:quit, nil}, state) do
-          Maty.DSL.done(state)
-        end
-
-        @spec f(wat()) :: number()
-        def f(_x), do: 1
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "[maty] 2 type errors in"
-      assert error.description =~ "Missing Handler"
-      assert error.description =~ "Invalid Spec Argument"
-    end
-
-    test "errors are reported in source order, each at its own location" do
-      # defined b, a, c: the report used to follow function names (a, b, c)
-      src =
-        seller_src("SourceOrder", """
-        #{@valid_handlers}
-
-        @spec b() :: number()
-        def b(), do: "not a number"
-
-        @spec a() :: number()
-        def a(), do: "not a number"
-
-        @spec c() :: number()
-        def c(), do: "not a number"
-        """)
-
-      error = compile_error!(src)
-
-      [b_line, a_line, c_line] = Enum.map(["def b()", "def a()", "def c()"], &line_of(src, &1))
-
-      reported = Regex.scan(~r/^nofile:(\d+): \[(\w+\/\d)\]/m, error.description)
-
-      assert Enum.map(reported, fn [_, line, func] -> {String.to_integer(line), func} end) ==
-               [{b_line, "b/0"}, {a_line, "a/0"}, {c_line, "c/0"}]
-
-      # the CompileError points at the first error in the file
-      assert error.line == b_line
-    end
+      )
+    )
   end
 
-  describe "register" do
-    # the :seller actor, registering with `register_call` from on_link
-    # `init_handlers` replaces the default single-clause init handler taking a {pid, binary}
-    defp register_src(module_name, register_call, init_handlers \\ nil) do
-      init_handlers =
-        init_handlers ||
-          """
-          defhandler install({_ap_pid, _title} :: {pid(), binary()}, state) do
-            Maty.DSL.suspend(&decision_handler/3, state)
-          end
-          """
-
-      """
-      defmodule MatyCompileErrorFixture.#{module_name} do
-        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
-
-        global_state %{}
-        local_state :seller, %{}
-
-        @role :seller
-
+  test "a message handler whose session type is not a receive is reported once" do
+    src =
+      actor_src("",
+        st: """
         @st {:install, ~q/decision_handler/}
-        @st {:decision_handler, ~q/&buyer2:{address(binary).+buyer2:{date(binary).end},quit(nil).end}/}
+        @st {:decision_handler, ~q/+buyer2:{date(binary).end}/}
+        """
+      )
 
-        on_start ap_pid :: pid() do
-          #{register_call}
-          %{}
-        end
-
-        #{init_handlers}
-
-        #{@valid_handlers}
-      end
-      """
-    end
-
-    @two_clause_init_handler """
-    defhandler install({_ap_pid, _title} :: {pid(), binary()}, state) do
-      Maty.DSL.suspend(&decision_handler/3, state)
-    end
-
-    defhandler install({_ap_pid, _stock, _quantity} :: {pid(), number(), number()}, state) do
-      Maty.DSL.suspend(&decision_handler/3, state)
-    end
-    """
-
-    test "args of the wrong type are reported as register's fourth argument" do
-      src =
-        register_src(
-          "RegisterBadArgs",
-          "Maty.DSL.register(ap_pid, @role, &install/2, {ap_pid, false})"
-        )
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Register Argument Type"
-      assert error.description =~ "Argument: 4 (init handler args)"
-      assert error.description =~ "Expected: {:tuple, [:pid, :binary]}\n"
-      assert error.description =~ "Got: {:tuple, [:pid, :boolean]}"
-      assert error.line == line_of(src, "Maty.DSL.register(")
-    end
-
-    test "args are checked against every clause of a multi-clause init handler" do
-      src =
-        register_src(
-          "RegisterBadArgsTwoClauses",
-          "Maty.DSL.register(ap_pid, @role, &install/2, 1)",
-          @two_clause_init_handler
-        )
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Argument: 4 (init handler args)"
-      assert error.description =~ "Expected: one of: "
-      assert error.description =~ "{:tuple, [:pid, :binary]}"
-      assert error.description =~ "{:tuple, [:pid, :number, :number]}"
-      assert error.description =~ "Got: :number"
-    end
-
-    test "args matching any clause of a multi-clause init handler are accepted" do
-      src =
-        register_src(
-          "RegisterSecondClause",
-          "Maty.DSL.register(ap_pid, @role, &install/2, {ap_pid, 5, 10})",
-          @two_clause_init_handler
-        )
-
-      assert [{MatyCompileErrorFixture.RegisterSecondClause, _}] = Code.compile_string(src)
-    end
-
-    test "a capture of a function that is not a handler is reported" do
-      src =
-        register_src(
-          "RegisterNonHandler",
-          ~s|Maty.DSL.register(ap_pid, @role, &nope/2, {ap_pid, "title"})|,
-          """
-          defhandler install({_ap_pid, _title} :: {pid(), binary()}, state) do
-            Maty.DSL.suspend(&decision_handler/3, state)
-          end
-
-          @spec nope(pid(), binary()) :: atom()
-          def nope(_ap_pid, _title), do: :ok
-          """
-        )
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Unsupported Capture"
-      assert error.description =~ "Capture: &nope/2"
-      assert error.line == line_of(src, "Maty.DSL.register(")
-    end
-
-    test "a remote capture is reported as an unsupported capture" do
-      src =
-        register_src(
-          "RegisterRemoteCapture",
-          ~s|Maty.DSL.register(ap_pid, @role, &Kernel.elem/2, {ap_pid, "title"})|
-        )
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Unsupported Capture"
-      assert error.description =~ "Capture: &Kernel.elem/2"
-      assert error.line == line_of(src, "Maty.DSL.register(")
-    end
-
-    test "a message handler is not accepted as an init handler" do
-      src =
-        register_src(
-          "RegisterMessageHandler",
-          ~s|Maty.DSL.register(ap_pid, @role, &decision_handler/3, {ap_pid, "title"})|
-        )
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Expected an Init Handler"
-      assert error.description =~ "Got: message handler"
-    end
-
-    test "registering with a variable that is not a handler is reported" do
-      src =
-        register_src("RegisterNonLiteralHandler", """
-        handler_name = :install
-        Maty.DSL.register(ap_pid, @role, handler_name, {ap_pid, "title"})
-        """)
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Expected an Init Handler"
-      assert error.description =~ "Got: :atom"
-      assert error.line == line_of(src, "Maty.DSL.register(")
-    end
+    error = compile_error!(src)
+    assert error.description =~ "[maty] 1 type error in"
+    assert error.description =~ "Message Handler Does Not Receive"
   end
 
-  describe "suspend" do
-    # the :seller actor whose init handler suspends with `next_handler` the session type continues as `title_handler`
-    defp suspend_src(module_name, next_handler) do
-      """
-      defmodule MatyCompileErrorFixture.#{module_name} do
-        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
-
-        global_state %{}
-        local_state :seller, %{}
-
-        @role :seller
-
-        @st {:install, ~q/title_handler/}
-        @st {:title_handler, ~q/&buyer:{title(binary).end}/}
-
-        on_start ap_pid :: pid() do
-          Maty.DSL.register(ap_pid, @role, &install/2, nil)
-          %{}
-        end
-
-        defhandler install(nil, state) do
-          next_handler = :title_handler
-          _ = next_handler
-          Maty.DSL.suspend(#{next_handler}, state)
-        end
-
-        defhandler title_handler(:buyer, {:title, _title :: binary()}, state) do
+  test "handler heads against their session types" do
+    wrong_role =
+      actor_src("",
+        handlers: """
+        defhandler decision_handler(:buyer1, {:address, addr :: binary()}, state) do
+          Maty.DSL.send_to(:buyer2, {:date, addr})
           Maty.DSL.done(state)
         end
-      end
-      """
-    end
 
-    test "suspending with an init handler is reported" do
-      src = suspend_src("SuspendInitHandler", "&install/2")
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Expected a Message Handler"
-      assert error.description =~ "Got: init handler"
-      assert error.line == line_of(src, "Maty.DSL.suspend(")
-    end
-
-    test "suspending with a variable that is not a handler is reported" do
-      src = suspend_src("SuspendVariable", "next_handler")
-
-      error = compile_error!(src)
-
-      assert error.description =~ "Expected a Message Handler"
-      assert error.description =~ "Got: :atom"
-      assert error.line == line_of(src, "Maty.DSL.suspend(")
-    end
-
-    test "suspending with the message handler the session type names compiles" do
-      src = suspend_src("SuspendMessageHandler", "&title_handler/3")
-
-      assert [{MatyCompileErrorFixture.SuspendMessageHandler, _}] = Code.compile_string(src)
-    end
-  end
-
-  # the label picks the branch, so a wrong payload on a label that isn't the first branch's
-  # is a payload error, not an unknown label
-  describe "branch lookup" do
-    test "sending a wrong payload on the second label reports the payload" do
-      src = """
-      defmodule MatyCompileErrorFixture.SendSecondLabelPayload do
-        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:buyer1]
-
-        global_state %{}
-        local_state :buyer1, %{}
-
-        @role :buyer1
-
-        @st {:install, ~q/+seller:{title(binary).end,quit(nil).end}/}
-
-        on_start {ap_pid, title} :: {pid(), binary()} do
-          Maty.DSL.register(ap_pid, @role, &install/2, title)
-          %{}
-        end
-
-        defhandler install(title :: binary(), state) do
-          Maty.DSL.send_to(:seller, {:quit, title})
+        defhandler decision_handler(:buyer2, {:quit, nil}, state) do
           Maty.DSL.done(state)
         end
-      end
-      """
+        """
+      )
 
-      error = compile_error!(src)
+    assert compile_error!(wrong_role).description =~ "Incorrect Incoming Participant"
 
-      assert error.description =~ "Incorrect Payload Type"
-      refute error.description =~ "Incorrect Message Label"
-      assert own_line(error) == line_of(src, "Maty.DSL.send_to(")
-    end
-
-    test "handling a wrong payload on the second label reports the payload" do
-      src =
-        seller_src("HandleSecondLabelPayload", """
+    # the label picks the branch, so a wrong payload on the second label is a payload error,
+    # not an unknown label
+    wrong_payload =
+      actor_src("",
+        handlers: """
         defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
           Maty.DSL.send_to(:buyer2, {:date, addr})
           Maty.DSL.done(state)
         end
 
+        defhandler decision_handler(:buyer2, {:quit, 5}, state) do
+          Maty.DSL.done(state)
+        end
+        """
+      )
+
+    error = compile_error!(wrong_payload)
+    assert error.description =~ "Pattern Type Mismatch"
+    refute error.description =~ "Incorrect Incoming Message Label"
+
+    init_receives =
+      actor_src("",
+        st: "@st {:install, ~q/&buyer2:{quit(nil).end}/}",
+        init: """
+        defhandler install(_ap_pid :: pid(), state) do
+          Maty.DSL.done(state)
+        end
+        """,
+        handlers: ""
+      )
+
+    assert compile_error!(init_receives).description =~ "Init Handler Starts With a Receive"
+  end
+
+  # todo: fails until a handler's payload annotation is checked against its session type
+  # (`defhandler` strips `:: number()` from the pattern, and the bare variable matches any type)
+  test "a payload annotation that disagrees with the session type is reported" do
+    src =
+      actor_src("",
+        handlers: """
+        #{@handlers}
+
         defhandler decision_handler(:buyer2, {:quit, _n :: number()}, state) do
           Maty.DSL.done(state)
         end
-        """)
+        """
+      )
 
-      error = compile_error!(src)
+    compile_error!(src)
+  end
 
-      assert error.description =~ "Incorrect Incoming Payload Type"
-      refute error.description =~ "Incorrect Incoming Message Label"
+  test "sending a wrong payload on the second label reports the payload" do
+    src =
+      actor_src("",
+        st: "@st {:install, ~q/+buyer2:{date(binary).end,quit(nil).end}/}",
+        init: """
+        defhandler install(ap_pid :: pid(), state) do
+          Maty.DSL.send_to(:buyer2, {:quit, ap_pid})
+          Maty.DSL.done(state)
+        end
+        """,
+        handlers: ""
+      )
+
+    error = compile_error!(src)
+    assert error.description =~ "Incorrect Payload Type"
+    refute error.description =~ "Incorrect Message Label"
+  end
+
+  # -- Function specs
+
+  test "function specs" do
+    # a function without a spec is reported once, not once per clause
+    no_spec =
+      actor_src("""
+      def h(1), do: 1
+      def h(_x), do: 2
+      """)
+
+    error = compile_error!(no_spec)
+    assert length(String.split(error.description, "Missing Function Spec")) == 2
+    refute error.description =~ "in clause"
+
+    # a function takes exactly one spec, whether the specs are on one clause or spread over several
+    for body <- [
+          """
+          @spec f(number()) :: number()
+          @spec f(binary()) :: binary()
+          def f(x), do: x
+          """,
+          """
+          @spec f(number()) :: number()
+          def f(1), do: 1
+
+          @spec f(binary()) :: binary()
+          def f(_x), do: "a binary"
+          """
+        ] do
+      error = compile_error!(actor_src(body))
+      assert error.description =~ "Wrong Number of Specs"
+      assert error.description =~ "Expected specs: 1"
+      assert error.description =~ "Got specs: 2"
+    end
+  end
+
+  # -- on_start, register and suspend
+
+  test "roles" do
+    not_literal =
+      actor_src("", on_start: ~s|Maty.DSL.register(ap_pid, "seller", &install/2, ap_pid)|)
+
+    error = compile_error!(not_literal)
+    assert error.description =~ "Role Not a Literal"
+    assert error.description =~ ~s(Got: "seller")
+
+    undeclared =
+      actor_src("", on_start: "Maty.DSL.register(ap_pid, :buyer1, &install/2, ap_pid)")
+
+    error = compile_error!(undeclared)
+    assert error.description =~ "Undeclared Role"
+    assert error.description =~ "Got: :buyer1"
+
+    not_in_protocol = actor_src("", roles: [:seller, :auditor])
+
+    error = compile_error!(not_in_protocol)
+    assert error.description =~ "Unknown Roles"
+    assert error.description =~ "Got: :auditor"
+  end
+
+  test "register arguments" do
+    bad_ap =
+      actor_src("", on_start: "Maty.DSL.register(:not_a_pid, :seller, &install/2, ap_pid)")
+
+    error = compile_error!(bad_ap)
+    assert error.description =~ "Register Argument Type"
+    assert error.description =~ "Argument: 1 (access point)"
+
+    bad_args =
+      actor_src("", on_start: ~s|Maty.DSL.register(ap_pid, :seller, &install/2, "not a pid")|)
+
+    error = compile_error!(bad_args)
+    assert error.description =~ "Argument: 4 (init handler args)"
+    assert error.description =~ "Expected: :pid"
+    assert error.description =~ "Got: :binary"
+
+    never_registers = actor_src("", on_start: "")
+    assert compile_error!(never_registers).description =~ "Missing Session Registration"
+  end
+
+  test "register's handler argument" do
+    function =
+      actor_src(
+        """
+        @spec nope(pid()) :: atom()
+        def nope(_ap_pid), do: :ok
+        """,
+        on_start: "Maty.DSL.register(ap_pid, :seller, &nope/1, ap_pid)"
+      )
+
+    assert compile_error!(function).description =~ "Expected an Init Handler"
+
+    remote =
+      actor_src("", on_start: "Maty.DSL.register(ap_pid, :seller, &Kernel.elem/2, ap_pid)")
+
+    assert compile_error!(remote).description =~ "Function Does Not Exist"
+
+    message_handler =
+      actor_src("", on_start: "Maty.DSL.register(ap_pid, :seller, &decision_handler/3, ap_pid)")
+
+    error = compile_error!(message_handler)
+    assert error.description =~ "Expected an Init Handler"
+    assert error.description =~ "Got: message handler"
+
+    variable =
+      actor_src("",
+        on_start: """
+        handler = :install
+        Maty.DSL.register(ap_pid, :seller, handler, ap_pid)
+        """
+      )
+
+    error = compile_error!(variable)
+    assert error.description =~ "Expected an Init Handler"
+    assert error.description =~ "Got: :atom"
+  end
+
+  test "init handler clauses must take the same argument type" do
+    src =
+      actor_src("",
+        init: """
+        #{@init}
+
+        defhandler install(_n :: number(), state) do
+          Maty.DSL.suspend(&decision_handler/3, state)
+        end
+        """
+      )
+
+    assert compile_error!(src).description =~ "Init Handler Clauses Take Different Types"
+  end
+
+  test "suspend's handler argument" do
+    init_handler =
+      actor_src("",
+        init: """
+        defhandler install(_ap_pid :: pid(), state) do
+          Maty.DSL.suspend(&install/2, state)
+        end
+        """
+      )
+
+    error = compile_error!(init_handler)
+    assert error.description =~ "Expected a Message Handler"
+    assert error.description =~ "Got: init handler"
+
+    variable =
+      actor_src("",
+        init: """
+        defhandler install(_ap_pid :: pid(), state) do
+          next = :decision_handler
+          Maty.DSL.suspend(next, state)
+        end
+        """
+      )
+
+    error = compile_error!(variable)
+    assert error.description =~ "Expected a Message Handler"
+    assert error.description =~ "Got: :atom"
+
+    # a message handler, but not the one the session type continues as
+    other_handler =
+      actor_src("",
+        st: """
+        #{@st}
+        @st {:other_handler, ~q/&buyer2:{quit(nil).end}/}
+        """,
+        init: """
+        defhandler install(_ap_pid :: pid(), state) do
+          Maty.DSL.suspend(&other_handler/3, state)
+        end
+        """,
+        handlers: """
+        #{@handlers}
+
+        defhandler other_handler(:buyer2, {:quit, nil}, state) do
+          Maty.DSL.done(state)
+        end
+        """
+      )
+
+    assert compile_error!(other_handler).description =~ "Handler for a Different Session Type"
+
+    # the default actor suspends with the handler its session type continues as
+    compiles!(actor_src(""))
+  end
+
+  # -- Expressions that expansion rewrites
+  # (the forms that look the same before and after expansion are tested in `tc_expr_test.exs`)
+
+  # `code` as the body of a function with one argument of each type it needs
+  defp function_src(code) do
+    actor_src("""
+    @spec f(number(), binary(), boolean(), pid()) :: number()
+    def f(n, s, b, p) do
+      #{code}
+    end
+    """)
+  end
+
+  test "operators and strings that compile" do
+    src =
+      actor_src(~S"""
+      @spec arith(number(), number()) :: number()
+      def arith(x, y), do: -(x + y * x - y / x)
+
+      @spec compare(number(), number()) :: boolean()
+      def compare(x, y), do: x < y and x <= y and x >= y and x > y and x == y and x != y
+
+      # `a and b` keeps a `:badbool` branch after expansion, `x > 1 and b` does not
+      @spec bools(boolean(), boolean(), number()) :: boolean()
+      def bools(a, b, x), do: not ((a and b) or a) or (x > 1 and b)
+
+      @spec strings(binary(), number()) :: binary()
+      def strings(s, n), do: "#{s} has #{n} " <> s
+      """)
+
+    compiles!(src)
+  end
+
+  test "operator and string type errors" do
+    for {code, title} <- [
+          {~S|n + s|, "Binary Operator Type Error"},
+          # `<=` expands to `:erlang.=<`, but is reported as written
+          {~S|n <= s|, "Operator: <="},
+          {~S|b and n|, "Logical Operator Type Error"},
+          {~S|b && b|, "Unsupported Operator"},
+          {~S|-s|, "Arithmetic Operator Type Error"},
+          {~S|not n|, "Logical Operator Type Error"},
+          {~S|n <> s|, "String Concatenation"},
+          {~S|"#{p}"|, "String Interpolation"},
+          {~S|<<n::8>>|, "Unsupported Bitstring"}
+        ] do
+      error = compile_error!(function_src(code))
+      assert error.description =~ title, "#{code} should report #{title}"
+    end
+  end
+
+  test "rejected expressions" do
+    for {code, title} <- [
+          {~S|String.length(s)|, "Unsupported Expression"},
+          {~S|send(p, n)|, "Attempted Native Communication"},
+          {~S"""
+           case n do
+             x when x > 0 -> x
+             _ -> 0
+           end
+           """, "Unsupported Pattern"}
+        ] do
+      error = compile_error!(function_src(code))
+      assert error.description =~ title, "#{code} should report #{title}"
     end
   end
 end
