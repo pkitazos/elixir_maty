@@ -57,14 +57,8 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
              TSP.parse(quote(do: %{user: %{name: binary()}}))
   end
 
-  # todo: fails until `%{}` is rejected, since a record needs at least one field
-  test "an empty map record is rejected" do
-    assert {:error, %Cause{}} = TSP.parse(quote(do: %{}))
-  end
-
   # -- Map dictionary types
 
-  # todo: fails until the parser reads a key type as a dictionary
   test "map dictionaries" do
     assert {:ok, {:map_dict, {:atom, :binary}}} = TSP.parse(quote(do: %{atom() => binary()}))
 
@@ -117,5 +111,15 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
         ] do
       assert {:error, %Cause{kind: :unsupported_type_constructor}} = TSP.parse(ast)
     end
+
+    # a record has at least one field
+    assert {:error, %Cause{kind: :empty_record}} = TSP.parse(quote(do: %{}))
+
+    # a dictionary has a single entry, whose key is a base type
+    assert {:error, %Cause{kind: :unsupported_type_constructor}} =
+             TSP.parse(quote(do: %{atom() => binary(), binary() => number()}))
+
+    assert {:error, %Cause{kind: :dict_key_not_base_type}} =
+             TSP.parse(quote(do: %{list(number()) => binary()}))
   end
 end

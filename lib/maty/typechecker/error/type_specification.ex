@@ -91,4 +91,17 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
   def heterogeneous_list_error(conflicting_types) do
     %Error.Cause{kind: :heterogeneous_list, details: %{types: conflicting_types}}
   end
+
+  # a record type with no fields, `%{}`: a record has at least one
+  def empty_record(type_ast) do
+    %Error.Cause{kind: :empty_record, details: %{type_ast: type_ast}}
+  end
+
+  # a dictionary type `%{k => v}` whose key type is not a base type
+  def dict_key_not_base_type(type_ast, key_type) do
+    %Error.Cause{
+      kind: :dict_key_not_base_type,
+      details: %{type_ast: type_ast, key_type: key_type}
+    }
+  end
 end

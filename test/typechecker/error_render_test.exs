@@ -32,7 +32,9 @@ defmodule Maty.Typechecker.ErrorRenderTest do
     {Error.TypeSpecification, :unsupported_type_constructor},
     {Error.TypeSpecification, :invalid_record_label},
     {Error.TypeSpecification, :unknown_type_constructor},
-    {Error.TypeSpecification, :heterogeneous_list_error}
+    {Error.TypeSpecification, :heterogeneous_list_error},
+    {Error.TypeSpecification, :empty_record},
+    {Error.TypeSpecification, :dict_key_not_base_type}
   ]
 
   defp errors do

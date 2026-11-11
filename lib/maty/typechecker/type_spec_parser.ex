@@ -12,6 +12,7 @@ defmodule Maty.Typechecker.TypeSpecParser do
   - {ast1, ast2}        (2-tuple)
   - {:{}, _, elements} (n-tuple)
   - {:%{}, _, fields}  (map record with literal atom keys, e.g. %{name: binary()})
+  - {:%{}, _, [{k, v}]} (map dictionary with a base key type, e.g. %{atom() => binary()})
   """
   @spec parse(type_ast :: Macro.t()) :: {:ok, Type.t()} | {:error, Error.Cause.t()}
   def parse(type_ast) do
@@ -66,6 +67,28 @@ defmodule Maty.Typechecker.TypeSpecParser do
   # Case 4: List {:list, _, [elements...]}
   defp do_parse({:list, _meta, elements_list}, type_env) when is_list(elements_list) do
     parse_list_elements(elements_list, type_env)
+  end
+
+  # `%{}` is not a type: a record has at least one field, and a dictionary names its key and value types
+  defp do_parse({:%{}, _meta, []} = map_ast, _type_env) do
+    {:error, Error.TypeSpecification.empty_record(map_ast)}
+  end
+
+  # Case 6: Map dictionary %{k => v}
+  # a single entry whose key is a type rather than a literal atom, the key type must be a base type
+  defp do_parse({:%{}, _meta, [{key_ast, value_ast}]} = map_ast, type_env)
+       when not is_atom(key_ast) do
+    with {:ok, key_type} <- do_parse(key_ast, type_env),
+         {:base, true, _key_type} <- {:base, Maty.Types.is_base_type?(key_type), key_type},
+         {:ok, value_type} <- do_parse(value_ast, type_env) do
+      {:ok, {:map_dict, {key_type, value_type}}}
+    else
+      {:base, false, key_type} ->
+        {:error, Error.TypeSpecification.dict_key_not_base_type(map_ast, key_type)}
+
+      {:error, _} = err ->
+        err
+    end
   end
 
   # Case 5: Map record %{k1: t1, ...}

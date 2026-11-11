@@ -1061,6 +1061,16 @@ defmodule Maty.Typechecker.Error.Formatter do
      "List type specifications must contain elements of the same type."}
   end
 
+  defp render_cause(%Error.Cause{kind: :empty_record}) do
+    {"Empty Record Type", "Type: %{}",
+     "A record type needs at least one field. Use nil for a value that carries nothing."}
+  end
+
+  defp render_cause(%Error.Cause{kind: :dict_key_not_base_type, details: %{key_type: key_type}}) do
+    {"Dict Key Not a Base Type", "Key type: #{render_type(key_type)}",
+     "Dict keys must have a base type."}
+  end
+
   defp render_cause(%Error.Cause{kind: :invalid_maty_state, details: %{got: got}}) do
     {"Invalid Maty State Type", "Expected type: :maty_actor_state\nGot type: #{render_type(got)}",
      "Maty operations require a valid actor state type."}

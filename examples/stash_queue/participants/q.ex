@@ -2,7 +2,7 @@ defmodule StashQueue.Participants.Q do
   use Maty.Actor, protocol: StashQueue.Protocol, roles: [:q]
 
   global_state nil
-  local_state :q, %{}
+  local_state :q, nil
 
   @st {:install, ~q/p1_handler/}
   @st {:p1_handler, ~q/&p:{a(number).r1_handler}/}

@@ -2,7 +2,7 @@ defmodule TwoBuyer.Participants.Buyer2 do
   use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:buyer2]
 
   global_state nil
-  local_state :buyer2, %{}
+  local_state :buyer2, nil
 
   @st {:install, ~q"share_handler"}
   @st {:share_handler,

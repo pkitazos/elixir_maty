@@ -2,7 +2,7 @@ defmodule TwoBuyer.Participants.Seller do
   use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
 
   global_state nil
-  local_state :seller, %{}
+  local_state :seller, nil
 
   @st {:install, ~q"title_handler"}
   @st {:title_handler, ~q"&buyer1:{title(binary).+buyer1:{quote(number).decision_handler}}"}
