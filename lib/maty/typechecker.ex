@@ -60,7 +60,6 @@ defmodule Maty.Typechecker do
     errors =
       Module.get_attribute(env.module, :handler_errors) ++
         unknown_role_errors(env) ++
-        handler_name_clash_errors(env) ++
         state_errors
 
     # we fail here, before the bodies are checked in `handle_after_compile`, on purpose:
@@ -80,29 +79,6 @@ defmodule Maty.Typechecker do
     case Signatures.build(env.module, clauses, session_types) do
       {:ok, signatures} -> Module.put_attribute(env.module, :maty_signatures, signatures)
       {:error, errors} -> raise_type_errors!(env, errors)
-    end
-  end
-
-  @spec handler_name_clash_errors(Macro.Env.t()) :: [{{atom(), arity()}, Error.t()}]
-  defp handler_name_clash_errors(env) do
-    all_handlers =
-      Map.merge(
-        Delta.get_key_set(env.module, :delta_M) |> Map.new(fn {name, _} -> {name, :message} end),
-        Delta.get_key_set(env.module, :delta_I) |> Map.new(fn {name, _} -> {name, :init} end)
-      )
-
-    for {name, arity, line} <-
-          Module.get_attribute(env.module, :non_handler_defs)
-          |> Enum.reverse()
-          |> Enum.uniq_by(fn {name, arity, _line} -> {name, arity} end),
-        Map.has_key?(all_handlers, name) do
-      {{name, arity},
-       Error.FrameworkUsage.handler_name_clash(
-         env.module,
-         [line: line],
-         {name, arity},
-         all_handlers[name]
-       )}
     end
   end
 
@@ -140,242 +116,44 @@ defmodule Maty.Typechecker do
     # we omit the definitions injected into the scope by our behaviour as we can assume they are type-safe
     all_module_definitions = fetch_module_definitions!(env.module, bytecode)
 
-    # Δ_M is the environment which maps message handler names to session type annotations
-    delta_M = Module.get_attribute(env.module, :delta_M)
-
-    # we get both, the list of tuples and the map, because I've not figured out what the cleanest thing is yet
-    delta_m = Utils.Env.get_map(env.module, :delta_M)
-
-    # similarly, Δ_I is the environment which maps init handler names to session type annotations
-    delta_I = Module.get_attribute(env.module, :delta_I)
-    # and again, I will eventually stick to only fetching one of the two
-    delta_i = Utils.Env.get_map(env.module, :delta_I)
-
-    # Ψ is the function definition environment, maps function names to type signatures
-    psi = Utils.Env.get_map(env.module, :psi)
-
     # build the typing context struct for synth and friends
     ctx = %Ctx{
       module: env.module,
       # until a clause sets its own, errors that have no location of their own point at the module
       meta: [line: env.line],
       roles: Module.get_attribute(env.module, :maty_roles),
-      signatures: Module.get_attribute(env.module, :maty_signatures),
-      delta_M: delta_m,
-      delta_I: delta_i,
-      psi: psi
+      signatures: Module.get_attribute(env.module, :maty_signatures)
     }
-
-    # convert the lists of pairs into sets of fst for fast lookup (can also be optimised)
-    module_init_handlers = Delta.key_set(delta_I)
-    module_handlers = Delta.key_set(delta_M)
 
     # we then build up a list of `{func_id, %Error{}}` pairs
     # the errors are structs which bubble all the way up to here
     # and are only formatted once we report them in `raise_type_errors!`
     errors =
-      for {func_id, _kind, def_meta, func_clauses} <- all_module_definitions, reduce: [] do
+      for {{name, _arity} = func_id, _kind, meta, cs} <- all_module_definitions,
+          reduce: [] do
         # we reduce over the list of all the definitions in our module to accumulate errors
         acc ->
-          cond do
-            # a hand-written handler (an `@handler` on a plain def) may have no spec at all
-            # in which case there is nothing to check its clauses against
-            # todo: maybe just find a niccer way to forbid hand-written handlers..
-            MapSet.member?(module_handlers, func_id) and not Map.has_key?(psi, func_id) ->
-              [
-                {func_id,
-                 Error.TypeSpecification.no_spec_for_function(env.module, def_meta, func_id)}
-                | acc
-              ]
+          ctx = %{ctx | meta: meta}
 
-            # if this particular function is a message handler
-            # we check for its well-formedness
-            MapSet.member?(module_handlers, func_id) ->
-              {handler_name, 4} = func_id
+          errs =
+            cond do
+              match?({:handler, :message, _}, ctx.signatures[name]) ->
+                deal_with_message_handler(ctx, name, cs)
 
-              # we fetch the associated session type annotations for this handler
-              handler_M = delta_m[handler_name]
-              # and the associated type signatures
-              type_signatures = psi[func_id] |> Enum.reverse()
+              # next we check to see if the function we're type-checking is an init_handler
+              match?({:handler, :init, _, _}, ctx.signatures[name]) ->
+                deal_with_init_handler(ctx, name, cs)
 
-              # because we may have multiple handler clauses, we need to iterate over
-              # all definitions and their associated type signatures and check if they are well-formed
-              # we typecheck each clause exactly once, and derive both the per-clause errors
-              # and the visited session branches from these results
-              clause_results =
-                for {{clause, type_signature}, index} <-
-                      Enum.zip(func_clauses, type_signatures) |> Enum.with_index(1) do
-                  TC.WF.check_wf_message_handler_clause(
-                    ctx,
-                    handler_name,
-                    clause,
-                    handler_M.st
-                  )
-                  |> with_clause_frame(func_id, index, length(func_clauses))
-                end
+              # the next thing we check is whether the function we're type-checking is the on_link callback
+              func_id == {:on_start, 1} ->
+                deal_with_on_start(ctx, func_id, cs)
 
-              res =
-                clause_results
-                # then, for whatever reason I'm rejecting any branches that typechecked
-                # ig if something typechecks there is nothing interesting to report
-                |> Enum.flat_map(fn
-                  {:ok, %ST.SBranch{}} -> []
-                  # and creating a list mapping the function id to whatever error it returned
-                  {:error, error_msg} -> [{func_id, error_msg}]
-                end)
+              # otherwise, this is just a regular function which we still need to check is well-formed
+              true ->
+                deal_with_function(ctx, func_id, cs)
+            end
 
-              # if we have more function clauses than branches, then we need to be a bit more vigilant about our session typechecking
-              if(length(func_clauses) != length(handler_M.st.branches)) do
-                # we need to explicitly keep track of all the visited branches
-                # to ensure we sufficiently cover/support the annotated session type
-                visited_labels =
-                  func_clauses
-                  |> Enum.zip(clause_results)
-                  # in this case what we're interested in  is not the individual errors,
-                  # but whether or not we are actually sufficiently covering the session type
-                  # so we only keep the branches we went down after typechecking a clause
-                  #
-                  # a clause that failed typechecking still names the branch it implements
-                  # through its message label, so it should count too
-                  |> Enum.flat_map(fn
-                    {_clause, {:ok, %ST.SBranch{label: label}}} ->
-                      [label]
-
-                    {{_meta, [_role, {label, _payload}, _state, _session_ctx], _guards, _body},
-                     {:error, _msg}} ->
-                      [label]
-
-                    {_clause, {:error, _msg}} ->
-                      []
-                  end)
-                  # and we create a set containing the branches we covered
-                  |> MapSet.new()
-
-                # we check to see if we've covered all branches or not
-                missing_branches =
-                  Enum.reject(handler_M.st.branches, &MapSet.member?(visited_labels, &1.label))
-
-                if missing_branches == [] do
-                  # more clauses than branches is fine as long as every branch is covered
-                  res ++ acc
-                else
-                  # report an error stating that we have violated the protocol definition
-                  error_msg =
-                    Error.ProtocolViolation.incorrect_choice_implementation(
-                      env.module,
-                      def_meta,
-                      handler_name,
-                      missing_branches,
-                      handler_M.st
-                    )
-
-                  # this error is cons-ed onto the accumulator, alongside the per-clause errors
-                  [{func_id, error_msg} | res] ++ acc
-                end
-              else
-                # or otherwise the other result is appended
-                res ++ acc
-              end
-
-            # the next thing we check is whether the function we're type-checking is the on_link callback
-            func_id == {:on_start, 1} ->
-              # in which case we can fetch its type spec definition to begin our typechecking
-              # a hand-written on_link may have no spec at all, which should be reported below
-              type_signatures = psi |> Map.get(func_id, []) |> Enum.reverse()
-
-              # here we unpack pattern match on our function clauses
-              # to make sure we have only defined a single on_link function clause
-              with {:clause, [clause]} <- {:clause, func_clauses},
-                   {:signature, [type_signature]} <- {:signature, type_signatures} do
-                TC.WF.check_wf_on_start_callback(
-                  ctx,
-                  clause,
-                  type_signature
-                )
-                |> case do
-                  :ok -> acc
-                  # errors are propagated
-                  {:error, error_msg} -> [{func_id, error_msg} | acc]
-                end
-              else
-                {:clause, got} ->
-                  error_msg =
-                    Error.FunctionCall.wrong_number_of_clauses(env.module, def_meta, func_id,
-                      expected: 1,
-                      got: length(got)
-                    )
-
-                  [{func_id, error_msg} | acc]
-
-                {:signature, got} ->
-                  error_msg =
-                    Error.FunctionCall.wrong_number_of_specs(env.module, def_meta, func_id,
-                      expected: 1,
-                      got: length(got)
-                    )
-
-                  [{func_id, error_msg} | acc]
-              end
-
-            # todo: same as above, maybe a nicer way to forbid these
-            MapSet.member?(module_init_handlers, func_id) and not Map.has_key?(psi, func_id) ->
-              [
-                {func_id,
-                 Error.TypeSpecification.no_spec_for_function(env.module, def_meta, func_id)}
-                | acc
-              ]
-
-            # next we check to see if the function we're type-checking is an init_handler
-            MapSet.member?(module_init_handlers, func_id) ->
-              {handler_name, 3} = func_id
-
-              # fetch the appropriate environments
-              handler_I = delta_i[handler_name]
-              type_signatures = psi[func_id] |> Enum.reverse()
-
-              # and begin typechecking all clauses
-              res =
-                for {{clause, type_signature}, index} <-
-                      Enum.zip(func_clauses, type_signatures) |> Enum.with_index(1) do
-                  TC.WF.check_wf_init_handler_clause(
-                    ctx,
-                    handler_name,
-                    clause,
-                    handler_I.st,
-                    type_signature
-                  )
-                  |> with_clause_frame(func_id, index, length(func_clauses))
-                  |> case do
-                    :ok -> :ok
-                    {:error, error_msg} -> error_msg
-                  end
-                end
-                |> Enum.reject(&(&1 == :ok))
-                |> Enum.map(&{func_id, &1})
-
-              # propagating errors only
-              res ++ acc
-
-            # otherwise, this is just a regular function which we still need to check is well-formed
-            true ->
-              case TC.WF.check_wf_function(ctx, func_id, func_clauses) do
-                # a problem with the function as a whole, reported once and without a clause frame
-                {:error, error} ->
-                  [{func_id, error} | acc]
-
-                clause_results ->
-                  res =
-                    clause_results
-                    |> Enum.with_index(1)
-                    |> Enum.map(fn {result, index} ->
-                      with_clause_frame(result, func_id, index, length(func_clauses))
-                    end)
-                    |> Enum.reject(&match?({:ok, _}, &1))
-                    |> Enum.map(fn {:error, error_msg} -> {func_id, error_msg} end)
-
-                  res ++ acc
-              end
-          end
+          errs ++ acc
       end
 
     if errors != [] do
@@ -390,12 +168,135 @@ defmodule Maty.Typechecker do
     end
   end
 
+  defp deal_with_message_handler(ctx, handler, cs) do
+    {:handler, :message, st} = ctx.signatures[handler]
+    check_message_handler(ctx, handler, cs, st)
+  end
+
+  defp check_message_handler(ctx, handler, cs, %ST.SIn{} = st) do
+    func_id = {handler, 4}
+
+    # because we may have multiple handler clauses, we need to iterate over
+    # all definitions and their associated type signatures and check if they are well-formed
+    # we typecheck each clause exactly once, and derive both the per-clause errors
+    # and the visited session branches from these results
+    errs =
+      collect_clauses_errs(
+        func_id,
+        cs,
+        &TC.WF.check_wf_message_handler_clause(ctx, handler, &1, st)
+      )
+
+    # we need to explicitly keep track of all the visited branches
+    # to ensure we sufficiently cover/support the annotated session type
+    # and we create a set containing the branches we covered
+    visited_labels = MapSet.new(cs, &extract_label/1)
+
+    # we check to see if we've covered all branches or not
+    missing_branches = Enum.reject(st.branches, &MapSet.member?(visited_labels, &1.label))
+
+    if missing_branches == [] do
+      errs
+    else
+      e =
+        Error.ProtocolViolation.incorrect_choice_implementation(
+          ctx.module,
+          ctx.meta,
+          handler,
+          missing_branches,
+          st
+        )
+
+      [{func_id, e} | errs]
+    end
+  end
+
+  defp check_message_handler(ctx, handler, _cs, st) do
+    error = Error.ProtocolViolation.message_handler_not_receive(ctx.module, ctx.meta, handler, st)
+    [{{handler, 4}, error}]
+  end
+
+  defp deal_with_init_handler(ctx, handler, cs) do
+    {:handler, :init, args_ty, st} = ctx.signatures[handler]
+
+    collect_clauses_errs(
+      {handler, 3},
+      cs,
+      &TC.WF.check_wf_init_handler_clause(ctx, handler, &1, st, args_ty)
+    )
+  end
+
+  # ? does it even make sense to extract this out?
+  defp collect_clauses_errs(func_id, cs, f) do
+    for {c, i} <- Enum.with_index(cs, 1),
+        {:error, e} <- [with_clause_frame(f.(c), func_id, i, length(cs))],
+        do: {func_id, e}
+  end
+
+  defp extract_label(clause) do
+    {_meta, [_role, {label, _payload}, _state, _session_ctx], _guards, _block} = clause
+    label
+  end
+
+  defp deal_with_on_start(ctx, {name, arity} = func_id, cs) do
+    # here we unpack pattern match on our function clauses
+    # to make sure we have only defined a single on_link function clause
+    with {:clause, [clause]} <- {:clause, cs},
+         # Σ keys functions by their module too, and has no entry for one without a spec
+         {:spec, {:ok, ty}} <- {:spec, Map.fetch(ctx.signatures, {ctx.module, name, arity})},
+         :ok <- TC.WF.check_wf_on_start_callback(ctx, clause, ty) do
+      []
+    else
+      {:spec, :error} ->
+        # reported at the clause since the spec belongs to the function as a whole
+        {first_clause_meta, _, _, _} = hd(cs)
+
+        err =
+          Error.TypeSpecification.no_spec_for_function(
+            ctx.module,
+            first_clause_meta,
+            {ctx.module, name, arity}
+          )
+
+        [{func_id, err}]
+
+      {:clause, got} ->
+        err =
+          Error.FunctionCall.wrong_number_of_clauses(ctx.module, ctx.meta, func_id,
+            expected: 1,
+            got: length(got)
+          )
+
+        [{func_id, err}]
+
+      {:error, err} ->
+        [{func_id, err}]
+    end
+  end
+
+  defp deal_with_function(ctx, func_id, cs) do
+    case TC.WF.check_wf_function(ctx, func_id, cs) do
+      # a problem with the function as a whole, reported once and without a clause frame
+      {:error, error} ->
+        [{func_id, error}]
+
+      rs ->
+        collect_clauses_errs(
+          func_id,
+          rs,
+          & &1
+        )
+    end
+  end
+
   @typedoc "A top-level definition from debug_info: `{func_id, kind, meta, clauses}`."
   @type definition :: {{atom(), arity()}, atom(), keyword(), [tuple()]}
 
   @spec fetch_module_definitions!(module(), binary()) :: [definition()]
   defp fetch_module_definitions!(module, bytecode) do
-    stub_defs = Module.get_attribute(module, :handler_stubs)
+    stub_defs =
+      for %{kind: :handler_stub} = c <- Module.get_attribute(module, :maty_clauses),
+          do: {c.name, c.arity}
 
     bytecode
     |> read_debug_info!()
@@ -406,6 +307,8 @@ defmodule Maty.Typechecker do
         Enum.member?(stub_defs, func_id)
     end)
   end
+
+  # -- below this line does not spark joy
 
   # Function to read debug information from bytecode.
   #
