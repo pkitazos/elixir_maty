@@ -151,11 +151,9 @@ defmodule Maty.Typechecker do
   end
 
   defp message_handler_errors(ctx, {handler, 4} = func_id, cs) do
-    {:handler, :message, st} = ctx.signatures[handler]
-    message_handler_errors(ctx, func_id, cs, st)
-  end
+    # `Signatures` only gives a message handler a type when its session type starts with a receive
+    {:handler, :message, %ST.SIn{} = st} = ctx.signatures[handler]
 
-  defp message_handler_errors(ctx, {handler, 4} = func_id, cs, %ST.SIn{} = st) do
     # because we may have multiple handler clauses, we need to iterate over
     # all definitions and check if they are well-formed
     # we typecheck each clause exactly once and keep its errors
@@ -188,11 +186,6 @@ defmodule Maty.Typechecker do
 
       [{func_id, e} | errs]
     end
-  end
-
-  defp message_handler_errors(ctx, {handler, 4} = func_id, _cs, st) do
-    error = Error.ProtocolViolation.message_handler_not_receive(ctx.module, ctx.meta, handler, st)
-    [{func_id, error}]
   end
 
   defp init_handler_errors(ctx, {handler, 3} = func_id, cs) do

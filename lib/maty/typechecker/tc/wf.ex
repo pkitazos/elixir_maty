@@ -58,10 +58,10 @@ defmodule Maty.Typechecker.TC.WF do
   associated with the handler_label, and checks if the body correctly
   implements the session continuation, ending in done/suspend.
 
-  Returns `{:ok, {label, role}}` if well-formed, identifying the session
-  branch handled. Otherwise returns `{:error, error}`.
+  Returns `{:ok, branch}` if well-formed, where `branch` is the session
+  branch the clause handles. Otherwise returns `{:error, error}`.
   """
-  @spec check_wf_message_handler_clause(Ctx.t(), Types.handler_label(), clause(), ST.t()) ::
+  @spec check_wf_message_handler_clause(Ctx.t(), Types.handler_label(), clause(), ST.SIn.t()) ::
           {:ok, ST.SBranch.t()} | {:error, Error.t()}
   def check_wf_message_handler_clause(
         ctx,
@@ -109,11 +109,6 @@ defmodule Maty.Typechecker.TC.WF do
       {:error, msg} ->
         {:error, msg}
     end
-  end
-
-  def check_wf_message_handler_clause(ctx, handler_label, {meta, _, _, _}, st_pre) do
-    {:error,
-     Error.ProtocolViolation.message_handler_not_receive(ctx.module, meta, handler_label, st_pre)}
   end
 
   @doc """
