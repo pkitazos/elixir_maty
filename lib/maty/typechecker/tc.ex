@@ -556,7 +556,7 @@ defmodule Maty.Typechecker.TC do
           )
         end
 
-      expect {:ok, %{st: expected_st}} = Map.fetch(ctx.delta_M, expected_handler),
+      expect {:ok, {:handler, :message, expected_st}} = Map.fetch(ctx.signatures, expected_handler),
         else:
           Error.ProtocolViolation.undefined_continuation_handler(
             ctx.module,

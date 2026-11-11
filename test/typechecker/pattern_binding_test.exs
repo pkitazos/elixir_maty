@@ -4,7 +4,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
   alias Maty.Typechecker.{PatternBinding, Ctx, Error}
 
   @meta [line: 0]
-  @ctx %Ctx{module: TestModule, meta: @meta, roles: []}
+  @ctx %Ctx{module: TestModule, meta: @meta, roles: [], signatures: %{}}
 
   defp var(name), do: {name, @meta, nil}
 

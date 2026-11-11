@@ -138,34 +138,6 @@ defmodule Maty.Typechecker.Helpers do
     end
   end
 
-  @doc """
-  The possible types an init handler can accept based on its clauses
-
-  `handler_name` is looked up in Δ_I to get the init handler's function id.
-  That id is then looked up in Ψ to get its signatures.
-  Each signature is `{arg_types, :no_return}` where `arg_types` is `[args, state, session_ctx]`,
-  so only the first element is kept.
-
-  Returns `:error` when `handler_name` is not an init handler of the module, and
-  `{:ok, []}` when it is but has no spec.
-  """
-  # todo: register accepts args that fit any clause's spec
-  # but at runtime the first clause whose pattern matches runs
-  # (see the todo in T-App (tc.ex) for the same issue with function calls)
-  def init_handler_arg_types(ctx, handler_name) do
-    with {:ok, %{function: func_id}} <- Map.fetch(ctx.delta_I, handler_name) do
-      # a missing psi entry is reported as a missing spec on the handler itself
-      arg_types =
-        ctx.psi
-        |> Map.get(func_id, [])
-        |> Enum.map(fn {:function, [arg | _], _} -> arg end)
-        |> Enum.uniq()
-        |> Enum.sort()
-
-      {:ok, arg_types}
-    end
-  end
-
   # todo: move somewhere else?
   @spec contains_register_call?(Macro.t()) :: boolean()
   def contains_register_call?(ast) do

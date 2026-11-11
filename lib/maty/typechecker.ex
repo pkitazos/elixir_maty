@@ -2,7 +2,7 @@ defmodule Maty.Typechecker do
   @moduledoc """
   This is the main public interface for Maty’s typechecking.
 
-  - Called by `Maty.Hook` at compile-time
+  - Its compile callbacks are registered on each actor module by `Maty.Hook`
   - Delegates detailed checks to submodules
   """
 
@@ -16,10 +16,7 @@ defmodule Maty.Typechecker do
 
   @debug Application.compile_env(:maty, :debug_function_signatures, false)
 
-  @doc """
-  Called by Hook when a function definition is encountered (`@on_definition`).
-  """
-  def handle_on_definition(env, _kind, name, args, _guards, _body) do
+  def __on_definition__(env, _kind, name, args, _guards, _body) do
     arity = length(args)
 
     clause =
@@ -38,10 +35,7 @@ defmodule Maty.Typechecker do
     end
   end
 
-  @doc """
-  Called by Hook at `@before_compile`.
-  """
-  def handle_before_compile(env) do
+  def __before_compile__(env) do
     customise_logger()
 
     {state_types, state_errors} =
@@ -66,7 +60,8 @@ defmodule Maty.Typechecker do
     Module.put_attribute(env.module, :state_types, state_types)
 
     clauses = Module.get_attribute(env.module, :maty_clauses) |> Enum.reverse()
-    session_types = Utils.Env.get_map(env.module, :st)
+
+    session_types = Module.get_attribute(env.module, :st) |> Enum.into(%{})
 
     case Signatures.build(env.module, clauses, session_types) do
       {:ok, signatures} -> Module.put_attribute(env.module, :maty_signatures, signatures)
@@ -104,22 +99,13 @@ defmodule Maty.Typechecker do
     end
   end
 
-  @doc """
-  Called by Hook at `@after_compile`.
-  """
-  def handle_after_compile(env, bytecode) do
+  def __after_compile__(env, bytecode) do
     # get the expanded AST of all the relevant definitions in this module from the bytecode
     # we omit the definitions injected into the scope by our behaviour as we can assume they are type-safe
     all_module_definitions = fetch_module_definitions!(env.module, bytecode)
 
     # build the typing context struct for synth and friends
-    ctx = %Ctx{
-      module: env.module,
-      # until a clause sets its own, errors that have no location of their own point at the module
-      meta: [line: env.line],
-      roles: Module.get_attribute(env.module, :maty_roles),
-      signatures: Module.get_attribute(env.module, :maty_signatures)
-    }
+    ctx = Ctx.init(env)
 
     # we then build up a list of `{func_id, %Error{}}` pairs
     # the errors are structs which bubble all the way up to here
@@ -186,9 +172,9 @@ defmodule Maty.Typechecker do
     visited_labels = MapSet.new(cs, &message_label/1)
 
     # we check to see if we've covered all branches or not
-    missing_branches = Enum.reject(st.branches, &MapSet.member?(visited_labels, &1.label))
+    missing_bs = Enum.reject(st.branches, &MapSet.member?(visited_labels, &1.label))
 
-    if missing_branches == [] do
+    if missing_bs == [] do
       errs
     else
       e =
@@ -196,7 +182,7 @@ defmodule Maty.Typechecker do
           ctx.module,
           ctx.meta,
           handler,
-          missing_branches,
+          missing_bs,
           st
         )
 

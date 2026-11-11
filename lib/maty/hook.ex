@@ -1,47 +1,23 @@
 defmodule Maty.Hook do
-  alias Maty.{Typechecker, Utils}
-
+  # todo: can probably merge into Typechecker at some point
   defmacro __using__(_opts) do
     quote do
-      import Maty.Hook
+      @compile :debug_info
 
       # ephemeral annotations
-      Module.register_attribute(__MODULE__, :init_handler, accumulate: false, persist: false)
-      Module.register_attribute(__MODULE__, :handler, accumulate: false, persist: false)
-      Module.register_attribute(__MODULE__, :handler_stub, accumulate: false, persist: false)
-      Module.register_attribute(__MODULE__, :spec, accumulate: false, persist: false)
+      for attr <- [:init_handler, :handler, :handler_stub, :spec],
+          do: Module.register_attribute(__MODULE__, attr, accumulate: false, persist: false)
 
       # attribute stores
-      Utils.Env.setup(__MODULE__, :st)
-      Utils.Env.setup(__MODULE__, :delta_M)
-      Utils.Env.setup(__MODULE__, :delta_I)
-      Utils.Env.setup(__MODULE__, :psi)
-      Utils.Env.setup(__MODULE__, :spec_errors)
-      Utils.Env.setup(__MODULE__, :handler_errors)
-      Utils.Env.setup(__MODULE__, :non_handler_defs)
-      Utils.Env.setup(__MODULE__, :global_state_type)
-      Utils.Env.setup(__MODULE__, :local_state_type)
+      for attr <- [:st, :handler_errors, :global_state_type, :local_state_type],
+          do: Module.register_attribute(__MODULE__, attr, accumulate: true, persist: true)
 
       # one record per clause, which beocmes the input to `Signatures.build/3` @before_compile
       Module.register_attribute(__MODULE__, :maty_clauses, accumulate: true, persist: false)
 
-      @compile :debug_info
-
-      @on_definition Maty.Hook
-      @before_compile Maty.Hook
-      @after_compile Maty.Hook
+      @on_definition Maty.Typechecker
+      @before_compile Maty.Typechecker
+      @after_compile Maty.Typechecker
     end
-  end
-
-  def __on_definition__(env, kind, name, args, guards, body) do
-    Typechecker.handle_on_definition(env, kind, name, args, guards, body)
-  end
-
-  def __before_compile__(env) do
-    Typechecker.handle_before_compile(env)
-  end
-
-  def __after_compile__(env, bytecode) do
-    Typechecker.handle_after_compile(env, bytecode)
   end
 end
