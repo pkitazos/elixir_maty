@@ -44,16 +44,6 @@ defmodule Maty.Types do
   # it maps roles to queues storing pairs of `PID` * `REF` (initialisation token)
   @type access_point_state :: %{role() => :queue.queue(candidate())}
 
-  # this maps our type names to their actual structural type
-  def __map__ do
-    %{
-      session_ctx: T.session_ctx(),
-      local_state: T.local_state(),
-      global_state: T.global_state(),
-      maty_actor_state: T.maty_actor_state()
-    }
-  end
-
   # List of accepted types in session types
   @supported_payload_types [
     :atom,

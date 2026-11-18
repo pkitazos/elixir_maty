@@ -1,7 +1,7 @@
 defmodule Maty.HandlerExpansionTest.Handlers do
   use Maty.DSL
 
-  @type session_ctx :: any()
+  @type maty_session_ctx :: any()
   @type maty_actor_state :: any()
 
   defhandler done_handler(:seller, {:quote, amount :: number()}, state) do

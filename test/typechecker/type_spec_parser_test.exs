@@ -3,7 +3,6 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
 
   alias Maty.Typechecker.TypeSpecParser, as: TSP
   alias Maty.Typechecker.Error.Cause
-  alias Maty.Types.T, as: Type
 
   @meta [line: 0]
 
@@ -24,12 +23,6 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
 
     date_ast = {{:., @meta, [{:__aliases__, @meta, [:Date]}, :t]}, @meta, []}
     assert {:ok, :date} = TSP.parse(date_ast)
-
-    state = Type.maty_actor_state()
-    assert {:ok, ^state} = TSP.parse(type_ast(:maty_actor_state))
-
-    session_ctx = Type.session_ctx()
-    assert {:ok, ^session_ctx} = TSP.parse(type_ast(:session_ctx))
   end
 
   test "tuples" do

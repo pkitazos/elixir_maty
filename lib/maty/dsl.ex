@@ -40,7 +40,7 @@ defmodule Maty.DSL do
 
     quote do
       @impl true
-      @spec on_start(unquote(type_spec)) :: {:ok, global_state()}
+      @spec on_start(unquote(type_spec)) :: maty_global_state()
       # todo: somehow type the global state from this ^
       def on_start(unquote(clean_pattern)) do
         unquote(body)
@@ -92,7 +92,7 @@ defmodule Maty.DSL do
       @spec unquote(handler_name)(
               unquote(type_spec),
               maty_actor_state(),
-              session_ctx()
+              maty_session_ctx()
             ) :: no_return()
       # no_return() describes the body as the typechecker sees it (it always ends in suspend/done),
       # the generated function itself returns the caught {:suspend, ...} / {:done, ...} result
@@ -148,7 +148,7 @@ defmodule Maty.DSL do
               unquote(role),
               unquote(type_spec),
               maty_actor_state(),
-              session_ctx()
+              maty_session_ctx()
             ) :: no_return()
       # no_return() describes the body as the typechecker sees it (it always ends in suspend/done),
       # the generated function itself returns the caught {:suspend, ...} / {:done, ...} result

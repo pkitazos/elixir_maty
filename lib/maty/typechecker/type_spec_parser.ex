@@ -22,7 +22,6 @@ defmodule Maty.Typechecker.TypeSpecParser do
     type_env =
       Maty.Types.payload_types()
       |> Map.new(fn x -> {x, x} end)
-      |> Map.merge(Maty.Types.__map__())
       |> Map.put(:no_return, :no_return)
 
     parse(type_ast, type_env)

@@ -63,7 +63,7 @@ defmodule Maty.Typechecker do
 
     session_types = Module.get_attribute(env.module, :st) |> Enum.into(%{})
 
-    case Signatures.build(env.module, clauses, session_types) do
+    case Signatures.build(env.module, clauses, session_types, state_types.global) do
       {:ok, signatures} -> Module.put_attribute(env.module, :maty_signatures, signatures)
       {:error, errors} -> raise_type_errors!(env, errors)
     end

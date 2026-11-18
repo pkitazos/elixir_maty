@@ -12,7 +12,7 @@ defmodule Maty.Hook do
       for attr <- [:st, :handler_errors, :global_state_type, :local_state_type],
           do: Module.register_attribute(__MODULE__, attr, accumulate: true, persist: true)
 
-      # one record per clause, which beocmes the input to `Signatures.build/3` @before_compile
+      # one record per clause, which beocmes the input to `Signatures.build/4` @before_compile
       Module.register_attribute(__MODULE__, :maty_clauses, accumulate: true, persist: false)
 
       @on_definition Maty.Typechecker
