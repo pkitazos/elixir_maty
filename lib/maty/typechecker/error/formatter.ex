@@ -80,18 +80,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :protocol_violation, kind: :incorrect_incoming_payload_type} = e) do
-    %{got: payload_received, expected: payload_expected} = e.details
-
-    """
-    Protocol Violation: Incorrect Incoming Payload Type
-      Got: #{render_atom(payload_received)}
-      Expected: #{render_atom(payload_expected)}
-      --
-      Session Type: #{Maty.ST.repr(e.st)}
-    """
-  end
-
   defp render(%Error{category: :protocol_violation, kind: :incorrect_target_participant} = e) do
     %{got: role_received, expected: role_expected} = e.details
 
@@ -282,18 +270,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :type_mismatch, kind: :list_elements_incompatible} = e) do
-    %{element_types: element_types} = e.details
-    formatted_types = element_types |> Enum.map(&render_type/1) |> Enum.join(", ")
-
-    """
-    Type Mismatch Error: Incompatible List Elements
-      Element types found: #{formatted_types}
-      --
-      All elements in a list must have the same type.
-    """
-  end
-
   defp render(%Error{category: :type_mismatch, kind: :case_branches_incompatible} = e) do
     %{branches: branches} = e.details
 
@@ -475,6 +451,81 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :type_mismatch, kind: :dict_op_not_dict} = e) do
+    %{op: op, got: got} = e.details
+
+    """
+    Type Mismatch Error: Dict Operation on a Non-Dict
+      Function: #{render_dict_op(op)}
+      Expected: a dict
+      Got: #{render_type(got)}
+      --
+      #{render_dict_op_hint(got)}
+    """
+  end
+
+  defp render(%Error{category: :type_mismatch, kind: :dict_arg_type_mismatch} = e) do
+    %{op: op, argument: argument, expected: expected, got: got} = e.details
+
+    """
+    Type Mismatch Error: Dict #{render_dict_part(argument)} Type
+      Function: #{render_dict_op(op)}
+      Expected: #{render_type(expected)}
+      Got: #{render_type(got)}
+      --
+      The #{argument} must have the dict's #{argument} type.
+    """
+  end
+
+  defp render(%Error{category: :type_mismatch, kind: :not_a_function} = e) do
+    %{got: got} = e.details
+
+    """
+    Type Mismatch Error: Application of a Non-Function
+      Expected: a function
+      Got: #{render_type(got)}
+      --
+      `f.(...)` can only call a function.
+    """
+  end
+
+  defp render(%Error{category: :type_mismatch, kind: :function_arg_type_mismatch} = e) do
+    %{position: position, expected: expected, got: got} = e.details
+
+    """
+    Type Mismatch Error: Function Argument Type
+      Argument: #{position}
+      Expected: #{render_type(expected)}
+      Got: #{render_type(got)}
+      --
+      `f.(...)` was called with an argument of the wrong type.
+    """
+  end
+
+  defp render(%Error{category: :type_mismatch, kind: :lambda_not_expected} = e) do
+    %{expected: expected} = e.details
+
+    """
+    Type Mismatch Error: Unexpected Anonymous Function
+      Expected: #{render_type(expected)}
+      Got: an anonymous function
+      --
+      An anonymous function can only be used where a function is expected.
+    """
+  end
+
+  defp render(%Error{category: :type_mismatch, kind: :lambda_arity_mismatch} = e) do
+    %{expected: expected, got: got} = e.details
+
+    """
+    Type Mismatch Error: Anonymous Function Arity
+      Expected parameters: #{expected}
+      Got parameters: #{got}
+      --
+      The anonymous function must take as many parameters as the function type it is checked against.
+    """
+  end
+
   defp render(%Error{category: :type_mismatch, kind: :register_arg_type_mismatch} = e) do
     %{argument: argument, expected: expected, got: got} = e.details
 
@@ -616,15 +667,15 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :function_call, kind: :arity_mismatch} = e) do
+  defp render(%Error{category: :function_call, kind: :application_arity_mismatch} = e) do
     %{expected: expected, got: got} = e.details
 
     """
-    Function Call Error: Arity Mismatch
-      Expected arity: #{expected}
-      Got arity: #{got}
+    Function Call Error: Wrong Number of Arguments
+      Expected arguments: #{expected}
+      Got arguments: #{got}
       --
-      Arity mismatch between function spec and function definition.
+      `f.(...)` must be called with as many arguments as the function takes.
     """
   end
 
@@ -888,17 +939,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :framework_usage, kind: :unsupported_capture} = e) do
-    %{got: got} = e.details
-
-    """
-    Framework Usage Violation: Unsupported Capture
-      Capture: #{Macro.to_string(got)}
-      --
-      Only handlers can be captured: &name/2 for an init handler, &name/3 for a message handler.
-    """
-  end
-
   defp render(%Error{category: :framework_usage, kind: :handler_message_not_tagged_tuple} = e) do
     %{got: got} = e.details
 
@@ -968,6 +1008,28 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     Framework Usage Violation: Unsupported Anonymous Function
       Anonymous functions are not supported in Maty actors
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :unsupported_lambda} = e) do
+    %{reason: reason} = e.details
+
+    """
+    Framework Usage Violation: Unsupported Anonymous Function
+      #{render_unsupported_lambda(reason)}
+      --
+      Only single-clause anonymous functions without guards are supported. Consider a named function.
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :communication_in_lambda} = e) do
+    %{got: got} = e.details
+
+    """
+    Framework Usage Violation: Communication in an Anonymous Function
+      Got: #{render_action(got)}
+      --
+      Anonymous functions cannot communicate. Communicate from the handler or a named function instead.
     """
   end
 
@@ -1153,6 +1215,20 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render_string_segment_hint(:concatenation),
     do: "Both operands of <> must be binaries."
 
+  defp render_dict_op(:put), do: "Map.put/3"
+  defp render_dict_op(:fetch!), do: "Map.fetch!/2"
+  defp render_dict_op(:delete), do: "Map.delete/2"
+
+  defp render_dict_op_hint({:map_record, _}),
+    do:
+      "This is a record, not a dict: update it with %{m | k: v}, read it with m.k. Record fields cannot be deleted."
+
+  defp render_dict_op_hint(_got),
+    do: "Map.put/3, Map.fetch!/2 and Map.delete/2 only work on dicts."
+
+  defp render_dict_part(:key), do: "Key"
+  defp render_dict_part(:value), do: "Value"
+
   defp render_uninferable(:empty_list), do: "[]"
   defp render_uninferable(:empty_map), do: "%{}"
   defp render_uninferable(:anonymous_function), do: "an anonymous function"
@@ -1164,6 +1240,11 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render_uninferable_hint(_empty),
     do:
       "The type of its elements cannot be inferred here. Use it where its type is expected, e.g. as an argument to a function with a spec."
+
+  defp render_unsupported_lambda(:multiple_clauses),
+    do: "The anonymous function has more than one clause."
+
+  defp render_unsupported_lambda(:guard), do: "The anonymous function has a guard."
 
   defp render_operator(op) when is_atom(op), do: "#{op}"
   defp render_operator(op), do: "#{inspect(op)}"

@@ -209,8 +209,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          expected: :binary,
          got: :number
        )},
-      {{Error.TypeMismatch, :dict_entries_incompatible},
-       Error.TypeMismatch.dict_entries_incompatible(@m, @meta, :value, [:number, :binary])},
       {{Error.TypeMismatch, :dict_key_not_base_type},
        Error.TypeMismatch.dict_key_not_base_type(@m, @meta, got: {:list, :number})},
       {{Error.TypeMismatch, :not_a_function},

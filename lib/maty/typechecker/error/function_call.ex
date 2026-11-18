@@ -23,16 +23,6 @@ defmodule Maty.Typechecker.Error.FunctionCall do
     }
   end
 
-  def arity_mismatch(module, meta, func_id, expected: expected, got: got) do
-    %Error{
-      category: :function_call,
-      kind: :arity_mismatch,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{func_id: func_id, expected: expected, got: got}
-    }
-  end
-
   def no_matching_function_clause(module, meta, func_id, actual_arg_types) do
     %Error{
       category: :function_call,
@@ -71,6 +61,17 @@ defmodule Maty.Typechecker.Error.FunctionCall do
       module: module,
       meta: Keyword.take(meta, [:line, :column]),
       details: %{func_id: func_id, expected: expected, got: got}
+    }
+  end
+
+  # `f.(...)` was called with a different number of arguments than the function takes
+  def application_arity_mismatch(module, meta, expected: expected, got: got) do
+    %Error{
+      category: :function_call,
+      kind: :application_arity_mismatch,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{expected: expected, got: got}
     }
   end
 end

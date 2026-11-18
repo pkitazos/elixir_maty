@@ -28,6 +28,30 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
+  # only single-clause anonymous functions without guards are supported
+  def unsupported_lambda(module, meta, reason) when reason in [:multiple_clauses, :guard] do
+    %Error{
+      category: :framework_usage,
+      kind: :unsupported_lambda,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{reason: reason}
+    }
+  end
+
+  # the body of an anonymous function communicates (`send_to`, `suspend`, `done`)
+  # `got` is `{action, arg_asts}`, as for `ProtocolViolation.incorrect_action/4`
+  def communication_in_lambda(module, meta, got: {action, args})
+      when action in [:send, :suspend, :done] and is_list(args) do
+    %Error{
+      category: :framework_usage,
+      kind: :communication_in_lambda,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: {action, args}}
+    }
+  end
+
   # bitstring syntax other than string concatenation and interpolation was used
   def unsupported_bitstring(module, meta) do
     %Error{
@@ -231,17 +255,6 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
       module: module,
       meta: Keyword.take(meta, [:line, :column]),
       details: %{handler: handler, expected: expected, got: got}
-    }
-  end
-
-  # a capture of something other than a handler (only handlers are first class for now)
-  def unsupported_capture(module, meta, capture_ast) do
-    %Error{
-      category: :framework_usage,
-      kind: :unsupported_capture,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{got: capture_ast}
     }
   end
 

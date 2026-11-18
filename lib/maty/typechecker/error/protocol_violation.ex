@@ -85,21 +85,6 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     }
   end
 
-  def incorrect_incoming_payload_type(module, meta, handler, st,
-        got: payload_received,
-        expected: payload_expected
-      ) do
-    %Error{
-      category: :protocol_violation,
-      kind: :incorrect_incoming_payload_type,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      handler: handler,
-      details: %{got: payload_received, expected: payload_expected},
-      st: st
-    }
-  end
-
   def incorrect_target_participant(module, meta, st,
         got: role_received,
         expected: role_expected

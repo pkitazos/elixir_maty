@@ -75,16 +75,6 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
     }
   end
 
-  def list_elements_incompatible(module, meta, element_types) do
-    %Error{
-      category: :type_mismatch,
-      kind: :list_elements_incompatible,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{element_types: element_types}
-    }
-  end
-
   def case_branches_incompatible(module, meta, branches) do
     %Error{
       category: :type_mismatch,
@@ -255,6 +245,77 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
       module: module,
       meta: Keyword.take(meta, [:line, :column]),
       details: %{got: got}
+    }
+  end
+
+  # `Map.put/3`, `Map.fetch!/2` or `Map.delete/2` was applied to a value that is not a dict
+  def dict_op_not_dict(module, meta, op, got: got) when op in [:put, :fetch!, :delete] do
+    %Error{
+      category: :type_mismatch,
+      kind: :dict_op_not_dict,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{op: op, got: got}
+    }
+  end
+
+  # a dict operation was given a key (or for `Map.put/3` a value) whose type is not the dict's
+  def dict_arg_type_mismatch(module, meta, op, argument, expected: expected, got: got)
+      when op in [:put, :fetch!, :delete] and argument in [:key, :value] do
+    %Error{
+      category: :type_mismatch,
+      kind: :dict_arg_type_mismatch,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{op: op, argument: argument, expected: expected, got: got}
+    }
+  end
+
+  # -- functions
+
+  # `f.(...)` where `f` is not a function
+  def not_a_function(module, meta, got: got) do
+    %Error{
+      category: :type_mismatch,
+      kind: :not_a_function,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{got: got}
+    }
+  end
+
+  # `f.(...)` was given an argument whose type is not the function's parameter type
+  # `position` is 1-based
+  def function_arg_type_mismatch(module, meta, position, expected: expected, got: got)
+      when is_integer(position) do
+    %Error{
+      category: :type_mismatch,
+      kind: :function_arg_type_mismatch,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{position: position, expected: expected, got: got}
+    }
+  end
+
+  # an anonymous function was checked against a type that is not a function type
+  def lambda_not_expected(module, meta, expected: expected) do
+    %Error{
+      category: :type_mismatch,
+      kind: :lambda_not_expected,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{expected: expected}
+    }
+  end
+
+  # an anonymous function was checked against a function type with a different number of parameters
+  def lambda_arity_mismatch(module, meta, expected: expected, got: got) do
+    %Error{
+      category: :type_mismatch,
+      kind: :lambda_arity_mismatch,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{expected: expected, got: got}
     }
   end
 
