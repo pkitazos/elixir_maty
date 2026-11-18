@@ -45,6 +45,8 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
 
   test "lists" do
     assert {:ok, {:list, :number}} = TSP.parse(quote(do: list(number())))
+    assert {:ok, {:list, :number}} = TSP.parse(quote(do: [number()]))
+    assert {:ok, {:list, {:list, :binary}}} = TSP.parse(quote(do: [[binary()]]))
   end
 
   # -- Map record types
@@ -111,9 +113,16 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
                )
              )
 
-    # no heterogeneous lists
-    assert {:error, %Cause{kind: :heterogeneous_list}} =
-             TSP.parse(quote(do: list(number(), binary())))
+    # list types name exactly one element type
+    for ast <- [
+          quote(do: list(number(), binary())),
+          quote(do: list(number(), number())),
+          quote(do: []),
+          quote(do: [number(), ...]),
+          quote(do: [number(), binary()])
+        ] do
+      assert {:error, %Cause{kind: :unsupported_type_constructor}} = TSP.parse(ast)
+    end
 
     # map records only take literal atom keys, each at most once
     for ast <- [

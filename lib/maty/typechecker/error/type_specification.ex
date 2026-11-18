@@ -88,10 +88,6 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
     %Error.Cause{kind: :unknown_type_constructor, details: %{type: type_name}}
   end
 
-  def heterogeneous_list_error(conflicting_types) do
-    %Error.Cause{kind: :heterogeneous_list, details: %{types: conflicting_types}}
-  end
-
   # a record type with no fields, `%{}`: a record has at least one
   def empty_record(type_ast) do
     %Error.Cause{kind: :empty_record, details: %{type_ast: type_ast}}

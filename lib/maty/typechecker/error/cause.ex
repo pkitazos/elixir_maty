@@ -14,7 +14,6 @@ defmodule Maty.Typechecker.Error.Cause do
   @type kind ::
           :unsupported_type_constructor
           | :unknown_type_constructor
-          | :heterogeneous_list
           | :invalid_maty_state
 
   @type t :: %__MODULE__{kind: kind(), details: map()}

@@ -14,6 +14,7 @@ defmodule Maty.Typechecker.TypeSpecParser do
   - {:%{}, _, fields}  (map record with literal atom keys, e.g. %{name: binary()})
   - {:%{}, _, [{k, v}]} (map dictionary with a base key type, e.g. %{atom() => binary()})
   - [{:->, _, [args, ret]}] (function, e.g. (number(), atom() -> binary()))
+  - [t]                (list, the same as list(t))
   """
   @spec parse(type_ast :: Macro.t()) :: {:ok, Type.t()} | {:error, Error.Cause.t()}
   def parse(type_ast) do
@@ -65,9 +66,12 @@ defmodule Maty.Typechecker.TypeSpecParser do
     parse_tuple_elements(elements_list, type_env)
   end
 
-  # Case 4: List {:list, _, [elements...]}
-  defp do_parse({:list, _meta, elements_list}, type_env) when is_list(elements_list) do
-    parse_list_elements(elements_list, type_env)
+  # Case 4: List list(t)
+  # (`list/1` is the only list constructor, `list()` and `list(a, b)` are not supported)
+  defp do_parse({:list, _meta, [elem_ast]}, type_env) do
+    with {:ok, elem_type} <- do_parse(elem_ast, type_env) do
+      {:ok, {:list, elem_type}}
+    end
   end
 
   # `%{}` is not a type: a record has at least one field, and a dictionary names its key and value types
@@ -123,6 +127,15 @@ defmodule Maty.Typechecker.TypeSpecParser do
     end
   end
 
+  # Case 8: List [t]
+  # must come after the function case, whose `[{:->, _, _}]` also has one element
+  # (`[]`, `[t, ...]` and lists of several types fall through to the catch-all)
+  defp do_parse([elem_ast], type_env) do
+    with {:ok, elem_type} <- do_parse(elem_ast, type_env) do
+      {:ok, {:list, elem_type}}
+    end
+  end
+
   # Catch-all for unsupported AST formats
   defp do_parse(other_ast, _type_env) do
     error = Error.TypeSpecification.unsupported_type_constructor(other_ast)
@@ -161,31 +174,6 @@ defmodule Maty.Typechecker.TypeSpecParser do
     |> case do
       {:ok, parsed_fields} -> {:ok, {:map_record, Map.new(parsed_fields)}}
       {:error, _} = err -> err
-    end
-  end
-
-  defp parse_list_elements(element_asts, type_env) do
-    element_asts
-    |> Enum.reduce_while({:ok, []}, fn elem_ast, {:ok, acc} ->
-      case do_parse(elem_ast, type_env) do
-        {:ok, parsed_type} -> {:cont, {:ok, [parsed_type | acc]}}
-        {:error, _} = err -> {:halt, err}
-      end
-    end)
-    |> case do
-      {:ok, types_reversed} ->
-        all_types = types_reversed |> Enum.reverse() |> MapSet.new()
-
-        if MapSet.size(all_types) == 1 do
-          type = all_types |> MapSet.to_list() |> List.first()
-          {:ok, {:list, type}}
-        else
-          error = Error.TypeSpecification.heterogeneous_list_error(MapSet.to_list(all_types))
-          {:error, error}
-        end
-
-      {:error, _} = err ->
-        err
     end
   end
 end

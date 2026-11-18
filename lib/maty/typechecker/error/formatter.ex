@@ -1117,12 +1117,6 @@ defmodule Maty.Typechecker.Error.Formatter do
      "Unknown type constructor or type atom not found in the type environment."}
   end
 
-  defp render_cause(%Error.Cause{kind: :heterogeneous_list, details: %{types: types}}) do
-    {"Heterogeneous List Type",
-     "Conflicting types found: #{Enum.map_join(types, ", ", &inspect/1)}",
-     "List type specifications must contain elements of the same type."}
-  end
-
   defp render_cause(%Error.Cause{kind: :empty_record}) do
     {"Empty Record Type", "Type: %{}",
      "A record type needs at least one field. Use nil for a value that carries nothing."}
