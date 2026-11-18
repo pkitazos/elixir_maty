@@ -8,6 +8,7 @@
 
 #let ty_handler = $ty("Handler")(S^?, A_L)$
 #let ty_init = $ty("Init")(S, A, A_L)$
+#let ty_sum = $ell_1 (arrow(A)_1) + ... + ell_n (arrow(A)_n)$
 
 We use $x, y$ for variables, $c$ for constants, $f$ for function names, $h$ for handler names, $m$ for module names, $p, q$ for roles and $ell$ for labels. Each function name has a fixed arity, and we write $f$ for $f slash n$.
 
@@ -15,7 +16,7 @@ Top-level names are qualified by their module. Inside module $m$, a bare $f$ or 
 
 #bnf(
   Prod($C$, annot: [Base types], {
-      Or[$ty("Bool") | ty("Number") | ty("Binary") | ty("Atom") | ty("Nil") | ty("Pid")$][] // do I also need Unit?
+      Or[$ty("Bool") | ty("Number") | ty("Binary") | ty("Atom") | ty("Nil") | ty("Pid")$][]
   }),
   Prod($A, B$, annot: [Types], {
     Or[$C$][base]
@@ -24,6 +25,7 @@ Top-level names are qualified by their module. Inside module $m$, a bare $f$ or 
     Or[${ell_1 : A_1, ..., ell_n : A_n}$][record, $n >= 1$]
     Or[${C arrow.r.bar A}$][dictionary]
     Or[$(A_1, ..., A_n) arrow.r B$][function, $n >= 0$]
+    Or[#ty_sum][sum, $n >= 1$]
     Or[#ty_handler][message handler]
     Or[#ty_init][init handler]
     Or[$ty("AP"){p_i arrow.r.bar S_i}_(i in I)$][access point]
@@ -102,6 +104,9 @@ Top-level names are qualified by their module. Inside module $m$, a bare $f$ or 
 
 Records and record types are considered equal modulo reordering of fields. Labels within a record are pairwise distinct. Labels are atoms other than `true`, `false` and `nil`, which are constants of type $ty("Bool")$ and $ty("Nil")$.
 
+In a sum type #ty_sum, the tags $ell_i$ are pairwise distinct labels, and sum types are considered equal modulo reordering of variants. A variant $ell()$ corresponds to the atom $ell$, and a variant $ell(A_1, ..., A_m)$ to the tuple $(ell, V_1, ..., V_m)$.
+// Tagged values receive a sum type only by checking; in synthesis they have their ordinary atom or tuple type.
+
 // Throughout, we fix a global signature $Sigma$ and a current module $m$, whose global state type $A_G$ is given by $Sigma(m."on_start")$.
 
 = Typing Rules
@@ -119,7 +124,7 @@ Records and record types are considered equal modulo reordering of fields. Label
 #let dty(D) = $tack.r #D$
 
 // Utils
-#let nuffin = $emptyset$
+#let nuffin = $circle.filled.small$
 #let each(J, idx) = box(inset: (bottom: 0.3em), $(#J)_(#idx)$)
 
 #let trule(name, ..args) = stack(
@@ -206,6 +211,15 @@ Records and record types are considered equal modulo reordering of fields. Label
     each($#vty($Gamma$, $V_i$, $chk C$) quad #vty($Gamma$, $W_i$, $chk A$)$, $i in 1..n$),
     vty($Gamma$, ${V_1 arrow.r.bar W_1, ..., V_n arrow.r.bar W_n}$, $chk {C arrow.r.bar A}$)
   ),
+  trule([TV-Inj-Atom],
+    $k in 1..n quad arrow(A)_k = ()$,
+    vty($Gamma$, $ell_k$, $chk #ty_sum$)
+  ),
+  trule([TV-Inj-Tuple],
+    $k in 1..n quad arrow(A)_k = (A_(k,1), ..., A_(k,m))$,
+    each(vty($Gamma$, $V_j$, $chk A_(k,j)$), $j in 1..m$),
+    vty($Gamma$, $(ell_k, V_1, ..., V_m)$, $chk #ty_sum$)
+  ),
   trule([TV-Abs],
     cty($Gamma, x_1 : A_1, ..., x_n : A_n$, nuffin, $M$, $chk B$, nuffin),
     vty($Gamma$, $lambda (x_1, ..., x_n). M$, $chk (A_1, ..., A_n) arrow.r B$)
@@ -234,6 +248,7 @@ Records and record types are considered equal modulo reordering of fields. Label
   scaffold("T-Case-Chk", cty($Gamma$, $T$, $kw("case") V thick chevron.l P_i arrow.r M_i chevron.r_(i in I)$, blank, blank)),
   scaffold("T-Field", cty($Gamma$, $T$, $V.ell$, blank, blank)),
   scaffold("T-Update", cty($Gamma$, $T$, ${V | ell = W}$, blank, blank)),
+  // result type: ok(A) + error(), as in Map.fetch
   scaffold("T-Lookup", cty($Gamma$, $T$, $V[W]$, blank, blank)),
   scaffold("T-Insert", cty($Gamma$, $T$, ${V | W arrow.r.bar U}$, blank, blank)),
   scaffold("T-Delete", cty($Gamma$, $T$, $V without W$, blank, blank)),
@@ -258,6 +273,8 @@ Records and record types are considered equal modulo reordering of fields. Label
   scaffold("TP-Cons", pty($[P | Q]$, blank, blank)),
   scaffold("TP-Record", pty(${ell_1 = P_1, ..., ell_n = P_n}$, blank, blank)),
   scaffold("TP-Dict", pty(${c_1 arrow.r.bar P_1, ..., c_n arrow.r.bar P_n}$, blank, blank)),
+  scaffold("TP-Inj-Atom", pty($ell$, blank, blank)),
+  scaffold("TP-Inj-Tuple", pty($(ell, P_1, ..., P_m)$, blank, blank)),
 )
 
 === Definitions
