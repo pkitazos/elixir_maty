@@ -45,15 +45,24 @@ defmodule Maty.Typechecker do
         {:error, errors} -> {nil, Enum.map(errors, &{nil, &1})}
       end
 
+    {session_types, session_type_errors} =
+      case Preprocessor.process_session_type_declarations(env) do
+        {:ok, session_types} -> {session_types, []}
+        {:error, errors} -> {nil, Enum.map(errors, &{nil, &1})}
+      end
+
     errors =
       Module.get_attribute(env.module, :handler_errors) ++
         unknown_role_errors(env) ++
-        state_errors
+        state_errors ++
+        session_type_errors
 
     # we fail here, before the bodies are checked in `handle_after_compile`, on purpose.
     # an issue with a spec annotation or handler declaration leaves Σ incomplete and
     # checking bodies against it would only pile follow-on errors on top of the real one
     if errors != [] do
+      # this is very Go-coded
+      # todo: use combinators
       raise_type_errors!(env, errors)
     end
 
@@ -61,9 +70,10 @@ defmodule Maty.Typechecker do
 
     clauses = Module.get_attribute(env.module, :maty_clauses) |> Enum.reverse()
 
-    session_types = Module.get_attribute(env.module, :st) |> Enum.into(%{})
+    # todo: Σ's handler types carry the role, drop for now
+    handler_session_types = Map.new(session_types, fn {handler, {_role, st}} -> {handler, st} end)
 
-    case Signatures.build(env.module, clauses, session_types, state_types.global) do
+    case Signatures.build(env.module, clauses, handler_session_types, state_types.global) do
       {:ok, signatures} -> Module.put_attribute(env.module, :maty_signatures, signatures)
       {:error, errors} -> raise_type_errors!(env, errors)
     end

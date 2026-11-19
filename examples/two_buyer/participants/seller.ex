@@ -4,9 +4,11 @@ defmodule TwoBuyer.Participants.Seller do
   global_state nil
   local_state :seller, nil
 
-  @st {:install, ~q"title_handler"}
-  @st {:title_handler, ~q"&buyer1:{title(binary).+buyer1:{quote(number).decision_handler}}"}
-  @st {:decision_handler, ~q"&buyer2:{address(binary).+buyer2:{date(number).end},quit(nil).end}"}
+  session_type :seller, %{
+    install: ~q"title_handler",
+    title_handler: ~q"&buyer1:{title(binary).+buyer1:{quote(number).decision_handler}}",
+    decision_handler: ~q"&buyer2:{address(binary).+buyer2:{date(number).end},quit(nil).end}"
+  }
 
   on_start ap_pid :: pid() do
     Maty.DSL.register(ap_pid, :seller, &install/2, ap_pid)

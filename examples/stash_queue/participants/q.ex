@@ -4,11 +4,13 @@ defmodule StashQueue.Participants.Q do
   global_state nil
   local_state :q, nil
 
-  @st {:install, ~q/p1_handler/}
-  @st {:p1_handler, ~q/&p:{a(number).r1_handler}/}
-  @st {:r1_handler, ~q/&r:{b(number).r2_handler}/}
-  @st {:r2_handler, ~q/&r:{b(number).p2_handler}/}
-  @st {:p2_handler, ~q/&p:{a(number).end}/}
+  session_type :q, %{
+    install: ~q/p1_handler/,
+    p1_handler: ~q/&p:{a(number).r1_handler}/,
+    r1_handler: ~q/&r:{b(number).r2_handler}/,
+    r2_handler: ~q/&r:{b(number).p2_handler}/,
+    p2_handler: ~q/&p:{a(number).end}/
+  }
 
   on_start ap_pid :: pid() do
     Maty.DSL.register(ap_pid, :q, &install/2, nil)

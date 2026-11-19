@@ -5,6 +5,9 @@ defmodule Maty.Typechecker.Preprocessor do
   `process_state_declarations/1` checks the `global_state` / `local_state` declarations
   and parses their types. It runs once, at `@before_compile`, and returns the parsed
   types or the errors to the caller.
+
+  `process_session_type_declarations/1` checks the `session_type` declarations
+  and flattens them to the session type and role of each handler, also at `@before_compile`.
   """
   alias Maty.Typechecker.TypeSpecParser
   alias Maty.Typechecker.Error
@@ -44,6 +47,57 @@ defmodule Maty.Typechecker.Preprocessor do
       fn g, l -> %{global: g, local: l} end
     )
   end
+
+  @spec process_session_type_declarations(Macro.Env.t()) ::
+          {:ok, %{Types.handler_label() => {Types.role(), ST.t()}}} | {:error, [Error.t()]}
+  def process_session_type_declarations(env) do
+    declarations = env.module |> Module.get_attribute(:session_type) |> Enum.reverse()
+
+    # a role's later declarations are reported, and left out of the other checks
+    {firsts, repeats} = split_repeated_roles(declarations)
+
+    entries =
+      for {role, handlers, line} <- firsts,
+          {handler, st} <- handlers,
+          do: {handler, role, st, line}
+
+    duplicate_role_errors =
+      for {role, _handlers, line} <- repeats,
+          do: Error.FrameworkUsage.duplicate_role_session_type(env.module, [line: line], role)
+
+    # within one declaration the macro already reported repeated handlers,
+    # so a handler repeated here is named by two roles
+    duplicate_handler_errors =
+      for {handler, [_ | repeats]} <- Enum.group_by(entries, &elem(&1, 0)),
+          {_handler, _role, _st, line} <- repeats,
+          do:
+            Error.FrameworkUsage.duplicate_handler_session_type(env.module, [line: line], handler)
+
+    not_session_type_errors =
+      for {_handler, _role, st, line} <- entries,
+          not valid_session_type_start?(st),
+          do:
+            Error.FrameworkUsage.invalid_session_type_declaration(
+              env.module,
+              [line: line],
+              :not_a_session_type,
+              Macro.escape(st)
+            )
+
+    case duplicate_role_errors ++ duplicate_handler_errors ++ not_session_type_errors do
+      [] -> {:ok, Map.new(entries, fn {handler, role, st, _line} -> {handler, {role, st}} end)}
+      errors -> {:error, errors}
+    end
+  end
+
+  defp split_repeated_roles(declarations) do
+    firsts = Enum.uniq_by(declarations, &elem(&1, 0))
+    {firsts, declarations -- firsts}
+  end
+
+  # a handler starts at the top of a session type, never at a branch
+  defp valid_session_type_start?(%struct{}), do: struct in [ST.SIn, ST.SOut, ST.SName, ST.SEnd]
+  defp valid_session_type_start?(_value), do: false
 
   defp handle_global_declaration(env, declarations) do
     case declarations do

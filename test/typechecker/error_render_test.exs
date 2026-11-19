@@ -351,6 +351,8 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        )},
       {{Error.FrameworkUsage, :duplicate_handler_session_type},
        Error.FrameworkUsage.duplicate_handler_session_type(@m, @meta, :install)},
+      {{Error.FrameworkUsage, :duplicate_role_session_type},
+       Error.FrameworkUsage.duplicate_role_session_type(@m, @meta, :seller)},
       {{Error.FrameworkUsage, :unsupported_handler_guard},
        Error.FrameworkUsage.unsupported_handler_guard(
          @m,

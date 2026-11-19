@@ -115,7 +115,7 @@ defmodule Maty.Typechecker.Signatures do
   Builds Σ for `module` from its clause records and its session types.
 
   `clauses` are in source order
-  `session_types` is a map of the `@st` declarations
+  `session_types` is a map of the `session_type` declarations, from each handler to its session type
   `global_state_type` is the parsed `global_state` declaration, the return type of `on_start`
   """
   @spec build(module(), [clause()], %{Types.handler_label() => Maty.ST.t()}, Type.t()) ::

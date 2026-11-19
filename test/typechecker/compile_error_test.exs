@@ -5,8 +5,10 @@ defmodule Maty.Typechecker.CompileErrorTest do
   # opts can replace default parts, so tests only need to write the code they care about
 
   @st """
-  @st {:install, ~q/decision_handler/}
-  @st {:decision_handler, ~q/&buyer2:{address(binary).+buyer2:{date(binary).end},quit(nil).end}/}
+  session_type :seller, %{
+    install: ~q/decision_handler/,
+    decision_handler: ~q/&buyer2:{address(binary).+buyer2:{date(binary).end},quit(nil).end}/
+  }
   """
 
   @on_start "Maty.DSL.register(ap_pid, :seller, &install/2, ap_pid)"
@@ -324,8 +326,10 @@ defmodule Maty.Typechecker.CompileErrorTest do
     src =
       actor_src("",
         st: """
-        @st {:install, ~q/decision_handler/}
-        @st {:decision_handler, ~q/+buyer2:{date(binary).end}/}
+        session_type :seller, %{
+          install: ~q/decision_handler/,
+          decision_handler: ~q/+buyer2:{date(binary).end}/
+        }
         """
       )
 
@@ -373,7 +377,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
     init_receives =
       actor_src("",
-        st: "@st {:install, ~q/&buyer2:{quit(nil).end}/}",
+        st: "session_type :seller, %{install: ~q/&buyer2:{quit(nil).end}/}",
         init: """
         defhandler install(_ap_pid :: pid(), state) do
           Maty.DSL.done(state)
@@ -405,7 +409,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
   test "sending a wrong payload on the second label reports the payload" do
     src =
       actor_src("",
-        st: "@st {:install, ~q/+buyer2:{date(binary).end,quit(nil).end}/}",
+        st: "session_type :seller, %{install: ~q/+buyer2:{date(binary).end,quit(nil).end}/}",
         init: """
         defhandler install(ap_pid :: pid(), state) do
           Maty.DSL.send_to(:buyer2, {:quit, ap_pid})
@@ -584,8 +588,11 @@ defmodule Maty.Typechecker.CompileErrorTest do
     other_handler =
       actor_src("",
         st: """
-        #{@st}
-        @st {:other_handler, ~q/&buyer2:{quit(nil).end}/}
+        session_type :seller, %{
+          install: ~q/decision_handler/,
+          decision_handler: ~q/&buyer2:{address(binary).+buyer2:{date(binary).end},quit(nil).end}/,
+          other_handler: ~q/&buyer2:{quit(nil).end}/
+        }
         """,
         init: """
         defhandler install(_ap_pid :: pid(), state) do

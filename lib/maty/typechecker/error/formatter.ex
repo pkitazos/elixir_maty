@@ -1010,7 +1010,18 @@ defmodule Maty.Typechecker.Error.Formatter do
     Framework Usage Violation: Duplicate Handler Session Type
       Handler: #{handler}
       --
-      A session_type declaration must give each handler's session type once.
+      A handler's session type must be given once, under a single role.
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :duplicate_role_session_type} = e) do
+    %{role: role} = e.details
+
+    """
+    Framework Usage Violation: Duplicate Session Type Declaration
+      Role: #{render_atom(role)}
+      --
+      All of a role's handlers must be given in a single session_type declaration.
     """
   end
 

@@ -197,7 +197,7 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
-  # a `session_type` names the same handler twice
+  # a `session_type` names the same handler twice or the `session_type`s of two roles both name it
   def duplicate_handler_session_type(module, meta, handler) do
     %Error{
       category: :framework_usage,
@@ -205,6 +205,17 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
       module: module,
       meta: Keyword.take(meta, [:line, :column]),
       details: %{handler: handler}
+    }
+  end
+
+  # a role has a second `session_type`
+  def duplicate_role_session_type(module, meta, role) do
+    %Error{
+      category: :framework_usage,
+      kind: :duplicate_role_session_type,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{role: role}
     }
   end
 

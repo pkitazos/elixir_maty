@@ -4,7 +4,9 @@ defmodule StashQueue.Participants.P do
   global_state nil
   local_state :p, nil
 
-  @st {:install, ~q/+q:{a(number).+q:{a(number).end}}/}
+  session_type :p, %{
+    install: ~q/+q:{a(number).+q:{a(number).end}}/
+  }
 
   on_start {ap_pid, {n1, n2}} :: {pid(), {number(), number()}} do
     Maty.DSL.register(ap_pid, :p, &install/2, {n1, n2})
