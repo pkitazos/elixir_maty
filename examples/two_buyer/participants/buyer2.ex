@@ -1,5 +1,5 @@
 defmodule TwoBuyer.Participants.Buyer2 do
-  use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:buyer2]
+  use Maty.Actor, protocol: TwoBuyer.Protocol
 
   global_state nil
   local_state :buyer2, nil

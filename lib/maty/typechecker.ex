@@ -38,8 +38,13 @@ defmodule Maty.Typechecker do
   def __before_compile__(env) do
     customise_logger()
 
+    session_type_declarations = Module.get_attribute(env.module, :session_type) |> Enum.reverse()
+
+    # the actor's roles are the roles of its `session_type` declarations
+    roles = session_type_declarations |> Enum.map(&elem(&1, 0)) |> Enum.uniq()
+
     {state_types, state_errors} =
-      case Preprocessor.process_state_declarations(env) do
+      case Preprocessor.process_state_declarations(env, roles) do
         {:ok, state_types} -> {state_types, []}
         # state errors carry no function id, so they are tagged with nil to match the other error sources.
         {:error, errors} -> {nil, Enum.map(errors, &{nil, &1})}
@@ -53,7 +58,7 @@ defmodule Maty.Typechecker do
 
     errors =
       Module.get_attribute(env.module, :handler_errors) ++
-        unknown_role_errors(env) ++
+        unknown_role_errors(env, session_type_declarations) ++
         state_errors ++
         session_type_errors
 
@@ -67,6 +72,8 @@ defmodule Maty.Typechecker do
     end
 
     Module.put_attribute(env.module, :state_types, state_types)
+    # todo: goes once T-Register checks the init handler's role
+    Module.put_attribute(env.module, :maty_roles, roles)
 
     clauses = Module.get_attribute(env.module, :maty_clauses) |> Enum.reverse()
 
@@ -83,29 +90,25 @@ defmodule Maty.Typechecker do
     end
   end
 
-  # every role an actor declares in `use Maty.Actor` must be a role of its protocol
-  @spec unknown_role_errors(Macro.Env.t()) :: [{nil, Error.t()}]
-  defp unknown_role_errors(env) do
+  # every `session_type` must be given a role of the actor's protocol
+  @spec unknown_role_errors(Macro.Env.t(), [{Maty.Types.role(), map(), pos_integer()}]) ::
+          [{nil, Error.t()}]
+  defp unknown_role_errors(env, session_type_declarations) do
     protocol = Module.get_attribute(env.module, :maty_protocol)
-    roles = Module.get_attribute(env.module, :maty_roles)
-
     protocol_roles = protocol.__roles__()
 
-    case Enum.uniq(roles -- protocol_roles) do
-      [] ->
-        []
+    for {role, _handlers, line} <- session_type_declarations,
+        role not in protocol_roles do
+      error =
+        Error.FrameworkUsage.unknown_roles(
+          env.module,
+          [line: line],
+          protocol,
+          [role],
+          protocol_roles
+        )
 
-      unknown_roles ->
-        error =
-          Error.FrameworkUsage.unknown_roles(
-            env.module,
-            [line: env.line],
-            protocol,
-            unknown_roles,
-            protocol_roles
-          )
-
-        [{nil, error}]
+      {nil, error}
     end
   end
 

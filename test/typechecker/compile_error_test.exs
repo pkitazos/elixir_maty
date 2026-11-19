@@ -36,7 +36,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
 
     """
     defmodule MatyCompileErrorFixture.M#{System.unique_integer([:positive])} do
-    use Maty.Actor, protocol: TwoBuyer.Protocol, roles: #{inspect(roles)}
+    use Maty.Actor, protocol: TwoBuyer.Protocol
 
     global_state nil
     #{local_states}
@@ -477,7 +477,8 @@ defmodule Maty.Typechecker.CompileErrorTest do
     assert error.description =~ "Undeclared Role"
     assert error.description =~ "Got: :buyer1"
 
-    not_in_protocol = actor_src("", roles: [:seller, :auditor])
+    not_in_protocol =
+      actor_src("", roles: [:seller, :auditor], st: @st <> "session_type :auditor, %{}")
 
     error = compile_error!(not_in_protocol)
     assert error.description =~ "Unknown Roles"

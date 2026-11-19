@@ -125,6 +125,7 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
   end
 
   # `use Maty.Actor` declared roles that are not roles of the given protocol
+  # (now: a `session_type` was given a role that is not a role of the protocol)
   def unknown_roles(module, meta, protocol, unknown_roles, protocol_roles) do
     %Error{
       category: :framework_usage,
@@ -169,7 +170,7 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
-  # `local_state` was given a role not in this module's `use Maty.Actor`
+  # `local_state` was given a role not in this Protocol
   def local_state_undeclared_role(module, meta, role, declared_roles) do
     %Error{
       category: :framework_usage,

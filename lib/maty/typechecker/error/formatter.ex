@@ -853,7 +853,7 @@ defmodule Maty.Typechecker.Error.Formatter do
       Got: #{Enum.map_join(got, ", ", &inspect/1)}
       Roles of #{inspect(protocol)}: #{Enum.map_join(known, ", ", &inspect/1)}
       --
-      Maty.Actor must only declare roles of its protocol.
+      session_type must be given a role of the actor's protocol.
     """
   end
 
@@ -988,7 +988,7 @@ defmodule Maty.Typechecker.Error.Formatter do
       Got: #{inspect(got)}
       Declared roles: #{Enum.map_join(known, ", ", &inspect/1)}
       --
-      local_state must be given a role declared in this module's use Maty.Actor.
+      local_state must be given a role with a session_type declaration.
     """
   end
 
@@ -1033,7 +1033,7 @@ defmodule Maty.Typechecker.Error.Formatter do
       Got: #{inspect(got)}
       Declared roles: #{Enum.map_join(known, ", ", &inspect/1)}
       --
-      MatyDSL.register/4 must be given a role declared in this module's use Maty.Actor.
+      MatyDSL.register/4 must be given a role with a session_type declaration.
     """
   end
 

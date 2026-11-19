@@ -22,15 +22,15 @@ defmodule Maty.Actor do
 
   ## Options
 
-  `use Maty.Actor` requires two options:
+  `use Maty.Actor` requires one option:
 
     - `protocol`: the protocol module (implementing `Maty.Protocol`) whose sessions this actor takes part in
-    - `roles`: the roles of that protocol this actor plays
 
+  The roles of that protocol this actor plays are the roles of its `session_type` declarations.
   Every `MatyDSL.register/4` call in the actor must be given one of these roles as a literal atom.
 
       defmodule TwoBuyer.Participants.Seller do
-        use Maty.Actor, protocol: TwoBuyer.Protocol, roles: [:seller]
+        use Maty.Actor, protocol: TwoBuyer.Protocol
         ...
       end
   """
@@ -39,11 +39,9 @@ defmodule Maty.Actor do
 
   defmacro __using__(opts) do
     protocol = Keyword.fetch!(opts, :protocol)
-    roles = Keyword.fetch!(opts, :roles)
 
     quote do
       @maty_protocol unquote(protocol)
-      @maty_roles unquote(roles)
       use Maty.Hook
       use Maty.DSL
       import ST.Sigils

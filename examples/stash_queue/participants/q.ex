@@ -1,5 +1,5 @@
 defmodule StashQueue.Participants.Q do
-  use Maty.Actor, protocol: StashQueue.Protocol, roles: [:q]
+  use Maty.Actor, protocol: StashQueue.Protocol
 
   global_state nil
   local_state :q, nil

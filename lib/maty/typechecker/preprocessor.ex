@@ -2,7 +2,7 @@ defmodule Maty.Typechecker.Preprocessor do
   @moduledoc """
   Compile-time processing of a `Maty.Actor` module's state declarations.
 
-  `process_state_declarations/1` checks the `global_state` / `local_state` declarations
+  `process_state_declarations/2` checks the `global_state` / `local_state` declarations
   and parses their types. It runs once, at `@before_compile`, and returns the parsed
   types or the errors to the caller.
 
@@ -33,11 +33,10 @@ defmodule Maty.Typechecker.Preprocessor do
     end
   end
 
-  @spec process_state_declarations(Macro.Env.t()) ::
+  # `roles` are the actor's roles, every one of them has a single `local_state`
+  @spec process_state_declarations(Macro.Env.t(), [Types.role()]) ::
           {:ok, %{global: Type.t(), local: %{Types.role() => Type.t()}}} | {:error, [Error.t()]}
-  def process_state_declarations(env) do
-    roles = Module.get_attribute(env.module, :maty_roles)
-
+  def process_state_declarations(env, roles) do
     global_declarations = env.module |> Module.get_attribute(:global_state_type) |> Enum.reverse()
     local_declarations = env.module |> Module.get_attribute(:local_state_type) |> Enum.reverse()
 
