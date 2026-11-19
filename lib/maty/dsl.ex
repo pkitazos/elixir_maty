@@ -17,6 +17,7 @@ defmodule Maty.DSL do
         only: [
           global_state: 1,
           local_state: 2,
+          session_type: 2,
           on_start: 2,
           defhandler: 2
         ]
@@ -34,6 +35,61 @@ defmodule Maty.DSL do
       @local_state_type {unquote(role), unquote(Macro.escape(type_ast)), unquote(__CALLER__.line)}
     end
   end
+
+  defmacro session_type(role, handlers_ast) do
+    module = __CALLER__.module
+    line = __CALLER__.line
+
+    case session_type_errors(module, line, role, handlers_ast) do
+      [] ->
+        quote do
+          @session_type {unquote(role), unquote(handlers_ast), unquote(line)}
+        end
+
+      errors ->
+        {:__block__, [], Enum.map(errors, &handler_error(nil, &1))}
+    end
+  end
+
+  defp session_type_errors(module, line, role, handlers_ast) do
+    invalid = fn reason, got ->
+      Error.FrameworkUsage.invalid_session_type_declaration(module, [line: line], reason, got)
+    end
+
+    duplicate = fn handler ->
+      Error.FrameworkUsage.duplicate_handler_session_type(module, [line: line], handler)
+    end
+
+    check(is_atom(role), invalid.(:role_not_literal, role)) ++
+      handlers_errors(handlers_ast, invalid, duplicate)
+  end
+
+  defp handlers_errors({:%{}, _, entries} = handlers_ast, invalid, duplicate) do
+    # the `|` of `%{m | k: v}`, the one map literal whose entries are not pairs
+    handlers = for {handler, _st_ast} <- entries, do: handler
+    # each handler named more than once is reported once
+    repeated = Enum.uniq(handlers -- Enum.uniq(handlers))
+
+    not_map_errors =
+      check(length(handlers) == length(entries), invalid.(:handlers_not_map, handlers_ast))
+
+    not_literal_errors =
+      for(
+        handler <- handlers,
+        not is_atom(handler),
+        do: invalid.(:handler_name_not_literal, handler)
+      )
+
+    duplicate_errors = Enum.map(repeated, duplicate)
+
+    not_map_errors ++ not_literal_errors ++ duplicate_errors
+  end
+
+  defp handlers_errors(handlers_ast, invalid, _duplicate),
+    do: [invalid.(:handlers_not_map, handlers_ast)]
+
+  defp check(true, _error), do: []
+  defp check(false, error), do: [error]
 
   defmacro on_start(pattern, do: body) do
     {clean_pattern, type_spec} = DSL.Pattern.process_init_pattern(pattern)

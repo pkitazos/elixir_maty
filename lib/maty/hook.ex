@@ -9,7 +9,7 @@ defmodule Maty.Hook do
           do: Module.register_attribute(__MODULE__, attr, accumulate: false, persist: false)
 
       # attribute stores
-      for attr <- [:st, :handler_errors, :global_state_type, :local_state_type],
+      for attr <- [:st, :session_type, :handler_errors, :global_state_type, :local_state_type],
           do: Module.register_attribute(__MODULE__, attr, accumulate: true, persist: true)
 
       # one record per clause, which beocmes the input to `Signatures.build/4` @before_compile

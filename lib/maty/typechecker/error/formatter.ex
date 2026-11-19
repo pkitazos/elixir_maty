@@ -992,6 +992,28 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :framework_usage, kind: :invalid_session_type_declaration} = e) do
+    %{reason: reason, got: got} = e.details
+
+    """
+    Framework Usage Violation: Invalid Session Type Declaration
+      Got: #{Macro.to_string(got)}
+      --
+      #{render_session_type_declaration(reason)}
+    """
+  end
+
+  defp render(%Error{category: :framework_usage, kind: :duplicate_handler_session_type} = e) do
+    %{handler: handler} = e.details
+
+    """
+    Framework Usage Violation: Duplicate Handler Session Type
+      Handler: #{handler}
+      --
+      A session_type declaration must give each handler's session type once.
+    """
+  end
+
   defp render(%Error{category: :framework_usage, kind: :undeclared_role} = e) do
     %{got: got, known: known} = e.details
 
@@ -1186,6 +1208,18 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render_state_declaration(:global), do: "global_state"
   defp render_state_declaration({:local, role}), do: "local_state #{inspect(role)}"
+
+  defp render_session_type_declaration(:role_not_literal),
+    do: "session_type must be given the role as a literal atom."
+
+  defp render_session_type_declaration(:handlers_not_map),
+    do: "session_type must be given a map literal from handler names to session types."
+
+  defp render_session_type_declaration(:handler_name_not_literal),
+    do: "Each handler name in a session_type must be a literal atom."
+
+  defp render_session_type_declaration(:not_a_session_type),
+    do: "Each handler in a session_type must be given a session type"
 
   defp render_register_argument(:access_point), do: "1 (access point)"
   defp render_register_argument(:init_handler_args), do: "4 (init handler args)"

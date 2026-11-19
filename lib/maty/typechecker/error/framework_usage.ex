@@ -180,6 +180,34 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
+  # `session_type` was given something other than `role, %{handler: ~q"...", ...}`
+  def invalid_session_type_declaration(module, meta, reason, got_ast)
+      when reason in [
+             :role_not_literal,
+             :handlers_not_map,
+             :handler_name_not_literal,
+             :not_a_session_type
+           ] do
+    %Error{
+      category: :framework_usage,
+      kind: :invalid_session_type_declaration,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{reason: reason, got: got_ast}
+    }
+  end
+
+  # a `session_type` names the same handler twice
+  def duplicate_handler_session_type(module, meta, handler) do
+    %Error{
+      category: :framework_usage,
+      kind: :duplicate_handler_session_type,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{handler: handler}
+    }
+  end
+
   # register was given an expression for the role, not a literal atom
   def role_not_literal(module, meta, got_ast) do
     %Error{
