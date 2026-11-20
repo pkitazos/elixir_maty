@@ -131,8 +131,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          :message,
          {:handler, :init, :seller, :binary, @st_out}
        )},
-      {{Error.TypeMismatch, :return_type_mismatch},
-       Error.TypeMismatch.return_type_mismatch(@m, @meta, expected: :number, got: :binary)},
       {{Error.TypeMismatch, :binary_operator_type_mismatch},
        Error.TypeMismatch.binary_operator_type_mismatch(@m, @meta, :+, :number, :binary)},
       {{Error.TypeMismatch, :logical_operator_type_mismatch},

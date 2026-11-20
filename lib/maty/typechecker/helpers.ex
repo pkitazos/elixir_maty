@@ -129,4 +129,6 @@ defmodule Maty.Typechecker.Helpers do
       end
     end)
   end
+
+  # todo: maybe add `join_branch_session` separately
 end

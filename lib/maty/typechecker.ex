@@ -7,7 +7,7 @@ defmodule Maty.Typechecker do
   """
 
   alias Maty.Utils
-  alias Maty.Typechecker.{Ctx, Helpers, TC, Error, Preprocessor, Signatures}
+  alias Maty.Typechecker.{Ctx, TC, Error, Preprocessor, Signatures}
   alias Maty.Typechecker.Error.Formatter
 
   require Logger
@@ -351,7 +351,7 @@ defmodule Maty.Typechecker do
   # of the same function can be identified. single-clause functions needs no such context
   defp with_clause_frame({:error, %Error{} = e}, func_id, index, total_clauses)
        when total_clauses > 1,
-       do: {:error, %{e | trace: e.trace ++ [{:clause, func_id, index}]}}
+       do: {:error, Error.add_frame(e, {:clause, func_id, index})}
 
   defp with_clause_frame(result, _func_id, _index, _total_clauses), do: result
 

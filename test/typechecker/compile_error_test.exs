@@ -96,7 +96,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
     assert error.description =~ "[maty] 2 type errors in"
     assert error.description =~ "Missing Handler"
     assert error.description =~ "Invalid Spec Argument"
-    refute error.description =~ "Return Type Mismatch"
+    refute error.description =~ "Unexpected Type"
   end
 
   test "every error in the module is reported, in source order" do
@@ -161,7 +161,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       """)
 
     error = compile_error!(function)
-    assert error.description =~ "Return Type Mismatch"
+    assert error.description =~ "Unexpected Type"
     assert error.description =~ "in clause #2 of f/1"
 
     # a single-clause function needs no clause frame
@@ -172,7 +172,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       """)
 
     error = compile_error!(single)
-    assert error.description =~ "Return Type Mismatch"
+    assert error.description =~ "Unexpected Type"
     refute error.description =~ "Trace:"
   end
 

@@ -150,7 +150,7 @@ defmodule Maty.Check do
   def with_frame(check, frame) do
     fn env, st ->
       case apply_check(check, env, st) do
-        {:error, %Error{} = e, env} -> {:error, %{e | trace: e.trace ++ [frame]}, env}
+        {:error, %Error{} = e, env} -> {:error, Error.add_frame(e, frame), env}
         other -> other
       end
     end

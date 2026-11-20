@@ -34,16 +34,6 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
     }
   end
 
-  def return_type_mismatch(module, meta, expected: expected, got: got) do
-    %Error{
-      category: :type_mismatch,
-      kind: :return_type_mismatch,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{expected: expected, got: got}
-    }
-  end
-
   # a tuple literal checked against a tuple type has a different number of elements
   def tuple_arity_mismatch(module, meta, expected: expected, got: got) do
     %Error{

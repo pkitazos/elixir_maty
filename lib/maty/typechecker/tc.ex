@@ -399,9 +399,14 @@ defmodule Maty.Typechecker.TC do
   # todo: handle remote function call
 
   # Block Scope
+  # an empty block evaluates to `nil`
+  deftc synth(_ctx, env, st, {:__block__, _, []}), do: {:ok, nil, st, env}
+
   deftc synth(ctx, var_env, st_pre, {:__block__, _, body_asts}) when is_list(body_asts) do
-    # todo: reconsider what to do here..
-    tc_expr_list(ctx, var_env, st_pre, body_asts)
+    tcm env: var_env, st: st_pre do
+      types <- chain(body_asts, &syn(ctx, &1))
+      ok(List.last(types))
+    end
   end
 
   # -- T-Let
@@ -415,20 +420,11 @@ defmodule Maty.Typechecker.TC do
 
   # -- T-Case
   # todo: revisit this
-  deftc synth(ctx, env, st, {:case, meta, [scrutinee_ast, [do: clauses_list]]}) do
+  deftc synth(ctx, env, st, {:case, meta, [scrutinee_ast, [do: clauses]]}) do
     tcm env: env, st: st do
-      scrutinee_type <- syn(ctx, scrutinee_ast)
+      scrutinee_ty <- syn(ctx, scrutinee_ast)
 
-      branch_results <-
-        fan_out(Enum.with_index(clauses_list, 1), fn
-          {{:->, branch_meta, [[pat_ast], expr_ast]}, index} ->
-            tcm do
-              # a literal pattern has no meta of its own, so its errors are reported at the branch
-              _ <- match_pattern(%{ctx | meta: branch_meta}, pat_ast, scrutinee_type)
-              syn(ctx, expr_ast)
-            end
-            |> with_frame({:case_branch, index, Keyword.take(branch_meta, [:line, :column])})
-        end)
+      branch_results <- case_branches(ctx, scrutinee_ty, clauses, &syn(ctx, &1))
 
       case Helpers.join_branch_results(branch_results) do
         {:error, failed} ->
@@ -818,21 +814,23 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
+  # T-Case the actual branch checking is identical (for now) besides the mode we're in
+  defp case_branches(ctx, scrutinee_ty, clauses, mode) do
+    fan_out(Enum.with_index(clauses, 1), fn
+      {{:->, branch_meta, [[pat_ast], expr_ast]}, index} ->
+        tcm do
+          # a literal pattern has no meta of its own, so its errors are reported at the branch
+          _ <- match_pattern(%{ctx | meta: branch_meta}, pat_ast, scrutinee_ty)
+          mode.(expr_ast)
+        end
+        |> with_frame({:case_branch, index, Keyword.take(branch_meta, [:line, :column])})
+    end)
+  end
+
   defp normalise_list_shapes(xs) do
     case Enum.split(xs, -1) do
       {init, [{:|, _, [x, tail]}]} -> {init ++ [x], tail}
       _ -> {xs, []}
-    end
-  end
-
-  # Processes a list of expressions sequentially using synth.
-  # Returns the result of the *last* expression in the list.
-  # the only reason this isn't inlined is because it's used in a bunch of places in the wf module
-  @spec tc_expr_list(Ctx.t(), Check.var_env(), Maty.ST.t(), [ast()]) :: result()
-  def tc_expr_list(ctx, var_env, st_pre, ast_list) do
-    tcm env: var_env, st: st_pre do
-      types <- chain(ast_list, &syn(ctx, &1))
-      ok(List.last(types))
     end
   end
 
@@ -977,6 +975,53 @@ defmodule Maty.Typechecker.TC do
         )
         when is_list(params) do
     # todo: later
+  end
+
+  # -- Block-Chk
+  # e1; ...; en <== A
+  deftc check(ctx, env, st, {:__block__, _, []}, t), do: check(ctx, env, st, nil, t)
+
+  deftc check(ctx, env, st, {:__block__, _, body_asts}, t) when is_list(body_asts) do
+    tcm env: env, st: st do
+      {last, rest} = List.pop_at(body_asts, -1)
+      chain(rest, &syn(ctx, &1))
+
+      chk(ctx, last, t)
+    end
+  end
+
+  # -- T-Let-Chk
+  # p = e <== A
+  deftc check(ctx, env, st, {:=, _meta, [pat_ast, expr_ast]}, t) do
+    tcm env: env, st: st do
+      chk(ctx, expr_ast, t)
+      _ <- match_pattern(ctx, pat_ast, t)
+      ok(t)
+    end
+  end
+
+  # `and` / `or` / `&&` / `||` expand to a `case` but have their own synth rules
+  deftc check(ctx, env, st, boolean_op(:and, _, _, _) = ast, t), do: switch(ctx, env, st, ast, t)
+  deftc check(ctx, env, st, boolean_op(:or, _, _, _) = ast, t), do: switch(ctx, env, st, ast, t)
+  deftc check(ctx, env, st, truthy_op(:&&, _) = ast, t), do: switch(ctx, env, st, ast, t)
+  deftc check(ctx, env, st, truthy_op(:||, _) = ast, t), do: switch(ctx, env, st, ast, t)
+
+  # -- T-Case-Chk
+  # case e do p1 -> e1; ...; pn -> en end <== A
+  deftc check(ctx, env, st, {:case, meta, [scrutinee_ast, [do: clauses]]}, t) do
+    tcm env: env, st: st do
+      scrutinee_ty <- syn(ctx, scrutinee_ast)
+
+      branch_results <- case_branches(ctx, scrutinee_ty, clauses, &chk(ctx, &1, t))
+
+      case Helpers.join_branch_results(branch_results) do
+        {:error, failed} ->
+          fail(Error.TypeMismatch.case_branches_incompatible(ctx.module, meta, failed))
+
+        {:ok, {_, joined_st}} ->
+          ok(t, st: joined_st)
+      end
+    end
   end
 
   # -- TV-Switch

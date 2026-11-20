@@ -163,8 +163,7 @@ defmodule Maty.Typechecker.TC.WF do
          :ok <- typecheck_function(ctx, meta, {ctx.module, :on_start, 1}, env, block, ret_ty),
          # todo: also check the module defines at least one init handler without one the actor can never start a session
          # (which is a bit odd for a Maty actor)
-         body = extract_body(block),
-         {:register, true} <- {:register, contains_register_call?(body)} do
+         {:register, true} <- {:register, contains_register_call?(block)} do
       :ok
     else
       {:error, err, _env} ->
@@ -182,21 +181,12 @@ defmodule Maty.Typechecker.TC.WF do
 
   # body of a function clause must leave the session untouched and have the spec's return type
   defp typecheck_function(ctx, meta, func_id, env, block, ret_ty) do
-    with {:ok, actual, final_st, _} <-
-           TC.tc_expr_list(ctx, env, %ST.SEnd{}, extract_body(block)),
-         {:st, %ST.SEnd{}} <- {:st, final_st},
-         {:ret, ^ret_ty} <- {:ret, actual} do
+    with {:ok, _, final_st, _} <- TC.check(ctx, env, %ST.SEnd{}, block, ret_ty),
+         {:st, %ST.SEnd{}} <- {:st, final_st} do
       :ok
     else
       {:st, st} ->
         {:error, Error.FunctionCall.function_altered_session_state(ctx.module, meta, func_id, st)}
-
-      {:ret, actual} ->
-        {:error,
-         Error.TypeMismatch.return_type_mismatch(ctx.module, meta,
-           expected: ret_ty,
-           got: actual
-         )}
 
       {:error, err, _} ->
         {:error, err}
@@ -205,7 +195,7 @@ defmodule Maty.Typechecker.TC.WF do
 
   # body of a handler clause must end in `suspend` / `done` with the session used up
   defp typecheck_handler_body(ctx, env, meta, handler, st, block) do
-    case TC.tc_expr_list(ctx, env, st, extract_body(block)) do
+    case TC.synth(ctx, env, st, unwrap_body(block)) do
       {:ok, :no_return, %SBottom{}, _} ->
         :ok
 
@@ -218,10 +208,8 @@ defmodule Maty.Typechecker.TC.WF do
     end
   end
 
-  @spec extract_body(Macro.t()) :: [Macro.t()]
-  defp extract_body({:__block__, _, block}), do: block
-  defp extract_body({:try, _, [[do: body_block, catch: _]]}), do: extract_body(body_block)
-  defp extract_body(expr) when not is_list(expr), do: [expr]
+  defp unwrap_body({:try, _, [[do: body, catch: _]]}), do: body
+  defp unwrap_body(body), do: body
 
   # -- privater helpers
   # todo: figure out what stays and what moves

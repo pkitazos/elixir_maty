@@ -54,6 +54,10 @@ defmodule Maty.Typechecker.Error do
           trace: [frame()]
         }
 
+  # appends a context frame to the error's trace, as it bubbles up past the frame's site
+  @spec add_frame(t(), frame()) :: t()
+  def add_frame(%__MODULE__{} = error, frame), do: %{error | trace: error.trace ++ [frame]}
+
   def internal_error(a) do
     %__MODULE__{category: :internal, kind: :internal_error, details: %{message: "#{a}"}}
   end

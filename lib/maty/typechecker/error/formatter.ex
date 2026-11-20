@@ -207,18 +207,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :type_mismatch, kind: :return_type_mismatch} = e) do
-    %{expected: expected, got: got} = e.details
-
-    """
-    Type Mismatch Error: Return Type Mismatch
-      Expected return type: #{render_type(expected)}
-      Got return type: #{render_type(got)}
-      --
-      The function's actual return type does not match the declared return type.
-    """
-  end
-
   defp render(%Error{category: :type_mismatch, kind: :expected} = e) do
     %{expected: expected, got: got} = e.details
 
