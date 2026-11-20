@@ -23,16 +23,6 @@ defmodule Maty.Typechecker.Error.FunctionCall do
     }
   end
 
-  def function_altered_session_state(module, meta, func_id, final_state) do
-    %Error{
-      category: :function_call,
-      kind: :function_altered_session_state,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{func_id: func_id, final_state: final_state}
-    }
-  end
-
   def wrong_number_of_clauses(module, meta, func_id, expected: expected, got: got) do
     %Error{
       category: :function_call,

@@ -37,8 +37,11 @@ defmodule Maty.Typechecker.TC.WF do
         ctx = %{ctx | meta: meta}
 
         with {:ok, env} <- check_argument_patterns(ctx, meta, arg_pattern_asts, args_ty),
-             :ok <- typecheck_function(ctx, meta, func_id, env, block, ret_ty) do
+             {:ok, _, _, _} <- TC.check(ctx, env, %SBottom{reason: :nothing}, block, ret_ty) do
           {:ok, ret_ty}
+        else
+          {:error, error, _} -> {:error, error}
+          {:error, error} -> {:error, error}
         end
       end
     else
@@ -160,7 +163,7 @@ defmodule Maty.Typechecker.TC.WF do
     ctx = %{ctx | meta: meta}
 
     with {:ok, _bindings, env} <- tc_pattern(ctx, arg_pattern_ast, args_types, %{}),
-         :ok <- typecheck_function(ctx, meta, {ctx.module, :on_start, 1}, env, block, ret_ty),
+         {:ok, _, _, _} <- TC.check(ctx, env, %SBottom{reason: :nothing}, block, ret_ty),
          # todo: also check the module defines at least one init handler without one the actor can never start a session
          # (which is a bit odd for a Maty actor)
          {:register, true} <- {:register, contains_register_call?(block)} do
@@ -178,20 +181,6 @@ defmodule Maty.Typechecker.TC.WF do
   end
 
   # -- private helpers
-
-  # body of a function clause must leave the session untouched and have the spec's return type
-  defp typecheck_function(ctx, meta, func_id, env, block, ret_ty) do
-    with {:ok, _, final_st, _} <- TC.check(ctx, env, %ST.SEnd{}, block, ret_ty),
-         {:st, %ST.SEnd{}} <- {:st, final_st} do
-      :ok
-    else
-      {:st, st} ->
-        {:error, Error.FunctionCall.function_altered_session_state(ctx.module, meta, func_id, st)}
-
-      {:error, err, _} ->
-        {:error, err}
-    end
-  end
 
   # body of a handler clause must end in `suspend` / `done` with the session used up
   defp typecheck_handler_body(ctx, env, meta, handler, st, block) do

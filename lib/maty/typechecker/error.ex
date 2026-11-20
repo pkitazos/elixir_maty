@@ -50,7 +50,7 @@ defmodule Maty.Typechecker.Error do
           meta: Keyword.t(),
           # kind-specific payload (got/expected/pattern/...)
           details: map(),
-          # carried so the Formatter can call Maty.ST.repr/1 & get_action/1
+          # carried so the Formatter can call Maty.ST.repr/1
           st: Maty.ST.t() | nil,
           # context frames, innermost first (appended on bubble-up)
           trace: [frame()]

@@ -852,26 +852,6 @@ defmodule Maty.Typechecker.TC do
     end)
   end
 
-  # the first `send_to` / `suspend` / `done` in an anonymous function's body, as `{action, arg_asts}`, or `nil`
-  defp find_communication(body_ast) do
-    {_, found} =
-      Macro.prewalk(body_ast, nil, fn
-        maty_runtime(:send_session_message, _, [_, recipient, message]) = node, nil ->
-          {node, {:send, [recipient, message]}}
-
-        maty_runtime(:suspend, _, args) = node, nil ->
-          {node, {:suspend, args}}
-
-        maty_runtime(:done, _, args) = node, nil ->
-          {node, {:done, args}}
-
-        node, found ->
-          {node, found}
-      end)
-
-    found
-  end
-
   defp normalise_list_shapes(xs) do
     case Enum.split(xs, -1) do
       {init, [{:|, _, [x, tail]}]} -> {init ++ [x], tail}
@@ -1043,11 +1023,6 @@ defmodule Maty.Typechecker.TC do
             got: length(params)
           )
 
-      communication = find_communication(body_ast)
-
-      expect is_nil(communication),
-        else: Error.FrameworkUsage.communication_in_lambda(ctx.module, meta, got: communication)
-
       scoped(
         tcm do
           Enum.zip(params, param_types)
@@ -1058,8 +1033,7 @@ defmodule Maty.Typechecker.TC do
 
           chk(ctx, body_ast, return_type)
         end,
-        # todo: swap out for %ST.SBottom{} ?
-        st: %ST.SEnd{}
+        st: %SBottom{reason: :nothing}
       )
 
       ok(t)

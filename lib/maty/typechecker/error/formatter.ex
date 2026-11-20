@@ -44,12 +44,10 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render(%Error{category: :protocol_violation, kind: :incorrect_action} = e) do
     %{got: got} = e.details
-    actions = Maty.ST.get_action(e.st)
 
     """
     Protocol Violation: Incorrect Action
       Tried: #{render_action(got)}
-      Current permitted actions: #{actions}
       --
       Session Type: #{Maty.ST.repr(e.st)}
     """
@@ -642,17 +640,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :function_call, kind: :function_altered_session_state} = e) do
-    %{final_state: final_state} = e.details
-
-    """
-    Function Call Error: Function Altered Session State
-      Final state: #{inspect(final_state)}
-      --
-      Function altered the session state when it should remain unchanged.
-    """
-  end
-
   defp render(%Error{category: :function_call, kind: :wrong_number_of_clauses} = e) do
     %{expected: expected, got: got} = e.details
 
@@ -997,17 +984,6 @@ defmodule Maty.Typechecker.Error.Formatter do
       #{render_unsupported_lambda(reason)}
       --
       Only single-clause anonymous functions without guards are supported. Consider a named function.
-    """
-  end
-
-  defp render(%Error{category: :framework_usage, kind: :communication_in_lambda} = e) do
-    %{got: got} = e.details
-
-    """
-    Framework Usage Violation: Communication in an Anonymous Function
-      Got: #{render_action(got)}
-      --
-      Anonymous functions cannot communicate. Communicate from the handler or a named function instead.
     """
   end
 

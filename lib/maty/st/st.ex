@@ -3,7 +3,7 @@ defmodule Maty.ST do
   Maty-specific extensions to `ST` (from the `st_parser` package).
 
   Defines `SBottom` for representing fully consumed session types,
-  and utility functions `repr/1` and `get_action/1` used by the typechecker.
+  and the utility function `repr/1` used by the typechecker.
   """
 
   defmodule SBottom do
@@ -11,17 +11,22 @@ defmodule Maty.ST do
     Represents a fully consumed session type (bottom).
 
     Produced after a handler terminates via done or suspend.
+    With `reason: :nothing` it is the state of code that has no session (function and `fn` bodies).
     """
     @enforce_keys [:reason]
     defstruct [:reason]
 
     @type t :: %__MODULE__{
+            # :done / :suspend - the session ended there
+            # :nothing - there is no session
             reason: :done | :suspend | :nothing
           }
   end
 
   @type t :: ST.t() | SBottom.t()
 
+  def repr(%SBottom{reason: :nothing}), do: "no session"
+  def repr(%SBottom{reason: reason}), do: "⊥ (after #{reason})"
   def repr(%ST.SEnd{}), do: "end"
   def repr(%ST.SName{handler: handler}), do: Atom.to_string(handler)
 
@@ -45,10 +50,4 @@ defmodule Maty.ST do
 
     "#{from_str}&{#{branches_str}}"
   end
-
-  def get_action(%ST.SEnd{}), do: :done
-  def get_action(%ST.SName{}), do: :suspend
-  def get_action(%ST.SOut{}), do: :send
-  def get_action(%ST.SIn{}), do: :receive
-  def get_action(%ST.SBranch{}), do: :error
 end

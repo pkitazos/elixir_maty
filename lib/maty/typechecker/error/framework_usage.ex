@@ -39,19 +39,6 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
-  # the body of an anonymous function communicates (`send_to`, `suspend`, `done`)
-  # `got` is `{action, arg_asts}`, as for `ProtocolViolation.incorrect_action/4`
-  def communication_in_lambda(module, meta, got: {action, args})
-      when action in [:send, :suspend, :done] and is_list(args) do
-    %Error{
-      category: :framework_usage,
-      kind: :communication_in_lambda,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{got: {action, args}}
-    }
-  end
-
   # bitstring syntax other than string concatenation and interpolation was used
   def unsupported_bitstring(module, meta) do
     %Error{
