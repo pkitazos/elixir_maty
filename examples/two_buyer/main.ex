@@ -12,7 +12,8 @@ defmodule TwoBuyer.Main do
 
     spawn_buyers(ap, "Types and Programming Languages")
     IO.puts("---")
-    # spawn_buyers(ap, "Compiling with Continuations")
+    # a pricier book, so buyer2 quits this time
+    spawn_buyers(ap, "Compiling with Continuations")
 
     # Give time for all processes to complete their communication
     :timer.sleep(2000)

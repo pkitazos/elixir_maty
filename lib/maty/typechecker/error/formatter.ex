@@ -1154,10 +1154,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render_type(type), do: "#{inspect(type)}"
 
-  # an expected type, or a description where there is no single type to show
-  defp render_expected(description) when is_binary(description), do: description
-  defp render_expected(type), do: render_type(type)
-
   defp render_state_declaration(:global), do: "global_state"
   defp render_state_declaration({:local, role}), do: "local_state #{inspect(role)}"
 
@@ -1172,8 +1168,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render_session_type_declaration(:not_a_session_type),
     do: "Each handler in a session_type must be given a session type"
-
-  defp render_handler_ref(name, arity) when is_atom(name), do: "&#{name}/#{arity}"
 
   defp handler_ref_kind(2), do: "an init handler"
   defp handler_ref_kind(3), do: "a message handler"
