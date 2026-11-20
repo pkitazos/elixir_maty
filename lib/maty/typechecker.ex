@@ -49,7 +49,7 @@ defmodule Maty.Typechecker do
     # a bad module type is reported on its own, before anything that uses it,
     # since every use of it would otherwise also be reported as an unknown type
     module_types =
-      case Preprocessor.process_type_declarations(type_declarations) do
+      case Preprocessor.process_type_declarations(env.module, type_declarations) do
         {:ok, module_types} -> module_types
         {:error, errors} -> raise_type_errors!(env, Enum.map(errors, &{nil, &1}))
       end

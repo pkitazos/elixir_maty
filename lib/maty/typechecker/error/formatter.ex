@@ -808,6 +808,22 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
+  defp render(%Error{category: :type_specification, kind: :module_type_not_well_typed} = e) do
+    %{name: name, cause: cause} = e.details
+    {title, opts, message} = render_cause(cause)
+
+    """
+    Type Specification Error: Invalid Module Type
+      Module type: #{name}
+      Reason: #{title}
+      #{opts}
+      --
+      The module type is invalid.
+
+      Details: #{message}
+    """
+  end
+
   defp render(%Error{category: :type_specification, kind: :no_spec_for_function}) do
     """
     Type Specification Error: Missing Function Spec
@@ -1150,6 +1166,20 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render_cause(%Error.Cause{kind: :dict_key_not_base_type, details: %{key_type: key_type}}) do
     {"Dict Key Not a Base Type", "Key type: #{render_type(key_type)}",
      "Dict keys must have a base type."}
+  end
+
+  defp render_cause(%Error.Cause{kind: :recursive_type, details: %{through: through}}) do
+    {"Recursive Type", "Through: #{through}()",
+     "A type cannot use itself, directly or through other module types."}
+  end
+
+  defp render_cause(%Error.Cause{kind: :parametric_type, details: %{name: name, arity: arity}}) do
+    {"Parametric Type", "Type: #{name}/#{arity}", "Types with parameters are not supported."}
+  end
+
+  defp render_cause(%Error.Cause{kind: :remote_type, details: %{type_ast: type_ast}}) do
+    {"Remote Type", "Type: #{Macro.to_string(type_ast)}",
+     "Types defined in other modules are not supported."}
   end
 
   defp render_cause(%Error.Cause{

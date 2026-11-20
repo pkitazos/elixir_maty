@@ -15,6 +15,9 @@ defmodule Maty.Typechecker.Error.Cause do
           :unsupported_type_constructor
           | :unknown_type_constructor
           | :invalid_maty_state
+          | :recursive_type
+          | :parametric_type
+          | :remote_type
 
   @type t :: %__MODULE__{kind: kind(), details: map()}
 end

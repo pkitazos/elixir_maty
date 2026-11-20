@@ -33,7 +33,10 @@ defmodule Maty.Typechecker.ErrorRenderTest do
     {Error.TypeSpecification, :invalid_record_label},
     {Error.TypeSpecification, :unknown_type_constructor},
     {Error.TypeSpecification, :empty_record},
-    {Error.TypeSpecification, :dict_key_not_base_type}
+    {Error.TypeSpecification, :dict_key_not_base_type},
+    {Error.TypeSpecification, :recursive_type},
+    {Error.TypeSpecification, :parametric_type},
+    {Error.TypeSpecification, :remote_type}
   ]
 
   defp errors do
@@ -289,6 +292,8 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          {:wat, [], []},
          @cause
        )},
+      {{Error.TypeSpecification, :module_type_not_well_typed},
+       Error.TypeSpecification.module_type_not_well_typed(@m, @meta, :order, @cause)},
       {{Error.TypeSpecification, :spec_args_parse_error_at},
        Error.TypeSpecification.spec_args_parse_error_at(
          @m,

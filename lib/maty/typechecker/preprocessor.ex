@@ -33,8 +33,8 @@ defmodule Maty.Typechecker.Preprocessor do
   end
 
   # `declarations` are the `@type` / `@typep` / `@opaque` attribute entries
-  @spec process_type_declarations([tuple()]) :: result(TypeSpecParser.module_types())
-  def process_type_declarations(declarations) do
+  @spec process_type_declarations(module(), [tuple()]) :: result(TypeSpecParser.module_types())
+  def process_type_declarations(module, declarations) do
     declarations =
       for {_kind, {:"::", _, [{name, meta, params}, body_ast]}, _location} <- declarations do
         # a type without parameters has `nil` for them
@@ -47,16 +47,15 @@ defmodule Maty.Typechecker.Preprocessor do
         {:ok, module_types}
 
       {_module_types, problems} ->
-        # todo: proper errors
         {:error,
-         for {name, line, problem} <- problems do
-           {:todo, "@type #{name} (line #{line}) does not resolve: #{inspect(problem)}"}
+         for {name, line, cause} <- problems do
+           Error.TypeSpecification.module_type_not_well_typed(module, [line: line], name, cause)
          end}
     end
   end
 
   # `roles` are the actor's roles, every one of them has a single `local_state`
-  # `module_types` are the module's own types, from `process_type_declarations/1`
+  # `module_types` are the declared module types, from `process_type_declarations/2`
   @spec process_state_declarations(Macro.Env.t(), [Types.role()], TypeSpecParser.module_types()) ::
           {:ok, Types.state_types()} | {:error, [Error.t()]}
   def process_state_declarations(env, roles, module_types) do

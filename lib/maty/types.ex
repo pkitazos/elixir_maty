@@ -56,7 +56,7 @@ defmodule Maty.Types do
     nil,
     # maybe not these actually
     :pid,
-    :ref
+    :reference
   ]
 
   @doc """
@@ -83,7 +83,7 @@ defmodule Maty.Types do
             | :pid
             # todo: check to what degree I can actually work with PIDs and REFs
             # and make the allowed ops explicit somewhere
-            | :ref
+            | :reference
 
     @typedoc """
     Represents types that are supported by the Maty typechecker.

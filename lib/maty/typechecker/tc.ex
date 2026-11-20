@@ -785,7 +785,7 @@ defmodule Maty.Typechecker.TC do
   # -- start of other little bits --------------------------------------------------------------------------------
 
   # types that String.Chars implements
-  @interpolatable_types [:atom, :binary, :boolean, :date, :number, nil]
+  @interpolatable_types [:atom, :binary, :boolean, :number, nil]
 
   # an interpolated value: `String.Chars.to_string(x) :: binary`
   defp tc_string_segment(

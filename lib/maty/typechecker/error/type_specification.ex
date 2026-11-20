@@ -31,6 +31,17 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
     }
   end
 
+  # one of the module types (`@type` / `@typep` / `@opaque`) does not resolve
+  def module_type_not_well_typed(module, meta, name, %Error.Cause{} = cause) do
+    %Error{
+      category: :type_specification,
+      kind: :module_type_not_well_typed,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{name: name, cause: cause}
+    }
+  end
+
   def spec_args_parse_error_at(
         module,
         meta,
@@ -99,5 +110,20 @@ defmodule Maty.Typechecker.Error.TypeSpecification do
       kind: :dict_key_not_base_type,
       details: %{type_ast: type_ast, key_type: key_type}
     }
+  end
+
+  # a module type that is still being resolved uses `through`, so it uses itself
+  def recursive_type(through) do
+    %Error.Cause{kind: :recursive_type, details: %{through: through}}
+  end
+
+  # a module type with parameters, `@type name(a, ...) :: ...`
+  def parametric_type(name, arity) do
+    %Error.Cause{kind: :parametric_type, details: %{name: name, arity: arity}}
+  end
+
+  # a type from another module, `Mod.t()`
+  def remote_type(type_ast) do
+    %Error.Cause{kind: :remote_type, details: %{type_ast: type_ast}}
   end
 end

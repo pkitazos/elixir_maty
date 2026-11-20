@@ -17,12 +17,9 @@ defmodule Maty.Typechecker.TypeSpecParserTest do
   end
 
   test "basic types" do
-    for t <- [:atom, :number, :binary, :boolean, :pid, :ref, :no_return] do
+    for t <- [:atom, :number, :binary, :boolean, :pid, :reference, :no_return] do
       assert {:ok, ^t} = TSP.parse(type_ast(t))
     end
-
-    date_ast = {{:., @meta, [{:__aliases__, @meta, [:Date]}, :t]}, @meta, []}
-    assert {:ok, :date} = TSP.parse(date_ast)
   end
 
   test "tuples" do

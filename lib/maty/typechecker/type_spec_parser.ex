@@ -48,14 +48,13 @@ defmodule Maty.Typechecker.TypeSpecParser do
     (a type that only fails because a type it uses failed has no problem of its own)
   """
   @spec resolve_module_types([{atom(), [Macro.t()], Macro.t(), non_neg_integer()}]) ::
-          {module_types(), [{atom(), non_neg_integer(), term()}]}
+          {module_types(), [{atom(), non_neg_integer(), Error.Cause.t()}]}
   def resolve_module_types(declarations) do
     {parametric, plain} = Enum.split_with(declarations, fn {_, params, _, _} -> params != [] end)
 
-    # todo: proper error
     parametric_problems =
       for {name, params, _body, line} <- parametric,
-          do: {name, line, {:todo, "parametric type #{name}/#{length(params)}"}}
+          do: {name, line, Error.TypeSpecification.parametric_type(name, length(params))}
 
     decls = Map.new(plain, fn {name, _params, body, line} -> {name, {body, line}} end)
 
@@ -72,8 +71,9 @@ defmodule Maty.Typechecker.TypeSpecParser do
           atom(),
           [atom()],
           %{atom() => {Macro.t(), non_neg_integer()}},
-          {%{atom() => {:ok, Type.t()} | :error}, [{atom(), non_neg_integer(), term()}]}
-        ) :: {%{atom() => {:ok, Type.t()} | :error}, [{atom(), non_neg_integer(), term()}]}
+          {%{atom() => {:ok, Type.t()} | :error}, [{atom(), non_neg_integer(), Error.Cause.t()}]}
+        ) ::
+          {%{atom() => {:ok, Type.t()} | :error}, [{atom(), non_neg_integer(), Error.Cause.t()}]}
   defp resolve(name, _stack, _decls, {resolved, _problems} = acc)
        when is_map_key(resolved, name) do
     acc
@@ -89,16 +89,16 @@ defmodule Maty.Typechecker.TypeSpecParser do
         {resolved, _problems} = acc = Enum.reduce(uses, acc, &resolve(&1, stack, decls, &2))
         record(acc, name, parse_body(body, line, uses, resolved))
 
-      _used ->
+      used ->
         # `name` uses a type that is still being resolved, which closes a cycle back to it
-        record(acc, name, {:error, line, recursive_problem()})
+        record(acc, name, {:error, line, recursive_problem(used)})
     end
   end
 
   # parses a type's body once every module type it uses has resolved.
   # returns `:error` when one of them failed
   @spec parse_body(Macro.t(), non_neg_integer(), [atom()], %{atom() => {:ok, Type.t()} | :error}) ::
-          {:ok, Type.t()} | {:error, non_neg_integer(), term()} | :error
+          {:ok, Type.t()} | {:error, non_neg_integer(), Error.Cause.t()} | :error
   defp parse_body(body, line, uses, resolved) do
     if Enum.all?(uses, &match?({:ok, _}, resolved[&1])) do
       module_types = for {n, {:ok, type}} <- resolved, into: %{}, do: {n, type}
@@ -113,18 +113,18 @@ defmodule Maty.Typechecker.TypeSpecParser do
   end
 
   # the cycle from `used` back to it, through the types on the stack
-  @spec recursive_problem() :: term()
-  defp recursive_problem() do
-    # todo: proper error
-    {:todo, "recursive type"}
+  @spec recursive_problem(atom()) :: Error.Cause.t()
+  defp recursive_problem(used) do
+    Error.TypeSpecification.recursive_type(used)
   end
 
   # records how resolving `name` went, with its problem when it has one of its own
   @spec record(
-          {%{atom() => {:ok, Type.t()} | :error}, [{atom(), non_neg_integer(), term()}]},
+          {%{atom() => {:ok, Type.t()} | :error}, [{atom(), non_neg_integer(), Error.Cause.t()}]},
           atom(),
-          {:ok, Type.t()} | {:error, non_neg_integer(), term()} | :error
-        ) :: {%{atom() => {:ok, Type.t()} | :error}, [{atom(), non_neg_integer(), term()}]}
+          {:ok, Type.t()} | {:error, non_neg_integer(), Error.Cause.t()} | :error
+        ) ::
+          {%{atom() => {:ok, Type.t()} | :error}, [{atom(), non_neg_integer(), Error.Cause.t()}]}
   defp record({resolved, problems}, name, {:ok, type}),
     do: {Map.put(resolved, name, {:ok, type}), problems}
 
@@ -152,8 +152,10 @@ defmodule Maty.Typechecker.TypeSpecParser do
   # Base Case: Literal nil
   defp do_parse(nil, _type_env), do: {:ok, nil}
 
-  # Date Type constructor
-  defp do_parse({{:., _, [{:__aliases__, _, [:Date]}, :t]}, _, []}, _type_env), do: {:ok, :date}
+  # a type from another module, `Mod.t()`
+  defp do_parse({{:., _, [_module, _name]}, _, _args} = type_ast, _type_env) do
+    {:error, Error.TypeSpecification.remote_type(type_ast)}
+  end
 
   # Base Case: Literal Atom (e.g., :ok, :error, :atom)
   defp do_parse(atom_name, _type_env) when is_atom(atom_name) do
