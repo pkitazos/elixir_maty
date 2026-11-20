@@ -456,8 +456,6 @@ defmodule Maty.Typechecker.TC do
       expect is_atom(literal_label),
         else: Error.TypeMismatch.send_message_not_tuple(ctx.module, meta, got: message_ast)
 
-      actual_payload_type <- syn(ctx, payload_expr_ast)
-
       # roles must be literal atoms
       expect is_atom(recipient_ast),
         else: Error.FrameworkUsage.role_not_literal(ctx.module, meta, recipient_ast)
@@ -483,11 +481,16 @@ defmodule Maty.Typechecker.TC do
           )
 
       # choosing a branch of the session type is static
-      case Helpers.try_get_matching_branch(branches, literal_label, actual_payload_type) do
-        {:ok, branch} ->
-          ok(:atom, st: branch.continue_as)
+      case Enum.find(branches, &(&1.label == literal_label)) do
+        %ST.SBranch{} = b ->
+          tcm do
+            chk(ctx, payload_expr_ast, b.payload)
+            |> with_frame({:message_payload, literal_label, q})
 
-        {:error, :label_mismatch} ->
+            ok(:atom, st: b.continue_as)
+          end
+
+        nil ->
           fail(
             Error.ProtocolViolation.incorrect_message_label(
               ctx.module,
@@ -495,17 +498,6 @@ defmodule Maty.Typechecker.TC do
               q,
               got: literal_label,
               expected: Enum.map(branches, & &1.label)
-            )
-          )
-
-        {:error, :payload_mismatch, branch} ->
-          fail(
-            Error.ProtocolViolation.incorrect_payload_type(
-              ctx.module,
-              meta,
-              q,
-              got: actual_payload_type,
-              expected: branch.payload
             )
           )
       end
@@ -536,20 +528,8 @@ defmodule Maty.Typechecker.TC do
       expect {:handler, :message, handler_role, handler_st} = handler_type,
         else: Error.TypeMismatch.handler_expected(ctx.module, meta, :message, handler_type)
 
-      state_ty <- syn(ctx, state_ast)
-
       handler_state_ty = Helpers.get_localised_state_type(ctx, handler_role)
-
-      expect state_ty == handler_state_ty,
-        else:
-          Error.TypeMismatch.invalid_maty_state_type(
-            ctx.module,
-            meta,
-            Error.TypeMismatch.invalid_maty_state_cause(
-              expected: handler_state_ty,
-              got: state_ty
-            )
-          )
+      chk(ctx, state_ast, handler_state_ty) |> with_frame({:state, :suspend})
 
       expect_st %ST.SName{handler: expected_handler} = q,
         else: fn st ->
@@ -605,45 +585,7 @@ defmodule Maty.Typechecker.TC do
           maty_runtime(:done, meta, [state_ast])
         ) do
     tcm env: env, st: st do
-      state_ty <- syn(ctx, state_ast)
-
-      # structural check
-      expect {:map_record, %{global: global_state_ty, local: _} = fields} = state_ty,
-        else:
-          Error.TypeMismatch.invalid_maty_state_type(
-            ctx.module,
-            meta,
-            Error.TypeMismatch.invalid_maty_state_cause(
-              expected: Helpers.get_localised_state_type(ctx),
-              got: state_ty
-            )
-          )
-
-      # only exact keys
-      expect map_size(fields) == 2,
-        else:
-          Error.TypeMismatch.invalid_maty_state_type(
-            ctx.module,
-            meta,
-            Error.TypeMismatch.invalid_maty_state_cause(
-              expected: Helpers.get_localised_state_type(ctx),
-              got: state_ty
-            )
-          )
-
-      # todo: find a way to chain checks and return same error?
-
-      # full type equality
-      expect global_state_ty == ctx.state_types.global,
-        else:
-          Error.TypeMismatch.invalid_maty_state_type(
-            ctx.module,
-            meta,
-            Error.TypeMismatch.invalid_maty_state_cause(
-              expected: ctx.state_types.global,
-              got: global_state_ty
-            )
-          )
+      chk(ctx, state_ast, ctx.state_type) |> with_frame({:state, :done})
 
       expect_st %ST.SEnd{},
         else: fn st ->
@@ -672,17 +614,7 @@ defmodule Maty.Typechecker.TC do
           ])
         ) do
     tcm env: env, st: st do
-      pid_type <- syn(ctx, ap_pid_ast)
-
-      expect pid_type == :pid,
-        else:
-          Error.TypeMismatch.register_arg_type_mismatch(
-            ctx.module,
-            meta,
-            :access_point,
-            expected: :pid,
-            got: pid_type
-          )
+      chk(ctx, ap_pid_ast, :pid) |> with_frame(:access_point)
 
       # the role must be known statically, as it is what pairs the init handler with a projection of the protocol
       expect is_atom(role_ast),
@@ -690,7 +622,7 @@ defmodule Maty.Typechecker.TC do
 
       handler_type <- syn(ctx, handler_ast)
 
-      expect {:handler, :init, handler_role, arg_type, _st} = handler_type,
+      expect {:handler, :init, handler_role, args_ty, _st} = handler_type,
         else: Error.TypeMismatch.handler_expected(ctx.module, meta, :init, handler_type)
 
       # the init handler's registered role matches the session type declared role
@@ -701,17 +633,7 @@ defmodule Maty.Typechecker.TC do
             got: role_ast
           )
 
-      args_type <- syn(ctx, args_ast)
-
-      expect args_type == arg_type,
-        else:
-          Error.TypeMismatch.register_arg_type_mismatch(
-            ctx.module,
-            meta,
-            :init_handler_args,
-            expected: arg_type,
-            got: args_type
-          )
+      chk(ctx, args_ast, args_ty) |> with_frame(:init_handler_args)
 
       ok(:atom)
     end
@@ -736,19 +658,10 @@ defmodule Maty.Typechecker.TC do
                Map.fetch(ctx.signatures, {ctx.module, func_name, length(arg_asts)}),
              else: Error.FunctionCall.function_not_exist(ctx.module, meta, func_id)
 
-      arg_types <-
-        arg_asts
-        |> chain(&syn(ctx, &1))
-        |> with_frame({:call, func_id, Keyword.take(meta, [:line, :column])})
-
-      expect arg_types == param_types,
-        else:
-          Error.FunctionCall.no_matching_function_clause(
-            ctx.module,
-            meta,
-            func_id,
-            arg_types
-          )
+      Enum.zip(arg_asts, param_types)
+      |> Enum.with_index(1)
+      |> chain(fn {{e, t}, i} -> chk(ctx, e, t) |> with_frame({:argument, i}) end)
+      |> with_frame({:call, func_id, Keyword.take(meta, [:line, :column])})
 
       ok(return_type)
     end

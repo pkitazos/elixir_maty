@@ -113,20 +113,6 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     }
   end
 
-  def incorrect_payload_type(module, meta, st,
-        got: payload_received,
-        expected: payload_expected
-      ) do
-    %Error{
-      category: :protocol_violation,
-      kind: :incorrect_payload_type,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{got: payload_received, expected: payload_expected},
-      st: st
-    }
-  end
-
   # todo: add @spec
   def incorrect_choice_implementation(module, meta, handler, missing_branches, st)
       when is_list(missing_branches) do

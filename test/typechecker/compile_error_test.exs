@@ -204,7 +204,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
     error = compile_error!(nested)
 
     assert error.description =~
-             ~r/Trace:\n\s+in case branch #1 .*\n\s+in case branch #1 .*\n\s+via f\/1/
+             ~r/Trace:\n\s+in case branch #1 .*\n\s+in case branch #1 .*\n\s+in argument #1\n\s+via f\/1/
 
     # only the branch the error is in is named
     second_branch =
@@ -420,7 +420,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
       )
 
     error = compile_error!(src)
-    assert error.description =~ "Incorrect Payload Type"
+    assert error.description =~ "in the payload of message `:quit`"
     refute error.description =~ "Incorrect Message Label"
   end
 
@@ -520,14 +520,14 @@ defmodule Maty.Typechecker.CompileErrorTest do
       actor_src("", on_start: "Maty.DSL.register(:not_a_pid, :seller, &install/2, ap_pid)")
 
     error = compile_error!(bad_ap)
-    assert error.description =~ "Register Argument Type"
-    assert error.description =~ "Argument: 1 (access point)"
+    assert error.description =~ "Expected: :pid"
+    assert error.description =~ "in the access point"
 
     bad_args =
       actor_src("", on_start: ~s|Maty.DSL.register(ap_pid, :seller, &install/2, "not a pid")|)
 
     error = compile_error!(bad_args)
-    assert error.description =~ "Argument: 4 (init handler args)"
+    assert error.description =~ "in the init handler's argument"
     assert error.description =~ "Expected: :pid"
     assert error.description =~ "Got: :binary"
 

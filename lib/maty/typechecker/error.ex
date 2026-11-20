@@ -18,6 +18,12 @@ defmodule Maty.Typechecker.Error do
           | {:dict_key, pos_integer()}
           | {:dict_value, pos_integer()}
           | {:record_field, atom()}
+          # the argument checked by T-App, T-Send, T-Suspend / T-Done and T-Register
+          | {:argument, pos_integer()}
+          | {:message_payload, atom(), Maty.ST.t()}
+          | {:state, :suspend | :done}
+          | :init_handler_args
+          | :access_point
 
   @type category ::
           :protocol_violation

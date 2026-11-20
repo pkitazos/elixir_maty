@@ -75,8 +75,7 @@ defmodule Maty.Typechecker.TC.WF do
          {:branch, %ST.SBranch{} = b} <- {:branch, Enum.find(st.branches, &(&1.label == label))},
          #
          {:ok, _bindings, env} <- tc_pattern(ctx, payload, b.payload, %{}),
-         {:ok, _bindings, env} <-
-           tc_pattern(ctx, state, Helpers.get_localised_state_type(ctx, role), env),
+         {:ok, _bindings, env} <- tc_pattern(ctx, state, ctx.state_type, env),
          #
          # the body starts from the continuation of the branch this clause handles
          :ok <- typecheck_handler_body(ctx, env, meta, handler, b.continue_as, block) do
@@ -144,8 +143,7 @@ defmodule Maty.Typechecker.TC.WF do
     ctx = %{ctx | meta: meta}
 
     with {:ok, _bindings, env} <- tc_pattern(ctx, arg_pattern_ast, args_ty, %{}),
-         {:ok, _bindings, env} <-
-           tc_pattern(ctx, state, Helpers.get_localised_state_type(ctx), env),
+         {:ok, _bindings, env} <- tc_pattern(ctx, state, ctx.state_type, env),
          :ok <- typecheck_handler_body(ctx, env, meta, handler, st, block) do
       :ok
     else

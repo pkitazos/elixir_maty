@@ -140,18 +140,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :protocol_violation, kind: :incorrect_payload_type} = e) do
-    %{got: payload_received, expected: payload_expected} = e.details
-
-    """
-    Protocol Violation: Incorrect Payload Type
-      Got: #{render_atom(payload_received)}
-      Expected: #{render_atom(payload_expected)}
-      --
-      Session Type: #{Maty.ST.repr(e.st)}
-    """
-  end
-
   defp render(%Error{category: :protocol_violation, kind: :incorrect_choice_implementation} = e) do
     %{missing_branches: missing_branches} = e.details
 
@@ -317,18 +305,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     #{lines}
       --
       All case branches must return the same type and result in compatible session states.
-    """
-  end
-
-  defp render(%Error{category: :type_mismatch, kind: :invalid_maty_state_type} = e) do
-    %{cause: cause} = e.details
-    {title, opts, message} = render_cause(cause)
-
-    """
-    Type Mismatch Error: #{title}
-      #{opts}
-      --
-      #{message}
     """
   end
 
@@ -538,19 +514,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :type_mismatch, kind: :register_arg_type_mismatch} = e) do
-    %{argument: argument, expected: expected, got: got} = e.details
-
-    """
-    Type Mismatch Error: Register Argument Type
-      Argument: #{render_register_argument(argument)}
-      Expected: #{render_register_expected(argument, expected)}
-      Got: #{render_type(got)}
-      --
-      MatyDSL.register/4 was called with an argument of the wrong type.
-    """
-  end
-
   defp render(%Error{category: :type_mismatch, kind: :send_message_not_tuple} = e) do
     %{got: message_ast} = e.details
 
@@ -688,20 +651,6 @@ defmodule Maty.Typechecker.Error.Formatter do
       Got arguments: #{got}
       --
       `f.(...)` must be called with as many arguments as the function takes.
-    """
-  end
-
-  defp render(%Error{category: :function_call, kind: :no_matching_function_clause} = e) do
-    %{func_id: func_id, arg_types: arg_types} = e.details
-    func_str = Utils.to_func(func_id)
-    formatted_args = arg_types |> Enum.map(&render_type/1) |> Enum.join(", ")
-
-    """
-    Function Call Error: No Matching Function Clause
-      Called function: #{func_str}
-      Called with argument types: (#{formatted_args})
-      --
-      No function clause matches the provided argument types.
     """
   end
 
@@ -1182,15 +1131,6 @@ defmodule Maty.Typechecker.Error.Formatter do
      "Types defined in other modules are not supported."}
   end
 
-  defp render_cause(%Error.Cause{
-         kind: :invalid_maty_state,
-         details: %{expected: expected, got: got}
-       }) do
-    {"Invalid Maty State Type",
-     "Expected type: #{render_type(expected)}\nGot type: #{render_type(got)}",
-     "Maty operations require a valid actor state type."}
-  end
-
   defp render_trace([]), do: ""
 
   defp render_trace(frames) do
@@ -1204,6 +1144,14 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render_frame({:case_branch, index, meta}),
     do: "in case branch ##{index}#{render_line(meta)}"
 
+  defp render_frame({:argument, index}), do: "in argument ##{index}"
+
+  defp render_frame({:message_payload, label, st}),
+    do: "in the payload of message `#{render_atom(label)}`, sent at `#{Maty.ST.repr(st)}`"
+
+  defp render_frame({:state, action}), do: "in the state given to #{action}"
+  defp render_frame(:init_handler_args), do: "in the init handler's argument"
+  defp render_frame(:access_point), do: "in the access point"
   defp render_frame({:tuple_element, index}), do: "in tuple element ##{index}"
   defp render_frame({:list_element, index}), do: "in list element ##{index}"
   defp render_frame(:list_tail), do: "in the list tail"
@@ -1241,9 +1189,6 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render_expected(description) when is_binary(description), do: description
   defp render_expected(type), do: render_type(type)
 
-  # init handler args are checked against the handler's one argument type
-  defp render_register_expected(_argument, expected), do: render_expected(expected)
-
   defp render_state_declaration(:global), do: "global_state"
   defp render_state_declaration({:local, role}), do: "local_state #{inspect(role)}"
 
@@ -1258,9 +1203,6 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   defp render_session_type_declaration(:not_a_session_type),
     do: "Each handler in a session_type must be given a session type"
-
-  defp render_register_argument(:access_point), do: "1 (access point)"
-  defp render_register_argument(:init_handler_args), do: "4 (init handler args)"
 
   defp render_handler_ref(name, arity) when is_atom(name), do: "&#{name}/#{arity}"
 

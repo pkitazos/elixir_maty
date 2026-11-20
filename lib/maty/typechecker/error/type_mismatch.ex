@@ -85,20 +85,6 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
     }
   end
 
-  def invalid_maty_state_type(module, meta, %Error.Cause{} = cause) do
-    %Error{
-      category: :type_mismatch,
-      kind: :invalid_maty_state_type,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{cause: cause}
-    }
-  end
-
-  def invalid_maty_state_cause(expected: expected, got: got) do
-    %Error.Cause{kind: :invalid_maty_state, details: %{expected: expected, got: got}}
-  end
-
   def send_message_not_tuple(module, meta, got: message_ast) do
     %Error{
       category: :type_mismatch,
@@ -106,20 +92,6 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
       module: module,
       meta: Keyword.take(meta, [:line, :column]),
       details: %{got: message_ast}
-    }
-  end
-
-  # MatyDSL.register/4 was called with an argument of the wrong type.
-  # - `argument` names which arg was wrong
-  # - `expected` is a type or (for the init handler args) the list of types its clauses accept
-  def register_arg_type_mismatch(module, meta, argument, expected: expected, got: got)
-      when argument in [:access_point, :init_handler_args] do
-    %Error{
-      category: :type_mismatch,
-      kind: :register_arg_type_mismatch,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{argument: argument, expected: expected, got: got}
     }
   end
 

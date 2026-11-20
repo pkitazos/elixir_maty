@@ -28,7 +28,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
   ]
 
   @cause_constructors [
-    {Error.TypeMismatch, :invalid_maty_state_cause},
     {Error.TypeSpecification, :unsupported_type_constructor},
     {Error.TypeSpecification, :invalid_record_label},
     {Error.TypeSpecification, :unknown_type_constructor},
@@ -78,11 +77,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.ProtocolViolation.incorrect_message_label(@m, @meta, @st_out,
          got: :name,
          expected: [:title]
-       )},
-      {{Error.ProtocolViolation, :incorrect_payload_type},
-       Error.ProtocolViolation.incorrect_payload_type(@m, @meta, @st_out,
-         got: :number,
-         expected: :binary
        )},
       {{Error.ProtocolViolation, :incorrect_choice_implementation},
        Error.ProtocolViolation.incorrect_choice_implementation(
@@ -150,22 +144,8 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          q1: @st_end,
          q2: @st_out
        )},
-      {{Error.TypeMismatch, :invalid_maty_state_type},
-       Error.TypeMismatch.invalid_maty_state_type(
-         @m,
-         @meta,
-         Error.TypeMismatch.invalid_maty_state_cause(
-           expected: {:map_record, %{global: :number, local: :binary}},
-           got: :number
-         )
-       )},
       {{Error.TypeMismatch, :send_message_not_tuple},
        Error.TypeMismatch.send_message_not_tuple(@m, @meta, got: {:title, [], nil})},
-      {{Error.TypeMismatch, :register_arg_type_mismatch},
-       Error.TypeMismatch.register_arg_type_mismatch(@m, @meta, :init_handler_args,
-         expected: :binary,
-         got: :number
-       )},
       {{Error.TypeMismatch, :string_segment_type_mismatch},
        Error.TypeMismatch.string_segment_type_mismatch(@m, @meta, :interpolation,
          expected: [:atom, :binary],
@@ -266,8 +246,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FunctionCall.handler_called_directly(@m, @meta, {:install, 3}, :init)},
       {{Error.FunctionCall, :application_arity_mismatch},
        Error.FunctionCall.application_arity_mismatch(@m, @meta, expected: 1, got: 2)},
-      {{Error.FunctionCall, :no_matching_function_clause},
-       Error.FunctionCall.no_matching_function_clause(@m, @meta, {:f, 1}, [:binary])},
       {{Error.FunctionCall, :function_altered_session_state},
        Error.FunctionCall.function_altered_session_state(@m, @meta, {:f, 1}, @st_out)},
       {{Error.FunctionCall, :wrong_number_of_clauses},
