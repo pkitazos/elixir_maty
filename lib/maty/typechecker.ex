@@ -72,8 +72,6 @@ defmodule Maty.Typechecker do
     end
 
     Module.put_attribute(env.module, :state_types, state_types)
-    # todo: goes once T-Register checks the init handler's role
-    Module.put_attribute(env.module, :maty_roles, roles)
 
     clauses = Module.get_attribute(env.module, :maty_clauses) |> Enum.reverse()
 
@@ -159,6 +157,8 @@ defmodule Maty.Typechecker do
       Logger.info("\n[#{env.module}] No communication errors", ansi_color: :light_green)
     end
   end
+
+  # todo: spec these bois
 
   defp message_handler_errors(ctx, {handler, 4} = func_id, cs) do
     # `Signatures` only gives a message handler a type when its session type starts with a receive

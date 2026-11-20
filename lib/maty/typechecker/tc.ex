@@ -643,13 +643,18 @@ defmodule Maty.Typechecker.TC do
       expect is_atom(role_ast),
         else: Error.FrameworkUsage.role_not_literal(ctx.module, meta, role_ast)
 
-      expect role_ast in ctx.roles,
-        else: Error.FrameworkUsage.undeclared_role(ctx.module, meta, role_ast, ctx.roles)
-
       handler_type <- syn(ctx, handler_ast)
 
-      expect {:handler, :init, _role, arg_type, _st} = handler_type,
+      expect {:handler, :init, handler_role, arg_type, _st} = handler_type,
         else: Error.TypeMismatch.handler_expected(ctx.module, meta, :init, handler_type)
+
+      # the init handler's registered role matches the session type declared role
+      expect role_ast == handler_role,
+        else:
+          Error.FrameworkUsage.init_handler_role_mismatch(ctx.module, meta,
+            expected: handler_role,
+            got: role_ast
+          )
 
       args_type <- syn(ctx, args_ast)
 

@@ -470,11 +470,11 @@ defmodule Maty.Typechecker.CompileErrorTest do
     assert error.description =~ "Role Not a Literal"
     assert error.description =~ ~s(Got: "seller")
 
-    undeclared =
+    wrong_role =
       actor_src("", on_start: "Maty.DSL.register(ap_pid, :buyer1, &install/2, ap_pid)")
 
-    error = compile_error!(undeclared)
-    assert error.description =~ "Undeclared Role"
+    error = compile_error!(wrong_role)
+    assert error.description =~ "Init Handler Role Mismatch"
     assert error.description =~ "Got: :buyer1"
 
     not_in_protocol =

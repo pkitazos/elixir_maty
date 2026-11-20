@@ -10,7 +10,6 @@ defmodule Maty.Typechecker.TCExprTest do
   @ctx %Ctx{
     module: TestModule,
     meta: [line: 0],
-    roles: [],
     signatures: %{
       {TestModule, :f, 1} => {:function, [:number], :binary},
       h: {:handler, :message, :seller, @st_in},

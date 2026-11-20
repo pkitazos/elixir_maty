@@ -4,7 +4,7 @@ defmodule Maty.Typechecker.PatternBindingTest do
   alias Maty.Typechecker.{PatternBinding, Ctx, Error}
 
   @meta [line: 0]
-  @ctx %Ctx{module: TestModule, meta: @meta, roles: [], signatures: %{}}
+  @ctx %Ctx{module: TestModule, meta: @meta, signatures: %{}}
 
   defp tc(pattern, expected_type, env \\ %{}),
     do: PatternBinding.tc_pattern(@ctx, pattern, expected_type, env)

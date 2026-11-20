@@ -231,14 +231,15 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
-  # register was given a role not in the protocol
-  def undeclared_role(module, meta, role, declared_roles) do
+  # register was given a role other than the one whose `session_type` declares its init handler
+  # todo: maybe pointless since this information can just be inferred? maybe not tho
+  def init_handler_role_mismatch(module, meta, expected: expected, got: got) do
     %Error{
       category: :framework_usage,
-      kind: :undeclared_role,
+      kind: :init_handler_role_mismatch,
       module: module,
       meta: Keyword.take(meta, [:line, :column]),
-      details: %{got: role, known: declared_roles}
+      details: %{expected: expected, got: got}
     }
   end
 

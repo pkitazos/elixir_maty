@@ -1025,15 +1025,15 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :framework_usage, kind: :undeclared_role} = e) do
-    %{got: got, known: known} = e.details
+  defp render(%Error{category: :framework_usage, kind: :init_handler_role_mismatch} = e) do
+    %{expected: expected, got: got} = e.details
 
     """
-    Framework Usage Violation: Undeclared Role
-      Got: #{inspect(got)}
-      Declared roles: #{Enum.map_join(known, ", ", &inspect/1)}
+    Framework Usage Violation: Init Handler Role Mismatch
+      Expected: #{render_atom(expected)}
+      Got: #{render_atom(got)}
       --
-      MatyDSL.register/4 must be given a role with a session_type declaration.
+      MatyDSL.register/4 must be given the role whose session_type declares its init handler.
     """
   end
 

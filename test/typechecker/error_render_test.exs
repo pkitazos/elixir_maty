@@ -332,8 +332,11 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        ])},
       {{Error.FrameworkUsage, :role_not_literal},
        Error.FrameworkUsage.role_not_literal(@m, @meta, {:role, [], nil})},
-      {{Error.FrameworkUsage, :undeclared_role},
-       Error.FrameworkUsage.undeclared_role(@m, @meta, :buyer1, [:seller])},
+      {{Error.FrameworkUsage, :init_handler_role_mismatch},
+       Error.FrameworkUsage.init_handler_role_mismatch(@m, @meta,
+         expected: :seller,
+         got: :buyer1
+       )},
       {{Error.FrameworkUsage, :missing_global_state},
        Error.FrameworkUsage.missing_global_state(@m, @meta)},
       {{Error.FrameworkUsage, :missing_local_states},
