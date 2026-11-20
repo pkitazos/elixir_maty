@@ -25,22 +25,22 @@ defmodule StashQueue.Participants.Q do
     Maty.DSL.suspend(&p1_handler/3, state)
   end
 
-  defhandler p1_handler(:p, {:a, n :: number()}, state) do
+  defhandler p1_handler(:p, {:a, n}, state) do
     IO.puts("received a=#{n} from P")
     Maty.DSL.suspend(&r1_handler/3, state)
   end
 
-  defhandler r1_handler(:r, {:b, n :: number()}, state) do
+  defhandler r1_handler(:r, {:b, n}, state) do
     IO.puts("received b=#{n} from R")
     Maty.DSL.suspend(&r2_handler/3, state)
   end
 
-  defhandler r2_handler(:r, {:b, n :: number()}, state) do
+  defhandler r2_handler(:r, {:b, n}, state) do
     IO.puts("received b=#{n} from R")
     Maty.DSL.suspend(&p2_handler/3, state)
   end
 
-  defhandler p2_handler(:p, {:a, n :: number()}, state) do
+  defhandler p2_handler(:p, {:a, n}, state) do
     IO.puts("received a=#{n} from P")
     Maty.DSL.done(state)
   end

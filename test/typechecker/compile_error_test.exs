@@ -20,7 +20,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
   """
 
   @handlers """
-  defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
+  defhandler decision_handler(:buyer2, {:address, addr}, state) do
     Maty.DSL.send_to(:buyer2, {:date, addr})
     Maty.DSL.done(state)
   end
@@ -122,7 +122,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
     handler =
       actor_src("",
         handlers: """
-        defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
+        defhandler decision_handler(:buyer2, {:address, addr}, state) do
           Maty.DSL.send_to(:buyer2, {:date, addr})
           Maty.DSL.done(state)
         end
@@ -259,7 +259,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
     missing =
       actor_src("",
         handlers: """
-        defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
+        defhandler decision_handler(:buyer2, {:address, addr}, state) do
           Maty.DSL.send_to(:buyer1, {:date, addr})
           Maty.DSL.done(state)
         end
@@ -274,12 +274,12 @@ defmodule Maty.Typechecker.CompileErrorTest do
     duplicate =
       actor_src("",
         handlers: """
-        defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
+        defhandler decision_handler(:buyer2, {:address, addr}, state) do
           Maty.DSL.send_to(:buyer2, {:date, addr})
           Maty.DSL.done(state)
         end
 
-        defhandler decision_handler(:buyer2, {:address, other :: binary()}, state) do
+        defhandler decision_handler(:buyer2, {:address, other}, state) do
           Maty.DSL.send_to(:buyer2, {:date, other})
           Maty.DSL.done(state)
         end
@@ -293,7 +293,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
     failing =
       actor_src("",
         handlers: """
-        defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
+        defhandler decision_handler(:buyer2, {:address, addr}, state) do
           Maty.DSL.send_to(:buyer1, {:date, addr})
           Maty.DSL.done(state)
         end
@@ -342,7 +342,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
     wrong_role =
       actor_src("",
         handlers: """
-        defhandler decision_handler(:buyer1, {:address, addr :: binary()}, state) do
+        defhandler decision_handler(:buyer1, {:address, addr}, state) do
           Maty.DSL.send_to(:buyer2, {:date, addr})
           Maty.DSL.done(state)
         end
@@ -360,7 +360,7 @@ defmodule Maty.Typechecker.CompileErrorTest do
     wrong_payload =
       actor_src("",
         handlers: """
-        defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
+        defhandler decision_handler(:buyer2, {:address, addr}, state) do
           Maty.DSL.send_to(:buyer2, {:date, addr})
           Maty.DSL.done(state)
         end
@@ -387,23 +387,6 @@ defmodule Maty.Typechecker.CompileErrorTest do
       )
 
     assert compile_error!(init_receives).description =~ "Init Handler Starts With a Receive"
-  end
-
-  # todo: fails until a handler's payload annotation is checked against its session type
-  # (`defhandler` strips `:: number()` from the pattern, and the bare variable matches any type)
-  test "a payload annotation that disagrees with the session type is reported" do
-    src =
-      actor_src("",
-        handlers: """
-        #{@handlers}
-
-        defhandler decision_handler(:buyer2, {:quit, _n :: number()}, state) do
-          Maty.DSL.done(state)
-        end
-        """
-      )
-
-    compile_error!(src)
   end
 
   test "sending a wrong payload on the second label reports the payload" do

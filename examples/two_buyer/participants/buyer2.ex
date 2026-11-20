@@ -20,7 +20,7 @@ defmodule TwoBuyer.Participants.Buyer2 do
     Maty.DSL.suspend(&share_handler/3, state)
   end
 
-  defhandler share_handler(:buyer1, {:share, amount :: number()}, state) do
+  defhandler share_handler(:buyer1, {:share, amount}, state) do
     IO.puts("&buyer1 : share(number)")
     :timer.sleep(100)
 
@@ -41,7 +41,7 @@ defmodule TwoBuyer.Participants.Buyer2 do
     end
   end
 
-  defhandler date_handler(:seller, {:date, _date :: number()}, state) do
+  defhandler date_handler(:seller, {:date, _date}, state) do
     IO.puts("&seller : date(number)")
     :timer.sleep(100)
 

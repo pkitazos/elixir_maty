@@ -1,14 +1,11 @@
 defmodule Maty.HandlerExpansionTest.Handlers do
   use Maty.DSL
 
-  @type maty_session_ctx :: any()
-  @type maty_actor_state :: any()
-
-  defhandler done_handler(:seller, {:quote, amount :: number()}, state) do
+  defhandler done_handler(:seller, {:quote, amount}, state) do
     Maty.DSL.done({amount, state})
   end
 
-  defhandler suspend_handler(:worker, {:task, data :: binary()}, state) do
+  defhandler suspend_handler(:worker, {:task, data}, state) do
     Maty.DSL.suspend(&done_handler/3, {data, state})
   end
 end

@@ -174,10 +174,7 @@ defmodule Maty.DSL do
 
     with {:role, true} <- {:role, is_atom(role)},
          {:message, {tag, _payload}} when is_atom(tag) <- {:message, pattern} do
-      # process the pattern to extract the cleaned pattern and type specification
-      {clean_pattern, type_spec} = DSL.Pattern.process_pattern(pattern)
-
-      build_message_handler(handler_name, role, clean_pattern, type_spec, state_var, body)
+      build_message_handler(handler_name, role, pattern, state_var, body)
     else
       {:role, _} ->
         handler_error(
@@ -193,24 +190,17 @@ defmodule Maty.DSL do
     end
   end
 
-  defp build_message_handler(handler_name, role, clean_pattern, type_spec, state_var, body) do
+  defp build_message_handler(handler_name, role, pattern, state_var, body) do
     # a handler may be defined by several clauses, but its expected role only needs
     # registering once, a second identical clause would never match (and would warn)
     expects_key = :"__handler_expects_#{handler_name}__"
 
     quote do
       @maty_kind {:handler, :message}
-      @spec unquote(handler_name)(
-              unquote(role),
-              unquote(type_spec),
-              maty_actor_state(),
-              maty_session_ctx()
-            ) :: no_return()
-      # no_return() describes the body as the typechecker sees it (it always ends in suspend/done),
-      # the generated function itself returns the caught {:suspend, ...} / {:done, ...} result
+      # the payload types come from the session type, so a message handler has no spec
       def unquote(handler_name)(
             unquote(role),
-            unquote(clean_pattern),
+            unquote(pattern),
             unquote(state_var),
             var!(session_ctx, Maty.DSL)
           ) do

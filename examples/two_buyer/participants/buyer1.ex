@@ -22,7 +22,7 @@ defmodule TwoBuyer.Participants.Buyer1 do
     Maty.DSL.suspend(&quote_handler/3, state)
   end
 
-  defhandler quote_handler(:seller, {:quote, amount :: number()}, state) do
+  defhandler quote_handler(:seller, {:quote, amount}, state) do
     IO.puts("&seller : quote(number)")
     :timer.sleep(100)
 

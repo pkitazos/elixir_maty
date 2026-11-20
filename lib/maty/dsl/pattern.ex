@@ -9,12 +9,6 @@ defmodule Maty.DSL.Pattern do
                    is_boolean(val) or
                    is_number(val)
 
-  # Process the pattern to strip type annotations and build a type spec
-  def process_pattern({tag, payload}) when is_atom(tag) do
-    {clean_payload, payload_type} = process_payload(payload)
-    {{tag, clean_payload}, quote(do: {unquote(tag), unquote(payload_type)})}
-  end
-
   # Case 1: Payload with type annotation
   def process_payload({:"::", _, [var, type]}) do
     {var, type}

@@ -21,7 +21,7 @@ defmodule TwoBuyer.Participants.Seller do
     Maty.DSL.suspend(&title_handler/3, state)
   end
 
-  defhandler title_handler(:buyer1, {:title, title :: binary()}, state) do
+  defhandler title_handler(:buyer1, {:title, title}, state) do
     IO.puts("&buyer1 : title(binary)")
     :timer.sleep(100)
 
@@ -33,7 +33,7 @@ defmodule TwoBuyer.Participants.Seller do
     Maty.DSL.suspend(&decision_handler/3, state)
   end
 
-  defhandler decision_handler(:buyer2, {:address, addr :: binary()}, state) do
+  defhandler decision_handler(:buyer2, {:address, addr}, state) do
     IO.puts("&buyer2 : address(binary)")
     :timer.sleep(100)
 
