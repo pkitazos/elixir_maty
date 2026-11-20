@@ -346,17 +346,17 @@ defmodule Maty.Typechecker.TC do
       # a handler is in Σ under its name, a function under `{module, name, arity}`
       case {Map.get(ctx.signatures, name), arity} do
         # TV-MsgHandler
-        {{:handler, :message, _} = handler_type, 3} ->
+        {{:handler, :message, _, _} = handler_type, 3} ->
           ok(handler_type)
 
-        {{:handler, :message, _}, _} ->
+        {{:handler, :message, _, _}, _} ->
           fail(Error.FrameworkUsage.handler_ref_wrong_arity(ctx.module, meta, name, arity, 3))
 
         # TV-InitHandler
-        {{:handler, :init, _, _} = handler_type, 2} ->
+        {{:handler, :init, _, _, _} = handler_type, 2} ->
           ok(handler_type)
 
-        {{:handler, :init, _, _}, _} ->
+        {{:handler, :init, _, _, _}, _} ->
           fail(Error.FrameworkUsage.handler_ref_wrong_arity(ctx.module, meta, name, arity, 2))
 
         _ ->
@@ -533,7 +533,8 @@ defmodule Maty.Typechecker.TC do
     tcm env: env, st: st do
       handler_type <- syn(ctx, handler_ast)
 
-      expect {:handler, :message, handler_st} = handler_type,
+      # todo: the role of the handler suspended with is not compared, only its session type
+      expect {:handler, :message, _handler_role, handler_st} = handler_type,
         else: Error.TypeMismatch.handler_expected(ctx.module, meta, :message, handler_type)
 
       state_type <- syn(ctx, state_ast)
@@ -556,7 +557,7 @@ defmodule Maty.Typechecker.TC do
           )
         end
 
-      expect {:ok, {:handler, :message, expected_st}} =
+      expect {:ok, {:handler, :message, _expected_role, expected_st}} =
                Map.fetch(ctx.signatures, expected_handler),
              else:
                Error.ProtocolViolation.undefined_continuation_handler(
@@ -647,7 +648,7 @@ defmodule Maty.Typechecker.TC do
 
       handler_type <- syn(ctx, handler_ast)
 
-      expect {:handler, :init, arg_type, _st} = handler_type,
+      expect {:handler, :init, _role, arg_type, _st} = handler_type,
         else: Error.TypeMismatch.handler_expected(ctx.module, meta, :init, handler_type)
 
       args_type <- syn(ctx, args_ast)
@@ -674,10 +675,10 @@ defmodule Maty.Typechecker.TC do
     func_id = {func_name, length(arg_asts)}
 
     tcm env: env, st: st do
-      expect not match?({:handler, :message, _}, ctx.signatures[func_name]),
+      expect not match?({:handler, :message, _, _}, ctx.signatures[func_name]),
         else: Error.FunctionCall.handler_called_directly(ctx.module, meta, func_id, :message)
 
-      expect not match?({:handler, :init, _, _}, ctx.signatures[func_name]),
+      expect not match?({:handler, :init, _, _, _}, ctx.signatures[func_name]),
         else: Error.FunctionCall.handler_called_directly(ctx.module, meta, func_id, :init)
 
       # a function has one signature, under `{module, name, arity}` in Σ

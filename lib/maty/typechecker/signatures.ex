@@ -29,9 +29,12 @@ defmodule Maty.Typechecker.Signatures do
 
   @type function_type :: {:function, [Type.t()], Type.t()}
 
+  # the flattened `session_type` declarations
+  @type session_types :: %{Types.handler_label() => {Types.role(), Maty.ST.t()}}
+
   @type handler_type ::
-          {:handler, :message, Maty.ST.t()}
-          | {:handler, :init, Type.t(), Maty.ST.t()}
+          {:handler, :message, Types.role(), Maty.ST.t()}
+          | {:handler, :init, Types.role(), Type.t(), Maty.ST.t()}
 
   @typedoc """
   Σ - Handlers are keyed by name, since a handler's name is unique in its module at any arity
@@ -115,11 +118,10 @@ defmodule Maty.Typechecker.Signatures do
   Builds Σ for `module` from its clause records and its session types.
 
   `clauses` are in source order
-  `session_types` is a map of the `session_type` declarations, from each handler to its session type
+  `session_types` is a map of the `session_type` declarations, from each handler to its role and session type
   `global_state_type` is the parsed `global_state` declaration, the return type of `on_start`
   """
-  @spec build(module(), [clause()], %{Types.handler_label() => Maty.ST.t()}, Type.t()) ::
-          result(t())
+  @spec build(module(), [clause()], session_types(), Type.t()) :: result(t())
   def build(module, cs, session_types, global_state_type) do
     join(
       handler_signatures(module, cs, session_types),
@@ -131,16 +133,18 @@ defmodule Maty.Typechecker.Signatures do
 
   # The handler entries of Σ.
   #
-  # A message handler `h` has the type `{:handler, :message, st}`, where `st` is the session type declared for `h`
+  # A message handler `h` has the type `{:handler, :message, role, st}`
+  # - `st` is the session type declared for `h`
+  # - `role` is the role whose `session_type` declares it
   #
-  # An init handler `h` has the type `{:handler, :init, arg_type, st}`, every clause takes the same type
+  # An init handler `h` has the type `{:handler, :init, role, arg_type, st}`
   #
   # Errors:
   #   * a handler with no session type declared for its name
   #   * a message handler whose session type does not start with a receive
   #   * an init handler clause whose spec does not parse
   #   * an init handler clause that takes a different argument type than the first clause
-  @spec handler_signatures(module(), [clause()], %{Types.handler_label() => Maty.ST.t()}) ::
+  @spec handler_signatures(module(), [clause()], session_types()) ::
           result(%{Types.handler_label() => handler_type()})
   defp handler_signatures(module, cs, session_types) do
     hs = for c <- cs, match?({:handler, _}, c.kind), do: c
@@ -330,50 +334,45 @@ defmodule Maty.Typechecker.Signatures do
   end
 
   # The entry of handler `h` in Σ, from all of its clauses
-  @spec handler_signature(
-          module(),
-          %{Types.handler_label() => Maty.ST.t()},
-          Types.handler_label(),
-          [clause()]
-        ) :: result({Types.handler_label(), handler_type()})
+  @spec handler_signature(module(), session_types(), Types.handler_label(), [clause()]) ::
+          result({Types.handler_label(), handler_type()})
   defp handler_signature(module, session_types, h, cs) do
-    with {:ok, st} <- fetch_st(module, session_types, cs),
-         {:ok, ty} <- handler_type(module, st, cs) do
+    with {:ok, {role, st}} <- fetch_st(module, session_types, cs),
+         {:ok, ty} <- handler_type(module, role, st, cs) do
       {:ok, {h, ty}}
     end
   end
 
   # The session type declared for a handler's name
   # A handler with none is reported at its first clause
-  @spec fetch_st(module(), %{Types.handler_label() => Maty.ST.t()}, [clause()]) ::
-          result(Maty.ST.t())
+  @spec fetch_st(module(), session_types(), [clause()]) :: result({Types.role(), Maty.ST.t()})
   defp fetch_st(module, session_types, [%{name: h, arity: arity, line: line} | _]) do
     case Map.fetch(session_types, h) do
-      {:ok, st} ->
-        {:ok, st}
+      {:ok, role_st} ->
+        {:ok, role_st}
 
       :error ->
         {:error, [{{h, arity}, Error.ProtocolViolation.missing_handler(module, h, line: line)}]}
     end
   end
 
-  @spec handler_type(module(), Maty.ST.t(), [clause()]) :: result(handler_type())
+  @spec handler_type(module(), Types.role(), Maty.ST.t(), [clause()]) :: result(handler_type())
   # the type of a message handler only depends on its name
   # a message handler runs when a message arrives, so its session type has to start with a receive
-  defp handler_type(_, %ST.SIn{} = st, [%{kind: {:handler, :message}} | _]),
-    do: {:ok, {:handler, :message, st}}
+  defp handler_type(_, role, %ST.SIn{} = st, [%{kind: {:handler, :message}} | _]),
+    do: {:ok, {:handler, :message, role, st}}
 
-  defp handler_type(module, st, [%{kind: {:handler, :message}} = c | _]) do
+  defp handler_type(module, _role, st, [%{kind: {:handler, :message}} = c | _]) do
     error =
       Error.ProtocolViolation.message_handler_not_receive(module, [line: c.line], c.name, st)
 
     {:error, [{{c.name, c.arity}, error}]}
   end
 
-  defp handler_type(module, st, clauses) do
+  defp handler_type(module, role, st, clauses) do
     with {:ok, [ty | _] = tys} <- map_m(clauses, &init_arg_type(module, &1)),
          :ok <- check_same_arg_type(module, clauses, tys) do
-      {:ok, {:handler, :init, ty, st}}
+      {:ok, {:handler, :init, role, ty, st}}
     end
   end
 

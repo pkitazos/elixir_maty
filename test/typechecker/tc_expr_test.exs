@@ -13,8 +13,8 @@ defmodule Maty.Typechecker.TCExprTest do
     roles: [],
     signatures: %{
       {TestModule, :f, 1} => {:function, [:number], :binary},
-      h: {:handler, :message, @st_in},
-      i: {:handler, :init, :number, @st_out}
+      h: {:handler, :message, :seller, @st_in},
+      i: {:handler, :init, :seller, :number, @st_out}
     }
   }
 
@@ -217,8 +217,8 @@ defmodule Maty.Typechecker.TCExprTest do
   # -- TV-MsgHandler, TV-InitHandler, function captures
 
   test "captures" do
-    assert {:ok, {:handler, :message, @st_in}, _, _} = synth(quote(do: &h/3))
-    assert {:ok, {:handler, :init, :number, @st_out}, _, _} = synth(quote(do: &i/2))
+    assert {:ok, {:handler, :message, :seller, @st_in}, _, _} = synth(quote(do: &h/3))
+    assert {:ok, {:handler, :init, :seller, :number, @st_out}, _, _} = synth(quote(do: &i/2))
     assert {:ok, {:function, [:number], :binary}, _, _} = synth(quote(do: &f/1))
 
     assert_error(synth(quote(do: &h/2)), :handler_ref_wrong_arity)

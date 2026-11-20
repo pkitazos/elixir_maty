@@ -77,10 +77,7 @@ defmodule Maty.Typechecker do
 
     clauses = Module.get_attribute(env.module, :maty_clauses) |> Enum.reverse()
 
-    # todo: Σ's handler types carry the role, drop for now
-    handler_session_types = Map.new(session_types, fn {handler, {_role, st}} -> {handler, st} end)
-
-    case Signatures.build(env.module, clauses, handler_session_types, state_types.global) do
+    case Signatures.build(env.module, clauses, session_types, state_types.global) do
       {:ok, signatures} -> Module.put_attribute(env.module, :maty_signatures, signatures)
       {:error, errors} -> raise_type_errors!(env, errors)
     end
@@ -132,11 +129,11 @@ defmodule Maty.Typechecker do
 
           errs =
             cond do
-              match?({:handler, :message, _}, ctx.signatures[name]) ->
+              match?({:handler, :message, _, _}, ctx.signatures[name]) ->
                 message_handler_errors(ctx, func_id, cs)
 
               # next we check to see if the function we're type-checking is an init_handler
-              match?({:handler, :init, _, _}, ctx.signatures[name]) ->
+              match?({:handler, :init, _, _, _}, ctx.signatures[name]) ->
                 init_handler_errors(ctx, func_id, cs)
 
               # the next thing we check is whether the function we're type-checking is the `on_start` callback
@@ -165,7 +162,7 @@ defmodule Maty.Typechecker do
 
   defp message_handler_errors(ctx, {handler, 4} = func_id, cs) do
     # `Signatures` only gives a message handler a type when its session type starts with a receive
-    {:handler, :message, %ST.SIn{} = st} = ctx.signatures[handler]
+    {:handler, :message, _role, %ST.SIn{} = st} = ctx.signatures[handler]
 
     # because we may have multiple handler clauses, we need to iterate over
     # all definitions and check if they are well-formed
@@ -202,7 +199,7 @@ defmodule Maty.Typechecker do
   end
 
   defp init_handler_errors(ctx, {handler, 3} = func_id, cs) do
-    {:handler, :init, args_ty, st} = ctx.signatures[handler]
+    {:handler, :init, _role, args_ty, st} = ctx.signatures[handler]
 
     clause_errors(
       func_id,

@@ -10,7 +10,9 @@ defmodule Maty.Typechecker.Ctx do
           roles: list(Types.role()),
           signatures: %{
             # reuse types from `Maty.Types` instead of redefining them all over the place
-            atom() => {:handler, :message, ST.t()} | {:handler, :init, Types.T.t(), ST.t()},
+            atom() =>
+              {:handler, :message, Types.role(), ST.t()}
+              | {:handler, :init, Types.role(), Types.T.t(), ST.t()},
             {module(), atom(), arity()} => {:function, [Types.T.t()], Types.T.t()}
           }
         }

@@ -96,11 +96,11 @@ defmodule Maty.Types do
             | {:map_dict, {c(), t()}}
             | {:function, [t()], t()}
             # really these should be S?
-            | {:handler, :message, Maty.ST.t()}
+            | {:handler, :message, Maty.Types.role(), Maty.ST.t()}
             # and S! | h
             # but we don't have unions for this one..
             # also need to probably add the state type in here
-            | {:handler, :init, t(), Maty.ST.t()}
+            | {:handler, :init, Maty.Types.role(), t(), Maty.ST.t()}
 
     def role, do: :atom
 

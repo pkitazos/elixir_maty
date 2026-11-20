@@ -1201,12 +1201,13 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render_type(type) when is_atom(type), do: ":#{type}"
 
   # todo: make the representations not suck
-  defp render_type({:handler, :message, st}),
-    do: "message handler for #{Maty.ST.repr(st)}"
+  defp render_type({:handler, :message, role, st}),
+    do: "message handler of #{render_atom(role)} for #{Maty.ST.repr(st)}"
 
   # an init handler has one argument type, the same for all of its clauses
-  defp render_type({:handler, :init, arg_type, st}),
-    do: "init handler taking #{render_type(arg_type)} for #{Maty.ST.repr(st)}"
+  defp render_type({:handler, :init, role, arg_type, st}),
+    do:
+      "init handler of #{render_atom(role)} taking #{render_type(arg_type)} for #{Maty.ST.repr(st)}"
 
   defp render_type(type), do: "#{inspect(type)}"
 
