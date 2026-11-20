@@ -460,6 +460,36 @@ defmodule Maty.Typechecker.CompileErrorTest do
     end
   end
 
+  test "a spec can use the module's own types" do
+    # `order` uses `book`, which is declared after it
+    compiles!(
+      actor_src("""
+      @type order :: {book(), number()}
+      @typep book :: %{title: binary(), price: number()}
+
+      @spec price(book()) :: order()
+      def price(b), do: {b, 1}
+      """)
+    )
+  end
+
+  test "recursive, parametric and remote module types are reported" do
+    error =
+      compile_error!(
+        actor_src("""
+        @type a :: list(b())
+        @type b :: {a(), number()}
+        @type p(x) :: list(x)
+        @type r :: String.t()
+        """)
+      )
+
+    assert error.description =~ "Invalid Module Type"
+    assert error.description =~ "Recursive Type"
+    assert error.description =~ "Parametric Type"
+    assert error.description =~ "Remote Type"
+  end
+
   # -- on_start, register and suspend
 
   test "roles" do
