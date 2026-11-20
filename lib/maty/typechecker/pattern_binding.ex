@@ -184,6 +184,29 @@ defmodule Maty.Typechecker.PatternBinding do
     end
   end
 
+  # Pat-List: a non-empty list pattern is nested Pat-Cons
+  # `[h | t]` is the one-element list `[{:|, _, [h, t]}]`, and `[p1, p2, ...]` is `[p1 | [p2, ...]]`
+  deftc tc_pattern(ctx, [_ | _] = list_ast, {:list, _} = expected_type, var_env) do
+    cons_ast =
+      case list_ast do
+        [{:|, _, [_h_ast, _t_ast]} = cons_ast] -> cons_ast
+        [h_ast | t_ast] -> {:|, ctx.meta, [h_ast, t_ast]}
+      end
+
+    tc_pattern(ctx, cons_ast, expected_type, var_env)
+  end
+
+  deftc tc_pattern(ctx, [_ | _] = list_ast, expected_type, var_env) do
+    error =
+      Error.PatternMatching.pattern_type_mismatch(ctx.module, ctx.meta,
+        pattern: list_ast,
+        expected: expected_type,
+        got: {:list, :any}
+      )
+
+    {:error, error, var_env}
+  end
+
   # Pat-Match: Pattern is 'p1 = p2', e.g. `%{global: g} = state`
   # both sides match the same value so both are checked against the expected type,
   # and like every other compound pattern the two sides must bind disjoint variables

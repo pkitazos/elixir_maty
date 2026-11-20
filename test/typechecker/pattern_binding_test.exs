@@ -71,7 +71,6 @@ defmodule Maty.Typechecker.PatternBindingTest do
 
   # -- Pat-Cons
 
-  # todo: fails until `[h | t]` reaches Pat-Cons (it is `[{:|, _, [h, t]}]`, a list around the cons)
   test "Pat-Cons" do
     assert {:ok, %{h: :number, t: {:list, :number}}, _env} =
              tc(quote(do: [h | t]), {:list, :number})
@@ -79,7 +78,6 @@ defmodule Maty.Typechecker.PatternBindingTest do
     assert_mismatch(quote(do: [h | t]), :number)
   end
 
-  # todo: fails until non-empty list patterns are supported
   test "list literal patterns" do
     assert {:ok, %{a: :number, b: :number}, _env} = tc(quote(do: [a, b]), {:list, :number})
 
