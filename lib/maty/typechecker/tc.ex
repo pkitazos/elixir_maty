@@ -334,9 +334,9 @@ defmodule Maty.Typechecker.TC do
   # or type inference (which was not really the point of this project)
   # Reject them explicitly so they do not fall through to T-App
 
-  # Anonymous function: fn args -> ... end
+  # Anonymous function: `fn args -> ... end` is check-only
   deftc synth(ctx, env, _st, {:fn, meta, _clauses}) do
-    {:error, Error.FrameworkUsage.unsupported_anonymous_function(ctx.module, meta), env}
+    {:error, Error.TypeInference.cannot_infer_type(ctx.module, meta, :anonymous_function), env}
   end
 
   # Function capture: &fun/arity
@@ -663,6 +663,31 @@ defmodule Maty.Typechecker.TC do
     end
   end
 
+  # -- T-App-Value
+  # V(W1, ..., Wn), calling a function value: `f.(args)` (one element in the `.`, a remote call has two)
+  deftc synth(ctx, env, st, {{:., meta, [fun_ast]}, _call_meta, arg_asts})
+        when is_list(arg_asts) do
+    tcm env: env, st: st do
+      fun_ty <- syn(ctx, fun_ast)
+
+      expect {:function, args_ty, ret_ty} = fun_ty,
+        else: Error.TypeMismatch.not_a_function(ctx.module, meta, got: fun_ty)
+
+      expect length(args_ty) == length(arg_asts),
+        else:
+          Error.FunctionCall.application_arity_mismatch(ctx.module, meta,
+            expected: length(args_ty),
+            got: length(arg_asts)
+          )
+
+      Enum.zip(arg_asts, args_ty)
+      |> Enum.with_index(1)
+      |> chain(fn {{arg, t}, i} -> chk(ctx, arg, t) |> with_frame({:argument, i}) end)
+
+      ok(ret_ty)
+    end
+  end
+
   # -- TV-Var
   # x : A ∈ Γ
   # a variable's context is `nil`
@@ -827,6 +852,26 @@ defmodule Maty.Typechecker.TC do
     end)
   end
 
+  # the first `send_to` / `suspend` / `done` in an anonymous function's body, as `{action, arg_asts}`, or `nil`
+  defp find_communication(body_ast) do
+    {_, found} =
+      Macro.prewalk(body_ast, nil, fn
+        maty_runtime(:send_session_message, _, [_, recipient, message]) = node, nil ->
+          {node, {:send, [recipient, message]}}
+
+        maty_runtime(:suspend, _, args) = node, nil ->
+          {node, {:suspend, args}}
+
+        maty_runtime(:done, _, args) = node, nil ->
+          {node, {:done, args}}
+
+        node, found ->
+          {node, found}
+      end)
+
+    found
+  end
+
   defp normalise_list_shapes(xs) do
     case Enum.split(xs, -1) do
       {init, [{:|, _, [x, tail]}]} -> {init ++ [x], tail}
@@ -965,16 +1010,65 @@ defmodule Maty.Typechecker.TC do
 
   # -- TV-Abs
   # Anonymous Function fn x1, ..., xn -> body end
-  # todo: there is no function type in `Types.T` yet, `{:function, param_types, return_type}` is a placeholder
+
+  # only single-clause anonymous functions are supported
+  deftc check(ctx, env, _st, {:fn, meta, [_, _ | _]}, {:function, _, _}) do
+    {:error, Error.FrameworkUsage.unsupported_lambda(ctx.module, meta, :multiple_clauses), env}
+  end
+
+  # without guards (before the main clause, whose `params` would match `[{:when, _, _}]`)
   deftc check(
-          _ctx,
-          _env,
+          ctx,
+          env,
           _st,
-          {:fn, _meta, [{:->, _, [params, _body_ast]}]},
-          {:function, _param_types, _return_type} = _t
+          {:fn, meta, [{:->, _, [[{:when, _, _}], _body_ast]}]},
+          {:function, _, _}
+        ) do
+    {:error, Error.FrameworkUsage.unsupported_lambda(ctx.module, meta, :guard), env}
+  end
+
+  deftc check(
+          ctx,
+          env,
+          st,
+          {:fn, meta, [{:->, _, [params, body_ast]}]},
+          {:function, param_types, return_type} = t
         )
         when is_list(params) do
-    # todo: later
+    tcm env: env, st: st do
+      expect length(params) == length(param_types),
+        else:
+          Error.TypeMismatch.lambda_arity_mismatch(ctx.module, meta,
+            expected: length(param_types),
+            got: length(params)
+          )
+
+      communication = find_communication(body_ast)
+
+      expect is_nil(communication),
+        else: Error.FrameworkUsage.communication_in_lambda(ctx.module, meta, got: communication)
+
+      scoped(
+        tcm do
+          Enum.zip(params, param_types)
+          |> Enum.with_index(1)
+          |> chain(fn {{param, t}, i} ->
+            match_pattern(ctx, param, t) |> with_frame({:param, i})
+          end)
+
+          chk(ctx, body_ast, return_type)
+        end,
+        # todo: swap out for %ST.SBottom{} ?
+        st: %ST.SEnd{}
+      )
+
+      ok(t)
+    end
+  end
+
+  # an anonymous function checked against a type that is not a function type
+  deftc check(ctx, env, _st, {:fn, meta, _clauses}, t) do
+    {:error, Error.TypeMismatch.lambda_not_expected(ctx.module, meta, expected: t), env}
   end
 
   # -- Block-Chk

@@ -1133,6 +1133,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     do: "in case branch ##{index}#{render_line(meta)}"
 
   defp render_frame({:argument, index}), do: "in argument ##{index}"
+  defp render_frame({:param, index}), do: "in parameter ##{index}"
 
   defp render_frame({:message_payload, label, st}),
     do: "in the payload of message `#{render_atom(label)}`, sent at `#{Maty.ST.repr(st)}`"

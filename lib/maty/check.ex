@@ -116,6 +116,16 @@ defmodule Maty.Check do
     end
   end
 
+  @spec scoped(t(a), st: Maty.ST.t()) :: t(a) when a: var
+  def scoped(check, st: inner_st) do
+    fn env, st ->
+      case apply_check(check, env, inner_st) do
+        {:error, error, _} -> {:error, error, env}
+        {:ok, value, _, _} -> {:ok, value, st, env}
+      end
+    end
+  end
+
   # -- internals
 
   @doc false

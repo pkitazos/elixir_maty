@@ -226,7 +226,7 @@ defmodule Maty.Typechecker.TCExprTest do
   end
 
   test "rejected expressions" do
-    assert_error(synth(quote(do: fn x -> x end)), :unsupported_anonymous_function)
+    assert_error(synth(quote(do: fn x -> x end)), :cannot_infer_type)
 
     receive_ast =
       quote do

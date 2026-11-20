@@ -20,6 +20,8 @@ defmodule Maty.Typechecker.Error do
           | {:record_field, atom()}
           # the argument checked by T-App, T-Send, T-Suspend / T-Done and T-Register
           | {:argument, pos_integer()}
+          # a parameter pattern of an anonymous function TV-Abs
+          | {:param, pos_integer()}
           | {:message_payload, atom(), Maty.ST.t()}
           | {:state, :suspend | :done}
           | :init_handler_args
