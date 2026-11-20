@@ -581,7 +581,7 @@ defmodule Maty.Typechecker.TC do
           maty_runtime(:done, meta, [state_ast])
         ) do
     tcm env: env, st: st do
-      chk(ctx, state_ast, ctx.handler_state_type) |> with_frame({:state, :done})
+      done_state(ctx, state_ast, ctx.handler_state_type)
 
       expect_st %ST.SEnd{},
         else: fn st ->
@@ -838,6 +838,12 @@ defmodule Maty.Typechecker.TC do
       ok({:map_record, Map.new(fields)})
     end
   end
+
+  # outside a handler there is no state type: the state isn't checked, and `expect_st` reports there is no session
+  defp done_state(_ctx, _state_ast, nil), do: ok()
+
+  defp done_state(ctx, state_ast, state_ty),
+    do: chk(ctx, state_ast, state_ty) |> with_frame({:state, :done})
 
   # T-Case the actual branch checking is identical (for now) besides the mode we're in
   defp case_branches(ctx, scrutinee_ty, clauses, mode) do
