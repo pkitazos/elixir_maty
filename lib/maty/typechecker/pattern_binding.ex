@@ -30,17 +30,22 @@ defmodule Maty.Typechecker.PatternBinding do
         ) ::
           {:ok, map(), var_env()} | {:error, Error.t(), var_env()}
 
+  # Pat-Wild: Pattern is '_'
+  # `_` has the shape of a variable (`{:_, meta, context}`), so it must come before Pat-Var
+  deftc tc_pattern(_ctx, {:_, _meta, _context}, _expected_type, var_env) do
+    {:ok, %{}, var_env}
+  end
+
+  deftc tc_pattern(_ctx, :_, _expected_type, var_env) do
+    {:ok, %{}, var_env}
+  end
+
   # Pat-Var: Pattern is a variable 'x'
   deftc tc_pattern(_ctx, {var_name, _meta, context}, expected_type, var_env)
         when is_atom(var_name) and (is_atom(context) or is_nil(context)) do
     new_bindings = %{var_name => expected_type}
     updated_env = Map.merge(var_env, new_bindings)
     {:ok, new_bindings, updated_env}
-  end
-
-  # Pat-Wild: Pattern is '_'
-  deftc tc_pattern(_ctx, :_, _expected_type, var_env) do
-    {:ok, %{}, var_env}
   end
 
   deftc tc_pattern(
@@ -57,10 +62,6 @@ defmodule Maty.Typechecker.PatternBinding do
           _expected_type,
           var_env
         ) do
-    {:ok, %{}, var_env}
-  end
-
-  deftc tc_pattern(_ctx, {:_, _meta, _context}, _expected_type, var_env) do
     {:ok, %{}, var_env}
   end
 

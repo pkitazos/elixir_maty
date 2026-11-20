@@ -30,7 +30,6 @@ defmodule Maty.Typechecker.PatternBindingTest do
 
   # -- Pat-Wild
 
-  # todo: fails until `_` reaches Pat-Wild (Pat-Var comes first and binds it as a variable named `_`)
   test "Pat-Wild" do
     env = %{x: :binary}
     assert {:ok, %{}, ^env} = tc(:_, :number, env)
