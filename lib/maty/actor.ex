@@ -27,7 +27,7 @@ defmodule Maty.Actor do
     - `protocol`: the protocol module (implementing `Maty.Protocol`) whose sessions this actor takes part in
 
   The roles of that protocol this actor plays are the roles of its `session_type` declarations.
-  Every `MatyDSL.register/4` call in the actor must be given one of these roles as a literal atom.
+  Every `Maty.DSL.register/4` call in the actor must be given one of these roles as a literal atom.
 
       defmodule TwoBuyer.Participants.Seller do
         use Maty.Actor, protocol: TwoBuyer.Protocol

@@ -786,7 +786,7 @@ defmodule Maty.Typechecker.Error.Formatter do
   defp render(%Error{category: :framework_usage, kind: :missing_session_registration}) do
     """
     Framework Usage Violation: Missing Session Registration
-      Actor does not register in a session in the on_link/2 callback
+      Actor does not register in a session in the on_start/1 callback
     """
   end
 
@@ -978,7 +978,7 @@ defmodule Maty.Typechecker.Error.Formatter do
       Expected: #{render_atom(expected)}
       Got: #{render_atom(got)}
       --
-      MatyDSL.register/4 must be given the role whose session_type declares its init handler.
+      Maty.DSL.register/4 must be given the role whose session_type declares its init handler.
     """
   end
 
@@ -1077,7 +1077,11 @@ defmodule Maty.Typechecker.Error.Formatter do
 
   # todo: add `@spec`
   defp render_action({action, args}),
-    do: "MatyDSL.#{action}(#{Enum.map_join(args, ", ", &Macro.to_string/1)})"
+    do: "Maty.DSL.#{render_action_name(action)}(#{Enum.map_join(args, ", ", &Macro.to_string/1)})"
+
+  # the `send` action is written `send_to`
+  defp render_action_name(:send), do: "send_to"
+  defp render_action_name(action), do: "#{action}"
 
   # an Error.Cause as {title, details line(s), explanation}, for the parent error's render clause
   defp render_cause(%Error.Cause{kind: :unsupported_type_constructor, details: %{type_ast: ast}}) do

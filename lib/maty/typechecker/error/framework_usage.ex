@@ -104,8 +104,7 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
-  # `use Maty.Actor` declared roles that are not roles of the given protocol
-  # (now: a `session_type` was given a role that is not a role of the protocol)
+  # a `session_type` was given a role that is not a role of the protocol
   def unknown_roles(module, meta, protocol, unknown_roles, protocol_roles) do
     %Error{
       category: :framework_usage,

@@ -41,7 +41,7 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     }
   end
 
-  # `got` is the MatyDSL call that was attempted, as `{action, argument_asts}`
+  # `got` is the Maty.DSL call that was attempted, as `{action, argument_asts}`
   # todo: add `@spec`s
   def incorrect_action(module, meta, [got: {action, args} = got], st)
       when action in [:send, :suspend, :done] and is_list(args) do

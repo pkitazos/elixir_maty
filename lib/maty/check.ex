@@ -12,7 +12,7 @@ defmodule Maty.Check do
 
   @typedoc "Γ variable binding environment"
   @type var_env :: %{atom() => Maty.Types.T.t()}
-  # The fixed per-module part (Ψ; Δ) is `Maty.Typechecker.Ctx`.
+  # The fixed per-module part (Σ) is `Maty.Typechecker.Ctx`.
 
   @typedoc "running a step gives back its value `a` (with the new Q and Γ), or an error"
   @type result(a) :: {:ok, a, Maty.ST.t(), var_env()} | {:error, Error.t(), var_env()}
@@ -50,11 +50,11 @@ defmodule Maty.Check do
 
   # -- typing judgements + friends
 
-  # Ψ; Δ; Γ | Q₁ |> e ==> T <| Q₂
+  # Σ; Γ | Q₁ |> e ==> T <| Q₂
   @spec syn(Maty.Typechecker.Ctx.t(), Macro.t()) :: t(Maty.Types.T.t())
   def syn(ctx, e), do: fn env, st -> TC.synth(ctx, env, st, e) end
 
-  # Ψ; Δ; Γ | Q₁ |> e <== T <| Q₂
+  # Σ; Γ | Q₁ |> e <== T <| Q₂
   @spec chk(Maty.Typechecker.Ctx.t(), Macro.t(), Maty.Types.t()) :: t(Maty.Types.T.t())
   def chk(ctx, e, t), do: fn env, st -> TC.check(ctx, env, st, e, t) end
 

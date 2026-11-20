@@ -170,7 +170,7 @@ defmodule Maty.Typechecker.Signatures do
 
     fs
     |> Enum.group_by(fn c -> {c.name, c.arity} end)
-    # a function with no spec is skipped, WF-Func reports it (see issues.md §15)
+    # a function with no spec is skipped, WF-Func reports it (see I145)
     |> Enum.reject(fn {_, cs} -> Enum.all?(cs, fn c -> c.specs == [] end) end)
     |> map_m(fn {_, cs} -> function_signature(module, global_state_type, module_types, cs) end)
     |> f_map(&Map.new/1)

@@ -3,7 +3,7 @@ defmodule Maty.Typechecker.TC.WF do
   Well-formedness checks for function definitions and handler clauses.
 
   Implements the formal rules WF-Func, WF-MsgHandler, WF-InitHandler,
-  and WF-OnLink, checking that definitions conform to their declared
+  and WF-OnStart, checking that definitions conform to their declared
   type specifications and session type annotations.
   """
 

@@ -73,7 +73,7 @@ defmodule Maty.Typechecker do
         state_errors ++
         session_type_errors
 
-    # we fail here, before the bodies are checked in `handle_after_compile`, on purpose.
+    # we fail here, before the bodies are checked in `__after_compile__`, on purpose.
     # an issue with a spec annotation or handler declaration leaves Σ incomplete and
     # checking bodies against it would only pile follow-on errors on top of the real one
     if errors != [] do
@@ -161,10 +161,6 @@ defmodule Maty.Typechecker do
       # if we found any errors, fail compilation
       raise_type_errors!(env, errors)
     else
-      # todo: sort these messages
-      # modules compile in parallel so needs collecting the results after compilation
-      # (e.g. a compiler tracer or a mix compiler step) since each module is checked in its own after_compile hook
-      # (maybe more trouble than it's worth)
       Logger.info("\n[#{env.module}] No communication errors", ansi_color: :light_green)
     end
   end
