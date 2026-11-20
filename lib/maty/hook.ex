@@ -5,11 +5,11 @@ defmodule Maty.Hook do
       @compile :debug_info
 
       # ephemeral annotations
-      for attr <- [:init_handler, :handler, :handler_stub, :spec],
+      for attr <- [:maty_kind, :spec],
           do: Module.register_attribute(__MODULE__, attr, accumulate: false, persist: false)
 
       # attribute stores
-      for attr <- [:session_type, :handler_errors, :global_state_type, :local_state_type],
+      for attr <- [:maty_handler_errors, :session_type, :global_state_type, :local_state_type],
           do: Module.register_attribute(__MODULE__, attr, accumulate: true, persist: true)
 
       # one record per clause, which beocmes the input to `Signatures.build/4` @before_compile

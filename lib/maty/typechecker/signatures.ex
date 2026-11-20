@@ -70,9 +70,7 @@ defmodule Maty.Typechecker.Signatures do
         }
 
   @type annotations :: %{
-          handler: Types.handler_label() | nil,
-          init_handler: Types.handler_label() | nil,
-          handler_stub: true | nil,
+          kind: kind() | nil,
           spec: [raw_spec()] | nil
         }
 
@@ -95,13 +93,7 @@ defmodule Maty.Typechecker.Signatures do
   """
   @spec clause(atom(), arity(), non_neg_integer(), annotations()) :: clause()
   def clause(name, arity, line, annotations) do
-    kind =
-      cond do
-        not is_nil(annotations.handler) -> {:handler, :message}
-        not is_nil(annotations.init_handler) -> {:handler, :init}
-        not is_nil(annotations.handler_stub) -> :handler_stub
-        true -> :function
-      end
+    kind = annotations.kind || :function
 
     %{
       name: name,

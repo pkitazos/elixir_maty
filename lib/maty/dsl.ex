@@ -130,7 +130,7 @@ defmodule Maty.DSL do
   # we record and report an error with the other handler annotation errors at `@before_compile`
   defp handler_error(func_id, error) do
     quote do
-      @handler_errors {unquote(Macro.escape(func_id)), unquote(Macro.escape(error))}
+      @maty_handler_errors {unquote(Macro.escape(func_id)), unquote(Macro.escape(error))}
     end
   end
 
@@ -144,7 +144,7 @@ defmodule Maty.DSL do
     stub_key = :"__handler_stub_#{handler_name}__"
 
     quote do
-      @init_handler unquote(handler_name)
+      @maty_kind {:handler, :init}
       @spec unquote(handler_name)(
               unquote(type_spec),
               maty_actor_state(),
@@ -162,7 +162,7 @@ defmodule Maty.DSL do
 
       if not Module.has_attribute?(__MODULE__, unquote(stub_key)) do
         Module.put_attribute(__MODULE__, unquote(stub_key), true)
-        @handler_stub true
+        @maty_kind :handler_stub
         def unquote(handler_name)(_, _), do: raise("handlers cannot be called directly")
       end
     end
@@ -199,7 +199,7 @@ defmodule Maty.DSL do
     expects_key = :"__handler_expects_#{handler_name}__"
 
     quote do
-      @handler unquote(handler_name)
+      @maty_kind {:handler, :message}
       @spec unquote(handler_name)(
               unquote(role),
               unquote(type_spec),
@@ -220,7 +220,7 @@ defmodule Maty.DSL do
       if not Module.has_attribute?(__MODULE__, unquote(expects_key)) do
         Module.put_attribute(__MODULE__, unquote(expects_key), true)
         def __handler_expects__(unquote(handler_name)), do: unquote(role)
-        @handler_stub true
+        @maty_kind :handler_stub
         def unquote(handler_name)(_, _, _), do: raise("handlers cannot be called directly")
       end
     end

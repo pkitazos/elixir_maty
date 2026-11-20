@@ -21,16 +21,14 @@ defmodule Maty.Typechecker do
 
     clause =
       Signatures.clause(name, arity, env.line, %{
-        handler: Module.get_attribute(env.module, :handler),
-        init_handler: Module.get_attribute(env.module, :init_handler),
-        handler_stub: Module.get_attribute(env.module, :handler_stub),
+        kind: Module.get_attribute(env.module, :maty_kind),
         spec: Module.get_attribute(env.module, :spec)
       })
 
     Module.put_attribute(env.module, :maty_clauses, clause)
 
     # the annotations belong to this clause only, so they must not be seen by the next one
-    for annotation <- [:handler, :init_handler, :handler_stub, :spec] do
+    for annotation <- [:maty_kind, :spec] do
       Module.delete_attribute(env.module, annotation)
     end
   end
@@ -57,7 +55,7 @@ defmodule Maty.Typechecker do
       end
 
     errors =
-      Module.get_attribute(env.module, :handler_errors) ++
+      Module.get_attribute(env.module, :maty_handler_errors) ++
         unknown_role_errors(env, session_type_declarations) ++
         state_errors ++
         session_type_errors
@@ -71,7 +69,7 @@ defmodule Maty.Typechecker do
       raise_type_errors!(env, errors)
     end
 
-    Module.put_attribute(env.module, :state_types, state_types)
+    Module.put_attribute(env.module, :maty_state_types, state_types)
 
     clauses = Module.get_attribute(env.module, :maty_clauses) |> Enum.reverse()
 
