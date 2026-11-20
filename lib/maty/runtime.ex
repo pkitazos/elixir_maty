@@ -223,6 +223,8 @@ defmodule Maty.Runtime do
     :ok
   end
 
+  # todo: figure out if I could work with the full `Types.state_types()` type internally instead
+
   @doc false
   @spec suspend(Types.message_handler(), Types.maty_actor_state()) :: no_return()
   def suspend(next_handler, state), do: throw({:maty_suspend, handler_name!(next_handler), state})

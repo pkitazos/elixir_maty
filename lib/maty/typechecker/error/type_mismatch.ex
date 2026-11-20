@@ -95,8 +95,8 @@ defmodule Maty.Typechecker.Error.TypeMismatch do
     }
   end
 
-  def invalid_maty_state_cause(got_type) do
-    %Error.Cause{kind: :invalid_maty_state, details: %{got: got_type}}
+  def invalid_maty_state_cause(expected: expected, got: got) do
+    %Error.Cause{kind: :invalid_maty_state, details: %{expected: expected, got: got}}
   end
 
   def send_message_not_tuple(module, meta, got: message_ast) do

@@ -12,7 +12,6 @@ defmodule Maty.Typechecker.Preprocessor do
   alias Maty.Typechecker.TypeSpecParser
   alias Maty.Typechecker.Error
   alias Maty.Types
-  alias Maty.Types.T, as: Type
 
   @typep result(a) :: {:ok, a} | {:error, [Error.t()]}
 
@@ -35,7 +34,7 @@ defmodule Maty.Typechecker.Preprocessor do
 
   # `roles` are the actor's roles, every one of them has a single `local_state`
   @spec process_state_declarations(Macro.Env.t(), [Types.role()]) ::
-          {:ok, %{global: Type.t(), local: %{Types.role() => Type.t()}}} | {:error, [Error.t()]}
+          {:ok, Types.state_types()} | {:error, [Error.t()]}
   def process_state_declarations(env, roles) do
     global_declarations = env.module |> Module.get_attribute(:global_state_type) |> Enum.reverse()
     local_declarations = env.module |> Module.get_attribute(:local_state_type) |> Enum.reverse()

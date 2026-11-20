@@ -105,6 +105,15 @@ defmodule Maty.Typechecker.ErrorRenderTest do
          got: @st_in,
          expected: %ST.SIn{from: :buyer2, branches: [@branch]}
        )},
+      {{Error.ProtocolViolation, :handler_role_mismatch},
+       Error.ProtocolViolation.handler_role_mismatch(
+         @m,
+         @meta,
+         %ST.SName{handler: :decision_handler},
+         :decision_handler,
+         expected: :buyer2,
+         got: :buyer1
+       )},
       {{Error.ProtocolViolation, :handler_body_wrong_termination},
        Error.ProtocolViolation.handler_body_wrong_termination(
          @meta,
@@ -142,7 +151,10 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.TypeMismatch.invalid_maty_state_type(
          @m,
          @meta,
-         Error.TypeMismatch.invalid_maty_state_cause(:number)
+         Error.TypeMismatch.invalid_maty_state_cause(
+           expected: {:map_record, %{global: :number, local: :binary}},
+           got: :number
+         )
        )},
       {{Error.TypeMismatch, :send_message_not_tuple},
        Error.TypeMismatch.send_message_not_tuple(@m, @meta, got: {:title, [], nil})},
@@ -320,10 +332,6 @@ defmodule Maty.Typechecker.ErrorRenderTest do
        Error.FrameworkUsage.unsupported_pattern(@m, @meta, {:when, [], [{:n, [], nil}, true]})},
       {{Error.FrameworkUsage, :missing_session_registration},
        Error.FrameworkUsage.missing_session_registration(@m, @meta)},
-      {{Error.FrameworkUsage, :on_link_altered_session_state},
-       Error.FrameworkUsage.on_link_altered_session_state(@m, @meta, @st_out)},
-      {{Error.FrameworkUsage, :on_link_bad_return},
-       Error.FrameworkUsage.on_link_bad_return(@m, @meta, :number)},
       {{Error.FrameworkUsage, :unknown_roles},
        Error.FrameworkUsage.unknown_roles(@m, @meta, TwoBuyer.Protocol, [:sellr], [
          :buyer1,

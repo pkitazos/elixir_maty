@@ -138,15 +138,9 @@ defmodule Maty.Typechecker.Helpers do
     end
   end
 
-  # todo: move somewhere else?
-  @spec contains_register_call?(Macro.t()) :: boolean()
-  def contains_register_call?(ast) do
-    {_, found} =
-      Macro.prewalk(ast, false, fn
-        {{:., _, [Maty.Runtime, :register]}, _meta, _args} = node, _acc -> {node, true}
-        node, acc -> {node, acc}
-      end)
+  # todo: idk where to put this tbh, defo does not belong here
+  def get_localised_state_type(ctx), do: {:map_record, %{ctx.state_types | local: nil}}
 
-    found
-  end
+  def get_localised_state_type(ctx, role),
+    do: {:map_record, %{ctx.state_types | local: ctx.state_types.local[role]}}
 end

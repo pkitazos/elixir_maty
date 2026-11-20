@@ -169,6 +169,21 @@ defmodule Maty.Typechecker.Error.ProtocolViolation do
     }
   end
 
+  # suspend was given a message handler of a different role than the handler the session type names (`expected_handler`)
+  def handler_role_mismatch(module, meta, st, expected_handler,
+        expected: expected_role,
+        got: got_role
+      ) do
+    %Error{
+      category: :protocol_violation,
+      kind: :handler_role_mismatch,
+      module: module,
+      meta: Keyword.take(meta, [:line, :column]),
+      details: %{expected_handler: expected_handler, expected: expected_role, got: got_role},
+      st: st
+    }
+  end
+
   # Fired when a message-handler body finishes without terminating the session (it should reduce to ⊥ via suspend/done)
   # - `got_return` is the body's value type
   # - `st` carries the residual session type that was left unconsumed

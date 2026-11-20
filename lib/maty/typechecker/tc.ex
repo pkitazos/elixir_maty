@@ -533,18 +533,22 @@ defmodule Maty.Typechecker.TC do
     tcm env: env, st: st do
       handler_type <- syn(ctx, handler_ast)
 
-      # todo: the role of the handler suspended with is not compared, only its session type
-      expect {:handler, :message, _handler_role, handler_st} = handler_type,
+      expect {:handler, :message, handler_role, handler_st} = handler_type,
         else: Error.TypeMismatch.handler_expected(ctx.module, meta, :message, handler_type)
 
-      state_type <- syn(ctx, state_ast)
+      state_ty <- syn(ctx, state_ast)
 
-      expect state_type == Types.T.maty_actor_state(),
+      handler_state_ty = Helpers.get_localised_state_type(ctx, handler_role)
+
+      expect state_ty == handler_state_ty,
         else:
           Error.TypeMismatch.invalid_maty_state_type(
             ctx.module,
             meta,
-            Error.TypeMismatch.invalid_maty_state_cause(state_type)
+            Error.TypeMismatch.invalid_maty_state_cause(
+              expected: handler_state_ty,
+              got: state_ty
+            )
           )
 
       expect_st %ST.SName{handler: expected_handler} = q,
@@ -557,7 +561,7 @@ defmodule Maty.Typechecker.TC do
           )
         end
 
-      expect {:ok, {:handler, :message, _expected_role, expected_st}} =
+      expect {:ok, {:handler, :message, expected_role, expected_st}} =
                Map.fetch(ctx.signatures, expected_handler),
              else:
                Error.ProtocolViolation.undefined_continuation_handler(
@@ -566,6 +570,17 @@ defmodule Maty.Typechecker.TC do
                  q,
                  expected_handler
                )
+
+      expect expected_role == handler_role,
+        else:
+          Error.ProtocolViolation.handler_role_mismatch(
+            ctx.module,
+            meta,
+            q,
+            expected_handler,
+            expected: expected_role,
+            got: handler_role
+          )
 
       expect handler_st == expected_st,
         else:
@@ -590,14 +605,44 @@ defmodule Maty.Typechecker.TC do
           maty_runtime(:done, meta, [state_ast])
         ) do
     tcm env: env, st: st do
-      state_type <- syn(ctx, state_ast)
+      state_ty <- syn(ctx, state_ast)
 
-      expect state_type == Types.T.maty_actor_state(),
+      # structural check
+      expect {:map_record, %{global: global_state_ty, local: _} = fields} = state_ty,
         else:
           Error.TypeMismatch.invalid_maty_state_type(
             ctx.module,
             meta,
-            Error.TypeMismatch.invalid_maty_state_cause(state_type)
+            Error.TypeMismatch.invalid_maty_state_cause(
+              expected: Helpers.get_localised_state_type(ctx),
+              got: state_ty
+            )
+          )
+
+      # only exact keys
+      expect map_size(fields) == 2,
+        else:
+          Error.TypeMismatch.invalid_maty_state_type(
+            ctx.module,
+            meta,
+            Error.TypeMismatch.invalid_maty_state_cause(
+              expected: Helpers.get_localised_state_type(ctx),
+              got: state_ty
+            )
+          )
+
+      # todo: find a way to chain checks and return same error?
+
+      # full type equality
+      expect global_state_ty == ctx.state_types.global,
+        else:
+          Error.TypeMismatch.invalid_maty_state_type(
+            ctx.module,
+            meta,
+            Error.TypeMismatch.invalid_maty_state_cause(
+              expected: ctx.state_types.global,
+              got: global_state_ty
+            )
           )
 
       expect_st %ST.SEnd{},
@@ -1011,11 +1056,11 @@ defmodule Maty.Typechecker.TC do
   # Anonymous Function fn x1, ..., xn -> body end
   # todo: there is no function type in `Types.T` yet, `{:function, param_types, return_type}` is a placeholder
   deftc check(
-          ctx,
-          env,
-          st,
-          {:fn, meta, [{:->, _, [params, body_ast]}]},
-          {:function, param_types, return_type} = t
+          _ctx,
+          _env,
+          _st,
+          {:fn, _meta, [{:->, _, [params, _body_ast]}]},
+          {:function, _param_types, _return_type} = _t
         )
         when is_list(params) do
     # todo: later

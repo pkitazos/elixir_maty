@@ -104,12 +104,24 @@ defmodule Maty.Typechecker.Error.Formatter do
   end
 
   defp render(%Error{category: :protocol_violation, kind: :handler_session_type_mismatch} = e) do
-    %{expected_handler: expected_handler, got: got_st, expected: expected_st} = e.details
+    %{got: got_st, expected: expected_st} = e.details
 
     """
     Protocol Violation: Handler for a Different Session Type
       Got: a message handler for #{Maty.ST.repr(got_st)}
-      Expected: a message handler for #{Maty.ST.repr(expected_st)} (like #{render_handler_ref(expected_handler, 3)})
+      Expected: a message handler for #{Maty.ST.repr(expected_st)}
+      --
+      Session Type: #{Maty.ST.repr(e.st)}
+    """
+  end
+
+  defp render(%Error{category: :protocol_violation, kind: :handler_role_mismatch} = e) do
+    %{expected: expected_role, got: got_role} = e.details
+
+    """
+    Protocol Violation: Handler for a Different Role
+      Got: a message handler for role #{render_atom(got_role)}
+      Expected: a message handler for role #{render_atom(expected_role)}
       --
       Session Type: #{Maty.ST.repr(e.st)}
     """
@@ -825,26 +837,6 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
   end
 
-  defp render(%Error{category: :framework_usage, kind: :on_link_altered_session_state} = e) do
-    %{got: got} = e.details
-
-    """
-    Framework Usage Violation: Session State Altered in on_link
-      The on_link/2 callback must not advance the session type.
-      Final state: #{inspect(got)}
-    """
-  end
-
-  defp render(%Error{category: :framework_usage, kind: :on_link_bad_return} = e) do
-    %{got: got} = e.details
-
-    """
-    Framework Usage Violation: Invalid on_link Return
-      The on_link/2 callback must return {:ok, actor_state}.
-      Got: #{inspect(got)}
-    """
-  end
-
   defp render(%Error{category: :framework_usage, kind: :unknown_roles} = e) do
     %{protocol: protocol, got: got, known: known} = e.details
 
@@ -954,7 +946,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     """
     Framework Usage Violation: Missing Global State
       --
-      Maty.Actor must declare its global state type with global_state, e.g. global_state %{}.
+      Maty.Actor must declare its global state type with global_state.
     """
   end
 
@@ -965,7 +957,7 @@ defmodule Maty.Typechecker.Error.Formatter do
     Framework Usage Violation: Missing Local State
       Roles: #{Enum.map_join(roles, ", ", &inspect/1)}
       --
-      Maty.Actor must declare a local state type with local_state for every role it plays, e.g. local_state #{inspect(hd(roles))}, %{}.
+      Maty.Actor must declare a local state type with local_state for every role it plays.
     """
   end
 
@@ -1160,8 +1152,12 @@ defmodule Maty.Typechecker.Error.Formatter do
      "Dict keys must have a base type."}
   end
 
-  defp render_cause(%Error.Cause{kind: :invalid_maty_state, details: %{got: got}}) do
-    {"Invalid Maty State Type", "Expected type: :maty_actor_state\nGot type: #{render_type(got)}",
+  defp render_cause(%Error.Cause{
+         kind: :invalid_maty_state,
+         details: %{expected: expected, got: got}
+       }) do
+    {"Invalid Maty State Type",
+     "Expected type: #{render_type(expected)}\nGot type: #{render_type(got)}",
      "Maty operations require a valid actor state type."}
   end
 
@@ -1277,9 +1273,11 @@ defmodule Maty.Typechecker.Error.Formatter do
     do:
       "The types of its parameters cannot be inferred here. Use it where a function type is expected, or consider creating a named function."
 
-  defp render_uninferable_hint(_empty),
-    do:
-      "The type of its elements cannot be inferred here. Use it where its type is expected, e.g. as an argument to a function with a spec."
+  defp render_uninferable_hint(:empty_list),
+    do: "The type of its elements cannot be inferred here."
+
+  defp render_uninferable_hint(:empty_map),
+    do: "The types of its keys and values cannot be inferred here."
 
   defp render_unsupported_lambda(:multiple_clauses),
     do: "The anonymous function has more than one clause."

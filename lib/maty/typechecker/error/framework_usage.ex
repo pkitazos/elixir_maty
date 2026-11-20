@@ -104,26 +104,6 @@ defmodule Maty.Typechecker.Error.FrameworkUsage do
     }
   end
 
-  def on_link_altered_session_state(module, meta, got_st) do
-    %Error{
-      category: :framework_usage,
-      kind: :on_link_altered_session_state,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{got: got_st}
-    }
-  end
-
-  def on_link_bad_return(module, meta, got) do
-    %Error{
-      category: :framework_usage,
-      kind: :on_link_bad_return,
-      module: module,
-      meta: Keyword.take(meta, [:line, :column]),
-      details: %{got: got}
-    }
-  end
-
   # `use Maty.Actor` declared roles that are not roles of the given protocol
   # (now: a `session_type` was given a role that is not a role of the protocol)
   def unknown_roles(module, meta, protocol, unknown_roles, protocol_roles) do

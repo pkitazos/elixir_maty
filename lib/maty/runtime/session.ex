@@ -16,6 +16,7 @@ defmodule Maty.Runtime.Session do
           roles: %{
             Types.role() => %{
               handler: {Types.handler_label(), Types.role()},
+              # todo: what actually goes here?
               state: Types.local_state()
             }
           },

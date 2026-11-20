@@ -16,6 +16,9 @@ defmodule Maty.Types do
   @type local_state :: term()
   @type global_state :: term()
 
+  # todo: these probably shouldn't be `T.t()` ?
+  @type state_types :: %{global: T.t(), local: %{role() => T.t()}}
+
   # todo: this should be tightened a bit more than `any()`
   @type message :: {atom(), any()}
 

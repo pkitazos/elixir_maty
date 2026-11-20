@@ -75,7 +75,8 @@ defmodule Maty.Typechecker.TC.WF do
          {:branch, %ST.SBranch{} = b} <- {:branch, Enum.find(st.branches, &(&1.label == label))},
          #
          {:ok, _bindings, env} <- tc_pattern(ctx, payload, b.payload, %{}),
-         {:ok, _bindings, env} <- tc_pattern(ctx, state, Type.maty_actor_state(), env),
+         {:ok, _bindings, env} <-
+           tc_pattern(ctx, state, Helpers.get_localised_state_type(ctx, role), env),
          #
          # the body starts from the continuation of the branch this clause handles
          :ok <- typecheck_handler_body(ctx, env, meta, handler, b.continue_as, block) do
@@ -103,11 +104,11 @@ defmodule Maty.Typechecker.TC.WF do
            expected: Enum.map(st.branches, & &1.label)
          )}
 
-      {:error, msg, _env} ->
-        {:error, msg}
+      {:error, err, _env} ->
+        {:error, err}
 
-      {:error, msg} ->
-        {:error, msg}
+      {:error, err} ->
+        {:error, err}
     end
   end
 
@@ -143,7 +144,8 @@ defmodule Maty.Typechecker.TC.WF do
     ctx = %{ctx | meta: meta}
 
     with {:ok, _bindings, env} <- tc_pattern(ctx, arg_pattern_ast, args_ty, %{}),
-         {:ok, _bindings, env} <- tc_pattern(ctx, state, Type.maty_actor_state(), env),
+         {:ok, _bindings, env} <-
+           tc_pattern(ctx, state, Helpers.get_localised_state_type(ctx), env),
          :ok <- typecheck_handler_body(ctx, env, meta, handler, st, block) do
       :ok
     else
@@ -155,48 +157,30 @@ defmodule Maty.Typechecker.TC.WF do
   def check_wf_on_start_callback(
         ctx,
         {meta, [arg_pattern_ast], _guards, block},
-        {:function, [args_types], _return_type}
+        {:function, [args_types], ret_ty}
       ) do
     ctx = %{ctx | meta: meta}
-    body = extract_body(block)
 
     with {:ok, _bindings, env} <- tc_pattern(ctx, arg_pattern_ast, args_types, %{}),
-         # typecheck the body (calls to register etc.)
-         {:ok, return_type, final_st, _env} <- TC.tc_expr_list(ctx, env, %ST.SEnd{}, body),
-         # session state must not change
-         :ok <- check_on_start_session_state(ctx, final_st),
-         # must contain at least one call to Maty.DSL.register
-         :ok <- check_contains_register(ctx, body),
+         :ok <- typecheck_function(ctx, meta, {ctx.module, :on_start, 1}, env, block, ret_ty),
          # todo: also check the module defines at least one init handler without one the actor can never start a session
          # (which is a bit odd for a Maty actor)
-
-         # must return {:ok, actor_state}
-         :ok <- check_on_start_return_type(ctx, return_type) do
+         body = extract_body(block),
+         {:register, true} <- {:register, contains_register_call?(body)} do
       :ok
     else
-      {:error, err, _env} -> {:error, err}
-      {:error, err} -> {:error, err}
+      {:error, err, _env} ->
+        {:error, err}
+
+      {:error, err} ->
+        {:error, err}
+
+      {:register, _} ->
+        {:error, Error.FrameworkUsage.missing_session_registration(ctx.module, ctx.meta)}
     end
   end
 
-  # --- Private helpers ---
-
-  defp check_on_start_session_state(_ctx, %ST.SEnd{}), do: :ok
-
-  defp check_on_start_session_state(ctx, other_st) do
-    {:error, Error.FrameworkUsage.on_link_altered_session_state(ctx.module, ctx.meta, other_st)}
-  end
-
-  defp check_contains_register(ctx, body) do
-    if Helpers.contains_register_call?(body),
-      do: :ok,
-      else: {:error, Error.FrameworkUsage.missing_session_registration(ctx.module, ctx.meta)}
-  end
-
-  defp check_on_start_return_type(_ctx, _return_type) do
-    # todo: check the return type against the actor's global state type once that is decided
-    :ok
-  end
+  # -- private helpers
 
   # body of a function clause must leave the session untouched and have the spec's return type
   defp typecheck_function(ctx, meta, func_id, env, block, ret_ty) do
@@ -241,8 +225,19 @@ defmodule Maty.Typechecker.TC.WF do
   defp extract_body({:try, _, [[do: body_block, catch: _]]}), do: extract_body(body_block)
   defp extract_body(expr) when not is_list(expr), do: [expr]
 
-  # --- Private helpers ---
+  # -- privater helpers
   # todo: figure out what stays and what moves
+
+  @spec contains_register_call?(Macro.t()) :: boolean()
+  defp contains_register_call?(ast) do
+    {_, found} =
+      Macro.prewalk(ast, false, fn
+        {{:., _, [Maty.Runtime, :register]}, _meta, _args} = node, _acc -> {node, true}
+        node, acc -> {node, acc}
+      end)
+
+    found
+  end
 
   defp check_argument_patterns(ctx, meta, arg_pattern_asts, spec_args_types) do
     initial_arg_env = %{}
@@ -263,13 +258,13 @@ defmodule Maty.Typechecker.TC.WF do
                ) do
           {:cont, {:ok, merged_bindings, updated_env}}
         else
-          {:error, msg, _env} -> {:halt, {:error, msg}}
+          {:error, err, _env} -> {:halt, {:error, err}}
         end
       end
     )
     |> case do
       {:ok, _final_bindings, body_var_env} -> {:ok, body_var_env}
-      {:error, msg} -> {:error, msg}
+      {:error, err} -> {:error, err}
     end
   end
 end

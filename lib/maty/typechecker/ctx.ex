@@ -1,12 +1,13 @@
 defmodule Maty.Typechecker.Ctx do
   alias Maty.Types
 
-  @enforce_keys [:module, :meta, :signatures]
+  @enforce_keys [:module, :meta, :signatures, :state_types]
   defstruct @enforce_keys
 
   @type t :: %__MODULE__{
           module: module(),
           meta: keyword(),
+          state_types: Types.state_types(),
           signatures: %{
             # reuse types from `Maty.Types` instead of redefining them all over the place
             atom() =>
@@ -21,6 +22,7 @@ defmodule Maty.Typechecker.Ctx do
     %__MODULE__{
       module: env.module,
       meta: [line: env.line],
+      state_types: Module.get_attribute(env.module, :maty_state_types),
       signatures: Module.get_attribute(env.module, :maty_signatures)
     }
   end
