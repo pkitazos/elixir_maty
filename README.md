@@ -4,7 +4,7 @@ A tool for statically checking Elixir communication patterns. Multiparty Session
 
 ## tl;dr
 
-- BYOP (bring your own (verified MPST) Protocol)
+- BYOP (Bring Your Own (verified MPST) Protocol)
 - you write actors. an actor plays some role(s) in the protocol
 - each actor is a module. all communication happens in handlers
 - every handler has a session type
@@ -34,4 +34,4 @@ mix test
 
 ## More
 
-- `docs/v2.typ`: the calculus and the typing rules.
+- `docs/v2.typ`: the calculus and the typing rules (in progress)
