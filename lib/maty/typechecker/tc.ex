@@ -528,7 +528,7 @@ defmodule Maty.Typechecker.TC do
       expect {:handler, :message, handler_role, handler_st} = handler_type,
         else: Error.TypeMismatch.handler_expected(ctx.module, meta, :message, handler_type)
 
-      handler_state_ty = Helpers.get_localised_state_type(ctx, handler_role)
+      handler_state_ty = Ctx.get_localised_state_type(ctx, handler_role)
       chk(ctx, state_ast, handler_state_ty) |> with_frame({:state, :suspend})
 
       expect_st %ST.SName{handler: expected_handler} = q,

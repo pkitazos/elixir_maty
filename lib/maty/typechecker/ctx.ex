@@ -37,4 +37,9 @@ defmodule Maty.Typechecker.Ctx do
       signatures: Module.get_attribute(env.module, :maty_signatures)
     }
   end
+
+  def get_localised_state_type(ctx), do: {:map_record, %{ctx.declared_state_types | local: nil}}
+
+  def get_localised_state_type(ctx, role),
+    do: {:map_record, %{ctx.declared_state_types | local: ctx.declared_state_types.local[role]}}
 end

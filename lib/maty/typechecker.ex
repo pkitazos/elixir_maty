@@ -175,7 +175,7 @@ defmodule Maty.Typechecker do
     # `Signatures` only gives a message handler a type when its session type starts with a receive
     {:handler, :message, role, %ST.SIn{} = st} = ctx.signatures[handler]
 
-    ctx = %{ctx | handler_state_type: Helpers.get_localised_state_type(ctx, role)}
+    ctx = %{ctx | handler_state_type: Ctx.get_localised_state_type(ctx, role)}
     # because we may have multiple handler clauses, we need to iterate over
     # all definitions and check if they are well-formed
     # we typecheck each clause exactly once and keep its errors
@@ -213,7 +213,7 @@ defmodule Maty.Typechecker do
   defp init_handler_errors(ctx, {handler, 3} = func_id, cs) do
     {:handler, :init, _role, args_ty, st} = ctx.signatures[handler]
 
-    ctx = %{ctx | handler_state_type: Helpers.get_localised_state_type(ctx)}
+    ctx = %{ctx | handler_state_type: Ctx.get_localised_state_type(ctx)}
 
     clause_errors(
       func_id,

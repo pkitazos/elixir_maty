@@ -129,18 +129,4 @@ defmodule Maty.Typechecker.Helpers do
       end
     end)
   end
-
-  def try_get_matching_branch(branches, label, payload_type) do
-    case Enum.find(branches, &(&1.label == label)) do
-      %ST.SBranch{payload: ^payload_type} = b -> {:ok, b}
-      %ST.SBranch{} = b -> {:error, :payload_mismatch, b}
-      nil -> {:error, :label_mismatch}
-    end
-  end
-
-  # todo: idk where to put this tbh, defo does not belong here
-  def get_localised_state_type(ctx), do: {:map_record, %{ctx.declared_state_types | local: nil}}
-
-  def get_localised_state_type(ctx, role),
-    do: {:map_record, %{ctx.declared_state_types | local: ctx.declared_state_types.local[role]}}
 end
