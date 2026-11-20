@@ -17,18 +17,136 @@ defmodule Maty.Typechecker.TypeSpecParser do
   - [t]                (list, the same as list(t))
   """
   @spec parse(type_ast :: Macro.t()) :: {:ok, Type.t()} | {:error, Error.Cause.t()}
-  def parse(type_ast) do
+  def parse(type_ast), do: parse(type_ast, %{})
+
+  @typedoc "The module's own types (`@type` / `@typep` / `@opaque`) resolved by name"
+  @type module_types :: %{atom() => Type.t()}
+
+  @doc """
+  Like `parse/1`, but a name that is not a base type can also be one of the module's own types.
+  """
+  @spec parse(Macro.t(), module_types()) :: {:ok, Type.t()} | {:error, Error.Cause.t()}
+  def parse(type_ast, module_types) do
     # todo: this should probably be build in `Types`
     type_env =
       Maty.Types.payload_types()
       |> Map.new(fn x -> {x, x} end)
       |> Map.put(:no_return, :no_return)
 
-    parse(type_ast, type_env)
+    # the base types win, Elixir does not let a module redefine its built-in types anyway
+    do_parse(type_ast, Map.merge(module_types, type_env))
   end
 
-  defp parse(type_ast, type_env) do
-    do_parse(type_ast, type_env)
+  @doc """
+  Resolves the module's types.
+
+  `declarations` are `{name, params, body_ast, line}` for each `@type` / `@typep` / `@opaque`
+
+  Returns:
+  - the types that resolved by name
+  - `{name, line, problem}` for each type that did not
+    (a type that only fails because a type it uses failed has no problem of its own)
+  """
+  @spec resolve_module_types([{atom(), [Macro.t()], Macro.t(), non_neg_integer()}]) ::
+          {module_types(), [{atom(), non_neg_integer(), term()}]}
+  def resolve_module_types(declarations) do
+    {parametric, plain} = Enum.split_with(declarations, fn {_, params, _, _} -> params != [] end)
+
+    # todo: proper error
+    parametric_problems =
+      for {name, params, _body, line} <- parametric,
+          do: {name, line, {:todo, "parametric type #{name}/#{length(params)}"}}
+
+    decls = Map.new(plain, fn {name, _params, body, line} -> {name, {body, line}} end)
+
+    {resolved, problems} =
+      Enum.reduce(plain, {%{}, []}, fn {name, _, _, _}, acc -> resolve(name, [], decls, acc) end)
+
+    types = for {name, {:ok, type}} <- resolved, into: %{}, do: {name, type}
+
+    {types, parametric_problems ++ Enum.reverse(problems)}
+  end
+
+  # a type already resolved (or failed) is left as it is
+  @spec resolve(
+          atom(),
+          [atom()],
+          %{atom() => {Macro.t(), non_neg_integer()}},
+          {%{atom() => {:ok, Type.t()} | :error}, [{atom(), non_neg_integer(), term()}]}
+        ) :: {%{atom() => {:ok, Type.t()} | :error}, [{atom(), non_neg_integer(), term()}]}
+  defp resolve(name, _stack, _decls, {resolved, _problems} = acc)
+       when is_map_key(resolved, name) do
+    acc
+  end
+
+  defp resolve(name, stack, decls, acc) do
+    {body, line} = Map.fetch!(decls, name)
+    stack = [name | stack]
+    uses = module_type_uses(body, decls)
+
+    case Enum.find(uses, &(&1 in stack)) do
+      nil ->
+        {resolved, _problems} = acc = Enum.reduce(uses, acc, &resolve(&1, stack, decls, &2))
+        record(acc, name, parse_body(body, line, uses, resolved))
+
+      _used ->
+        # `name` uses a type that is still being resolved, which closes a cycle back to it
+        record(acc, name, {:error, line, recursive_problem()})
+    end
+  end
+
+  # parses a type's body once every module type it uses has resolved.
+  # returns `:error` when one of them failed
+  @spec parse_body(Macro.t(), non_neg_integer(), [atom()], %{atom() => {:ok, Type.t()} | :error}) ::
+          {:ok, Type.t()} | {:error, non_neg_integer(), term()} | :error
+  defp parse_body(body, line, uses, resolved) do
+    if Enum.all?(uses, &match?({:ok, _}, resolved[&1])) do
+      module_types = for {n, {:ok, type}} <- resolved, into: %{}, do: {n, type}
+
+      case parse(body, module_types) do
+        {:ok, type} -> {:ok, type}
+        {:error, cause} -> {:error, line, cause}
+      end
+    else
+      :error
+    end
+  end
+
+  # the cycle from `used` back to it, through the types on the stack
+  @spec recursive_problem() :: term()
+  defp recursive_problem() do
+    # todo: proper error
+    {:todo, "recursive type"}
+  end
+
+  # records how resolving `name` went, with its problem when it has one of its own
+  @spec record(
+          {%{atom() => {:ok, Type.t()} | :error}, [{atom(), non_neg_integer(), term()}]},
+          atom(),
+          {:ok, Type.t()} | {:error, non_neg_integer(), term()} | :error
+        ) :: {%{atom() => {:ok, Type.t()} | :error}, [{atom(), non_neg_integer(), term()}]}
+  defp record({resolved, problems}, name, {:ok, type}),
+    do: {Map.put(resolved, name, {:ok, type}), problems}
+
+  defp record({resolved, problems}, name, :error),
+    do: {Map.put(resolved, name, :error), problems}
+
+  defp record({resolved, problems}, name, {:error, line, problem}),
+    do: {Map.put(resolved, name, :error), [{name, line, problem} | problems]}
+
+  # the module types a type body uses, in order and each once
+  @spec module_type_uses(Macro.t(), %{atom() => {Macro.t(), non_neg_integer()}}) :: [atom()]
+  defp module_type_uses(body, decls) do
+    {_, uses} =
+      Macro.prewalk(body, [], fn
+        {name, _meta, []} = node, uses when is_atom(name) and is_map_key(decls, name) ->
+          {node, [name | uses]}
+
+        node, uses ->
+          {node, uses}
+      end)
+
+    uses |> Enum.reverse() |> Enum.uniq()
   end
 
   # Base Case: Literal nil

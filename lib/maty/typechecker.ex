@@ -41,8 +41,21 @@ defmodule Maty.Typechecker do
     # the actor's roles are the roles of its `session_type` declarations
     roles = session_type_declarations |> Enum.map(&elem(&1, 0)) |> Enum.uniq()
 
+    type_declarations =
+      for attr <- [:type, :typep, :opaque],
+          declaration <- Module.get_attribute(env.module, attr),
+          do: declaration
+
+    # a bad module type is reported on its own, before anything that uses it,
+    # since every use of it would otherwise also be reported as an unknown type
+    module_types =
+      case Preprocessor.process_type_declarations(type_declarations) do
+        {:ok, module_types} -> module_types
+        {:error, errors} -> raise_type_errors!(env, Enum.map(errors, &{nil, &1}))
+      end
+
     {state_types, state_errors} =
-      case Preprocessor.process_state_declarations(env, roles) do
+      case Preprocessor.process_state_declarations(env, roles, module_types) do
         {:ok, state_types} -> {state_types, []}
         # state errors carry no function id, so they are tagged with nil to match the other error sources.
         {:error, errors} -> {nil, Enum.map(errors, &{nil, &1})}
@@ -73,7 +86,7 @@ defmodule Maty.Typechecker do
 
     clauses = Module.get_attribute(env.module, :maty_clauses) |> Enum.reverse()
 
-    case Signatures.build(env.module, clauses, session_types, state_types.global) do
+    case Signatures.build(env.module, clauses, session_types, state_types.global, module_types) do
       {:ok, signatures} -> Module.put_attribute(env.module, :maty_signatures, signatures)
       {:error, errors} -> raise_type_errors!(env, errors)
     end

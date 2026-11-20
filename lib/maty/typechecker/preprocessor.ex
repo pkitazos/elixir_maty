@@ -32,16 +32,40 @@ defmodule Maty.Typechecker.Preprocessor do
     end
   end
 
+  # `declarations` are the `@type` / `@typep` / `@opaque` attribute entries
+  @spec process_type_declarations([tuple()]) :: result(TypeSpecParser.module_types())
+  def process_type_declarations(declarations) do
+    declarations =
+      for {_kind, {:"::", _, [{name, meta, params}, body_ast]}, _location} <- declarations do
+        # a type without parameters has `nil` for them
+        {name, List.wrap(params), body_ast, meta[:line]}
+      end
+      |> Enum.sort_by(fn {_, _, _, line} -> line end)
+
+    case TypeSpecParser.resolve_module_types(declarations) do
+      {module_types, []} ->
+        {:ok, module_types}
+
+      {_module_types, problems} ->
+        # todo: proper errors
+        {:error,
+         for {name, line, problem} <- problems do
+           {:todo, "@type #{name} (line #{line}) does not resolve: #{inspect(problem)}"}
+         end}
+    end
+  end
+
   # `roles` are the actor's roles, every one of them has a single `local_state`
-  @spec process_state_declarations(Macro.Env.t(), [Types.role()]) ::
+  # `module_types` are the module's own types, from `process_type_declarations/1`
+  @spec process_state_declarations(Macro.Env.t(), [Types.role()], TypeSpecParser.module_types()) ::
           {:ok, Types.state_types()} | {:error, [Error.t()]}
-  def process_state_declarations(env, roles) do
+  def process_state_declarations(env, roles, module_types) do
     global_declarations = env.module |> Module.get_attribute(:global_state_type) |> Enum.reverse()
     local_declarations = env.module |> Module.get_attribute(:local_state_type) |> Enum.reverse()
 
     join(
-      handle_global_declaration(env, global_declarations),
-      handle_local_declarations(env, roles, local_declarations),
+      handle_global_declaration(env, global_declarations, module_types),
+      handle_local_declarations(env, roles, local_declarations, module_types),
       fn g, l -> %{global: g, local: l} end
     )
   end
@@ -97,10 +121,10 @@ defmodule Maty.Typechecker.Preprocessor do
   defp valid_session_type_start?(%struct{}), do: struct in [ST.SIn, ST.SOut, ST.SName, ST.SEnd]
   defp valid_session_type_start?(_value), do: false
 
-  defp handle_global_declaration(env, declarations) do
+  defp handle_global_declaration(env, declarations, module_types) do
     case declarations do
       [{type_ast, line}] ->
-        parse_state_type(env.module, :global, type_ast, line)
+        parse_state_type(env.module, :global, type_ast, line, module_types)
 
       [] ->
         error = Error.FrameworkUsage.missing_global_state(env.module, line: env.line)
@@ -120,7 +144,7 @@ defmodule Maty.Typechecker.Preprocessor do
     end
   end
 
-  defp handle_local_declarations(env, roles, declarations) do
+  defp handle_local_declarations(env, roles, declarations, module_types) do
     declarations = Enum.group_by(declarations, fn {role, _ast, _line} -> role end)
 
     {under, over} = two_way_set_diff(roles, Map.keys(declarations))
@@ -152,7 +176,7 @@ defmodule Maty.Typechecker.Preprocessor do
     |> Map.take(roles)
     |> map_m(fn {role, role_declarations} ->
       with {:ok, {_role, ast, line}} <- check_in_role_duplicates(env, role, role_declarations),
-           {:ok, type} <- parse_state_type(env.module, {:local, role}, ast, line) do
+           {:ok, type} <- parse_state_type(env.module, {:local, role}, ast, line, module_types) do
         {:ok, {role, type}}
       end
     end)
@@ -186,8 +210,8 @@ defmodule Maty.Typechecker.Preprocessor do
     {a_minus_b, b_minus_a}
   end
 
-  defp parse_state_type(module, state, type_ast, line) do
-    case TypeSpecParser.parse(type_ast) do
+  defp parse_state_type(module, state, type_ast, line, module_types) do
+    case TypeSpecParser.parse(type_ast, module_types) do
       {:ok, type} ->
         {:ok, type}
 

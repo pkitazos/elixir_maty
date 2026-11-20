@@ -112,12 +112,19 @@ defmodule Maty.Typechecker.Signatures do
   `clauses` are in source order
   `session_types` is a map of the `session_type` declarations, from each handler to its role and session type
   `global_state_type` is the parsed `global_state` declaration, the return type of `on_start`
+  `module_types` are the module's own types, which the specs may use (D26)
   """
-  @spec build(module(), [clause()], session_types(), Type.t()) :: result(t())
-  def build(module, cs, session_types, global_state_type) do
+  @spec build(
+          module(),
+          [clause()],
+          session_types(),
+          Type.t(),
+          TypeSpecParser.module_types()
+        ) :: result(t())
+  def build(module, cs, session_types, global_state_type, module_types) do
     join(
-      handler_signatures(module, cs, session_types),
-      function_signatures(module, cs, global_state_type),
+      handler_signatures(module, cs, session_types, module_types),
+      function_signatures(module, cs, global_state_type, module_types),
       &Map.merge/2
     )
     |> join_err(name_clash_errors(module, cs))
@@ -136,14 +143,14 @@ defmodule Maty.Typechecker.Signatures do
   #   * a message handler whose session type does not start with a receive
   #   * an init handler clause whose spec does not parse
   #   * an init handler clause that takes a different argument type than the first clause
-  @spec handler_signatures(module(), [clause()], session_types()) ::
+  @spec handler_signatures(module(), [clause()], session_types(), TypeSpecParser.module_types()) ::
           result(%{Types.handler_label() => handler_type()})
-  defp handler_signatures(module, cs, session_types) do
+  defp handler_signatures(module, cs, session_types, module_types) do
     hs = for c <- cs, match?({:handler, _}, c.kind), do: c
 
     hs
     |> Enum.group_by(fn d -> d.name end)
-    |> map_m(fn {h, cs} -> handler_signature(module, session_types, h, cs) end)
+    |> map_m(fn {h, cs} -> handler_signature(module, session_types, module_types, h, cs) end)
     |> f_map(&Map.new/1)
   end
 
@@ -156,30 +163,30 @@ defmodule Maty.Typechecker.Signatures do
   # Errors:
   #   * more than one spec for the same function
   #   * the errors of `parse_spec/2`
-  @spec function_signatures(module(), [clause()], Type.t()) ::
+  @spec function_signatures(module(), [clause()], Type.t(), TypeSpecParser.module_types()) ::
           result(%{func_id() => function_type()})
-  defp function_signatures(module, cs, global_state_type) do
+  defp function_signatures(module, cs, global_state_type, module_types) do
     fs = for c <- cs, match?(:function, c.kind), do: c
 
     fs
     |> Enum.group_by(fn c -> {c.name, c.arity} end)
     # a function with no spec is skipped, WF-Func reports it (see issues.md §15)
     |> Enum.reject(fn {_, cs} -> Enum.all?(cs, fn c -> c.specs == [] end) end)
-    |> map_m(fn {_, cs} -> function_signature(module, global_state_type, cs) end)
+    |> map_m(fn {_, cs} -> function_signature(module, global_state_type, module_types, cs) end)
     |> f_map(&Map.new/1)
   end
 
   # The entry of one function in Σ, from all of its clauses (at least one of which has a spec)
-  @spec function_signature(module(), Type.t(), [clause()]) ::
+  @spec function_signature(module(), Type.t(), TypeSpecParser.module_types(), [clause()]) ::
           result({func_id(), function_type()})
-  defp function_signature(module, global_state_type, [c | _] = cs) do
+  defp function_signature(module, global_state_type, module_types, [c | _] = cs) do
     func_id = {module, c.name, c.arity}
 
     # the specs of all function clauses (technically allows adding the spec in between clauses)
     case Enum.flat_map(cs, fn c -> c.specs end) do
       [spec] ->
         func_id
-        |> parse_spec(spec, global_state_type)
+        |> parse_spec(spec, global_state_type, module_types)
         |> map_err(fn e -> [localise_err(e, func_id)] end)
         |> f_map(fn ty -> {func_id, ty} end)
 
@@ -201,9 +208,9 @@ defmodule Maty.Typechecker.Signatures do
   #   * the spec's name or arity is not that of the function
   #   * an argument type does not parse (reported with its position)
   #   * the return type does not parse
-  @spec parse_spec(func_id(), raw_spec(), Type.t()) ::
+  @spec parse_spec(func_id(), raw_spec(), Type.t(), TypeSpecParser.module_types()) ::
           {:ok, function_type()} | {:error, Error.t()}
-  defp parse_spec({module, func_name, arity} = full_id, raw_spec, global_state_type) do
+  defp parse_spec({module, func_name, arity} = full_id, raw_spec, global_state_type, module_types) do
     {:spec, {:"::", meta, [{spec_name, _, args_asts}, ret_ast]}, _pos} = raw_spec
 
     # the errors name the function without its module
@@ -211,8 +218,9 @@ defmodule Maty.Typechecker.Signatures do
     func_id = {func_name, arity}
 
     with {:info, {^func_name, ^arity}} <- {:info, {spec_name, length(args_asts)}},
-         {:args, {:ok, args_ty}} <- {:args, parse_spec_args(args_asts)},
-         {:ret, {:ok, ret_ty}} <- {:ret, parse_return(full_id, ret_ast, global_state_type)} do
+         {:args, {:ok, args_ty}} <- {:args, parse_spec_args(args_asts, module_types)},
+         {:ret, {:ok, ret_ty}} <-
+           {:ret, parse_return(full_id, ret_ast, global_state_type, module_types)} do
       function_ty = {:function, args_ty, ret_ty}
       {:ok, function_ty}
     else
@@ -248,12 +256,18 @@ defmodule Maty.Typechecker.Signatures do
 
   # `on_start` returns the global state: the `on_start` macro writes the marker `maty_global_state()`
   # as its return type. The marker is only recognised there, anywhere else it is an unknown type
-  @spec parse_return(func_id(), Macro.t(), Type.t()) ::
+  @spec parse_return(func_id(), Macro.t(), Type.t(), TypeSpecParser.module_types()) ::
           {:ok, Type.t()} | {:error, Error.Cause.t()}
-  defp parse_return({_module, :on_start, 1}, {:maty_global_state, _, []}, global_state_type),
-    do: {:ok, global_state_type}
+  defp parse_return(
+         {_module, :on_start, 1},
+         {:maty_global_state, _, []},
+         global_state_type,
+         _module_types
+       ),
+       do: {:ok, global_state_type}
 
-  defp parse_return(_func_id, ret_ast, _global_state_type), do: TypeSpecParser.parse(ret_ast)
+  defp parse_return(_func_id, ret_ast, _global_state_type, module_types),
+    do: TypeSpecParser.parse(ret_ast, module_types)
 
   # One error for each plain function that has the name of a handler
   @spec name_clash_errors(module(), [clause()]) :: [located_error()]
@@ -280,13 +294,13 @@ defmodule Maty.Typechecker.Signatures do
   # Returns:
   # `{:ok, types}` in source order
   # `{:error, cause, index}` where `index` is the position of the first bad arg
-  @spec parse_spec_args([Macro.t()]) ::
+  @spec parse_spec_args([Macro.t()], TypeSpecParser.module_types()) ::
           {:ok, [Type.t()]} | {:error, Error.Cause.t(), non_neg_integer()}
-  defp parse_spec_args(asts) do
+  defp parse_spec_args(asts, module_types) do
     asts
     |> Enum.with_index()
     |> Enum.reduce_while([], fn {ast, i}, ts ->
-      case TypeSpecParser.parse(ast) do
+      case TypeSpecParser.parse(ast, module_types) do
         {:ok, t} -> {:cont, [t | ts]}
         {:error, err} -> {:halt, {:error, err, i}}
       end
@@ -297,8 +311,8 @@ defmodule Maty.Typechecker.Signatures do
     end
   end
 
-  @spec init_arg_type(module(), clause()) :: result(Type.t())
-  defp init_arg_type(module, %{name: name, arity: arity, specs: [spec]}) do
+  @spec init_arg_type(module(), TypeSpecParser.module_types(), clause()) :: result(Type.t())
+  defp init_arg_type(module, module_types, %{name: name, arity: arity, specs: [spec]}) do
     {:spec,
      {:"::", meta,
       [
@@ -308,7 +322,7 @@ defmodule Maty.Typechecker.Signatures do
 
     func_id = {name, arity}
 
-    TypeSpecParser.parse(arg_ast)
+    TypeSpecParser.parse(arg_ast, module_types)
     |> map_err(fn cause ->
       # the annotation is the first argument of the generated spec
       error =
@@ -326,11 +340,16 @@ defmodule Maty.Typechecker.Signatures do
   end
 
   # The entry of handler `h` in Σ, from all of its clauses
-  @spec handler_signature(module(), session_types(), Types.handler_label(), [clause()]) ::
-          result({Types.handler_label(), handler_type()})
-  defp handler_signature(module, session_types, h, cs) do
+  @spec handler_signature(
+          module(),
+          session_types(),
+          TypeSpecParser.module_types(),
+          Types.handler_label(),
+          [clause()]
+        ) :: result({Types.handler_label(), handler_type()})
+  defp handler_signature(module, session_types, module_types, h, cs) do
     with {:ok, {role, st}} <- fetch_st(module, session_types, cs),
-         {:ok, ty} <- handler_type(module, role, st, cs) do
+         {:ok, ty} <- handler_type(module, module_types, role, st, cs) do
       {:ok, {h, ty}}
     end
   end
@@ -348,21 +367,27 @@ defmodule Maty.Typechecker.Signatures do
     end
   end
 
-  @spec handler_type(module(), Types.role(), Maty.ST.t(), [clause()]) :: result(handler_type())
+  @spec handler_type(
+          module(),
+          TypeSpecParser.module_types(),
+          Types.role(),
+          Maty.ST.t(),
+          [clause()]
+        ) :: result(handler_type())
   # the type of a message handler only depends on its name
   # a message handler runs when a message arrives, so its session type has to start with a receive
-  defp handler_type(_, role, %ST.SIn{} = st, [%{kind: {:handler, :message}} | _]),
+  defp handler_type(_, _, role, %ST.SIn{} = st, [%{kind: {:handler, :message}} | _]),
     do: {:ok, {:handler, :message, role, st}}
 
-  defp handler_type(module, _role, st, [%{kind: {:handler, :message}} = c | _]) do
+  defp handler_type(module, _module_types, _role, st, [%{kind: {:handler, :message}} = c | _]) do
     error =
       Error.ProtocolViolation.message_handler_not_receive(module, [line: c.line], c.name, st)
 
     {:error, [{{c.name, c.arity}, error}]}
   end
 
-  defp handler_type(module, role, st, clauses) do
-    with {:ok, [ty | _] = tys} <- map_m(clauses, &init_arg_type(module, &1)),
+  defp handler_type(module, module_types, role, st, clauses) do
+    with {:ok, [ty | _] = tys} <- map_m(clauses, &init_arg_type(module, module_types, &1)),
          :ok <- check_same_arg_type(module, clauses, tys) do
       {:ok, {:handler, :init, role, ty, st}}
     end
