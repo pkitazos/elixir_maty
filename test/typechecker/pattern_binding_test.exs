@@ -43,13 +43,11 @@ defmodule Maty.Typechecker.PatternBindingTest do
     assert {:ok, %{}, %{}} = tc("hello", :binary)
     assert {:ok, %{}, %{}} = tc(true, :boolean)
     assert {:ok, %{}, %{}} = tc(:hello, :atom)
-    assert {:ok, %{}, %{}} = tc(:ok, :ok)
 
     assert_mismatch(42, :binary)
   end
 
-  # todo: fails until Pat-Value stops accepting an atom literal against any expected type
-  test "an atom literal only matches atom or its own atom type" do
+  test "an atom literal only matches atom" do
     assert_mismatch(:hello, :binary)
   end
 

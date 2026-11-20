@@ -73,7 +73,7 @@ defmodule Maty.Typechecker.PatternBinding do
                is_atom(literal_pattern) do
     literal_type = literal_type(literal_pattern)
 
-    if literal_type == expected_type or literal_type == :atom do
+    if literal_type == expected_type do
       {:ok, %{}, var_env}
     else
       error =
