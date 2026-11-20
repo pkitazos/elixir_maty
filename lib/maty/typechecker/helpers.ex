@@ -139,8 +139,8 @@ defmodule Maty.Typechecker.Helpers do
   end
 
   # todo: idk where to put this tbh, defo does not belong here
-  def get_localised_state_type(ctx), do: {:map_record, %{ctx.state_types | local: nil}}
+  def get_localised_state_type(ctx), do: {:map_record, %{ctx.declared_state_types | local: nil}}
 
   def get_localised_state_type(ctx, role),
-    do: {:map_record, %{ctx.state_types | local: ctx.state_types.local[role]}}
+    do: {:map_record, %{ctx.declared_state_types | local: ctx.declared_state_types.local[role]}}
 end

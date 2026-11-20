@@ -1,15 +1,23 @@
 defmodule Maty.Typechecker.Ctx do
   alias Maty.Types
 
-  @enforce_keys [:module, :meta, :signatures, :state_types, :state_type]
-  defstruct @enforce_keys
+  # `init/1` sets every field, the defaults let tests build a `Ctx` with only the fields they use
+  @enforce_keys [:module]
+  defstruct [
+    :module,
+    meta: [],
+    signatures: %{},
+    declared_state_types: %{global: nil, local: %{}},
+    handler_state_type: nil
+  ]
 
   @type t :: %__MODULE__{
           module: module(),
           meta: keyword(),
-          state_type: Types.T.t() | nil,
-          # todo: replace with above or idk rename one of the two
-          state_types: Types.state_types(),
+          # the state type of the handler whose body is being checked, `nil` outside a handler
+          handler_state_type: Types.T.t() | nil,
+          # the module's `global_state` / `local_state` declarations
+          declared_state_types: Types.state_types(),
           signatures: %{
             # reuse types from `Maty.Types` instead of redefining them all over the place
             atom() =>
@@ -24,8 +32,8 @@ defmodule Maty.Typechecker.Ctx do
     %__MODULE__{
       module: env.module,
       meta: [line: env.line],
-      state_type: nil,
-      state_types: Module.get_attribute(env.module, :maty_state_types),
+      handler_state_type: nil,
+      declared_state_types: Module.get_attribute(env.module, :maty_state_types),
       signatures: Module.get_attribute(env.module, :maty_signatures)
     }
   end

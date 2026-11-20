@@ -585,7 +585,7 @@ defmodule Maty.Typechecker.TC do
           maty_runtime(:done, meta, [state_ast])
         ) do
     tcm env: env, st: st do
-      chk(ctx, state_ast, ctx.state_type) |> with_frame({:state, :done})
+      chk(ctx, state_ast, ctx.handler_state_type) |> with_frame({:state, :done})
 
       expect_st %ST.SEnd{},
         else: fn st ->
